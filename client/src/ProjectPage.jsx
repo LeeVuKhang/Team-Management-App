@@ -915,8 +915,8 @@ export default function ProjectPage() {
     if (statusFilter !== 'all' && task.status !== statusFilter) return false;
     if (priorityFilter !== 'all' && task.priority !== priorityFilter) return false;
     if (assigneeFilter !== 'all') {
-      if (assigneeFilter === 'unassigned' && task.assignee_id !== null) return false;
-      if (assigneeFilter !== 'unassigned' && task.assignee_id !== parseInt(assigneeFilter)) return false;
+      if (assigneeFilter === 'unassigned' && task.assignees && task.assignees.length > 0) return false;
+      if (assigneeFilter !== 'unassigned' && (!task.assignees || !task.assignees.some(a => a.user_id === parseInt(assigneeFilter)))) return false;
     }
     return true;
   }).sort((a, b) => {
