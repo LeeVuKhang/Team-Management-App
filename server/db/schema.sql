@@ -58,11 +58,10 @@ CREATE TABLE project_members (
 );
 
 -- 6. Bảng TASKS
--- Công việc cụ thể, liên kết với Project và gán cho User (Assignee)
+-- Bỏ cột assignee_id vì một task không còn thuộc về duy nhất 1 người nữa
 CREATE TABLE tasks (
     id SERIAL PRIMARY KEY,
     project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
-    assignee_id INTEGER REFERENCES users(id) ON DELETE SET NULL, 
     title VARCHAR(255) NOT NULL,
     description TEXT,
     status VARCHAR(20) DEFAULT 'todo' CHECK (status IN ('todo', 'in_progress', 'review', 'done')),
@@ -70,6 +69,17 @@ CREATE TABLE tasks (
     due_date TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 6.5. Bảng TASK_ASSIGNEES (Quan hệ Nhiều - Nhiều)
+-- Bảng này đóng vai trò như danh sách "Những người được chọn"
+CREATE TABLE task_assignees (
+    task_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    assigned_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Khóa chính phức hợp: Đảm bảo 1 user chỉ được gán vào 1 task 1 lần (tránh trùng lặp)
+    PRIMARY KEY (task_id, user_id)
 );
 
 -- 7. Bảng CHANNELS (Project-Specific Chat)

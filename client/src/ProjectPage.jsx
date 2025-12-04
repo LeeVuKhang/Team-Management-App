@@ -1,0 +1,1280 @@
+import React, { useState, useEffect } from 'react';
+import { useOutletContext } from 'react-router-dom';
+import * as projectApi from './services/projectApi';
+import { 
+  CheckCircle2,
+  Clock,
+  MoreVertical, 
+  AlertCircle,
+  ArrowLeft,
+  Calendar,
+  Circle,
+  PlayCircle,
+  Eye,
+  Edit3,
+  Trash2,
+  Flag,
+  Paperclip,
+  Plus,
+  FolderKanban,
+  Search,
+  User,
+  MessageSquare
+} from 'lucide-react';
+
+/**
+ * UTILITY FUNCTIONS
+ */
+// Note: React automatically escapes text content to prevent XSS.
+// This function is kept for additional defense-in-depth, removing angle brackets
+// that could be used in HTML injection attempts. For user-generated HTML content,
+// consider using a library like DOMPurify.
+const sanitizeText = (text) => {
+  if (!text) return '';
+  return text.replace(/[<>]/g, '');
+};
+
+const formatDate = (dateString) => {
+  if (!dateString) return 'No deadline';
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch {
+    return 'Invalid date';
+  }
+};
+
+const getDaysUntilDue = (dueDateString) => {
+  if (!dueDateString) return null;
+  const due = new Date(dueDateString);
+  const now = new Date();
+  const diffTime = due - now;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays;
+};
+
+const canEditTasks = (userRole) => {
+  return userRole === 'lead' || userRole === 'editor';
+};
+
+/**
+ * PROJECT-SPECIFIC COMPONENTS
+ */
+const TaskStatusBadge = ({ status }) => {
+  const statusConfig = {
+    todo: { label: 'To Do', icon: Circle, color: 'text-slate-500 bg-slate-500/10' },
+    in_progress: { label: 'In Progress', icon: PlayCircle, color: 'text-blue-500 bg-blue-500/10' },
+    review: { label: 'Review', icon: Eye, color: 'text-purple-500 bg-purple-500/10' },
+    done: { label: 'Done', icon: CheckCircle2, color: 'text-green-500 bg-green-500/10' },
+  };
+
+  const config = statusConfig[status] || statusConfig.todo;
+  const Icon = config.icon;
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${config.color}`}>
+      <Icon size={12} />
+      {config.label}
+    </span>
+  );
+};
+
+const PriorityBadge = ({ priority }) => {
+  const priorityConfig = {
+    low: { label: 'Low', icon: Flag, color: 'text-slate-500 bg-slate-500/10' },
+    medium: { label: 'Medium', icon: Flag, color: 'text-amber-500 bg-amber-500/10' },
+    high: { label: 'High', icon: Flag, color: 'text-orange-500 bg-orange-500/10' },
+    urgent: { label: 'Urgent', icon: Flag, color: 'text-red-500 bg-red-500/10' },
+  };
+
+  const config = priorityConfig[priority] || priorityConfig.medium;
+  const Icon = config.icon;
+
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${config.color}`}>
+      <Icon size={12} />
+      {config.label}
+    </span>
+  );
+};
+
+const TaskCard = ({ task, darkMode, userRole, onEdit, onDelete }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showActions, setShowActions] = useState(false);
+  const daysUntilDue = getDaysUntilDue(task.due_date);
+  const isOverdue = daysUntilDue !== null && daysUntilDue < 0;
+  const isDueSoon = daysUntilDue !== null && daysUntilDue >= 0 && daysUntilDue <= 3;
+
+  const canEdit = canEditTasks(userRole);
+
+  return (
+    <div className={`${darkMode ? 'bg-[rgb(30,36,30)]/50 border-[rgb(45,52,45)]/50 hover:border-[rgb(119,136,115)]/50' : 'bg-white border-[rgb(210,220,182)] shadow-sm hover:border-[rgb(161,188,152)]'} border rounded-xl p-5 transition-all group`}>
+      
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex-1 min-w-0">
+          <h3 className={`font-semibold text-lg mb-2 ${darkMode ? 'text-[rgb(241,243,224)]' : 'text-[rgb(60,68,58)]'}`}>
+            {sanitizeText(task.title)}
+          </h3>
+          <div className="flex flex-wrap items-center gap-2">
+            <TaskStatusBadge status={task.status} />
+            <PriorityBadge priority={task.priority} />
+          </div>
+        </div>
+
+        {canEdit && (
+          <div className="relative">
+            <button
+              onClick={() => setShowActions(!showActions)}
+              className={`p-2 rounded-lg transition-colors ${darkMode ? 'hover:bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'hover:bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)]'}`}
+            >
+              <MoreVertical size={18} />
+            </button>
+
+            {showActions && (
+              <div className={`absolute right-0 mt-2 w-48 rounded-lg shadow-lg border overflow-hidden z-10 ${darkMode ? 'bg-[rgb(30,36,30)] border-[rgb(45,52,45)]' : 'bg-white border-[rgb(210,220,182)]'}`}>
+                <button
+                  onClick={() => { onEdit(task); setShowActions(false); }}
+                  className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${darkMode ? 'hover:bg-[rgb(45,52,45)] text-[rgb(210,220,182)]' : 'hover:bg-[rgb(210,220,182)]/30 text-[rgb(60,68,58)]'}`}
+                >
+                  <Edit3 size={14} />
+                  Edit Task
+                </button>
+                <button
+                  onClick={() => { onDelete(task); setShowActions(false); }}
+                  className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${darkMode ? 'hover:bg-[rgb(45,52,45)] text-red-400' : 'hover:bg-[rgb(210,220,182)]/30 text-red-600'}`}
+                >
+                  <Trash2 size={14} />
+                  Delete Task
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {task.description && (
+        <p className={`${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'} text-sm mb-4 ${isExpanded ? '' : 'line-clamp-2'}`}>
+          {sanitizeText(task.description)}
+        </p>
+      )}
+
+      {task.description && task.description.length > 100 && (
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className={`text-xs font-medium mb-3 ${darkMode ? 'text-[rgb(119,136,115)] hover:text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)] hover:text-[rgb(60,68,58)]'}`}
+        >
+          {isExpanded ? 'Show less' : 'Show more'}
+        </button>
+      )}
+
+      <div className={`space-y-3 pt-3 border-t ${darkMode ? 'border-[rgb(45,52,45)]/50' : 'border-[rgb(210,220,182)]'}`}>
+        
+        <div className="flex items-center justify-between">
+          <span className={`text-xs font-medium ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+            Assigned to:
+          </span>
+          <div className="flex items-center gap-2">
+            {(() => {
+              // Filter out null/invalid assignees and ensure we have valid data
+              const validAssignees = Array.isArray(task.assignees) 
+                ? task.assignees.filter(a => a && a.user_id) 
+                : [];
+              
+              if (validAssignees.length > 0) {
+                return (
+                  <>
+                    <div className="flex -space-x-2">
+                      {validAssignees.slice(0, 3).map((assignee, idx) => (
+                        <div
+                          key={assignee.user_id || idx}
+                          className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-medium border-2 ${
+                            darkMode 
+                              ? 'bg-[rgb(119,136,115)] text-white border-[rgb(30,36,30)]' 
+                              : 'bg-[rgb(210,220,182)] text-[rgb(60,68,58)] border-white'
+                          }`}
+                          title={assignee.username}
+                        >
+                          {assignee.username ? assignee.username.charAt(0).toUpperCase() : '?'}
+                        </div>
+                      ))}
+                      {validAssignees.length > 3 && (
+                        <div
+                          className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-medium border-2 ${
+                            darkMode 
+                              ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] border-[rgb(30,36,30)]' 
+                              : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] border-white'
+                          }`}
+                        >
+                          +{validAssignees.length - 3}
+                        </div>
+                      )}
+                    </div>
+                    <span className={`text-sm font-medium ${darkMode ? 'text-[rgb(210,220,182)]' : 'text-[rgb(60,68,58)]'}`}>
+                      {validAssignees.length} {validAssignees.length === 1 ? 'person' : 'people'}
+                    </span>
+                  </>
+                );
+              } else {
+                return (
+                  <>
+                    <div className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                      darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)]'
+                    }`}>
+                      ?
+                    </div>
+                    <span className={`text-sm font-medium ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+                      Unassigned
+                    </span>
+                  </>
+                );
+              }
+            })()}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <span className={`text-xs font-medium ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+            Due date:
+          </span>
+          <div className="flex items-center gap-1.5">
+            <Clock size={14} className={isOverdue ? 'text-red-500' : isDueSoon ? 'text-amber-500' : (darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]')} />
+            <span className={`text-sm font-medium ${isOverdue ? 'text-red-500' : isDueSoon ? 'text-amber-500' : (darkMode ? 'text-[rgb(210,220,182)]' : 'text-[rgb(60,68,58)]')}`}>
+              {formatDate(task.due_date)}
+              {isOverdue && ' (Overdue)'}
+              {isDueSoon && !isOverdue && ` (${daysUntilDue}d left)`}
+            </span>
+          </div>
+        </div>
+
+        <div className={`flex items-center gap-4 pt-2 border-t ${darkMode ? 'border-[rgb(45,52,45)]/50' : 'border-[rgb(210,220,182)]'}`}>
+          <div className={`flex items-center gap-1.5 text-xs ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+            <MessageSquare size={14} />
+            <span>{task.comments_count}</span>
+          </div>
+          <div className={`flex items-center gap-1.5 text-xs ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+            <Paperclip size={14} />
+            <span>{task.attachments_count}</span>
+          </div>
+          <div className={`flex items-center gap-1 text-xs ml-auto ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+            Updated {formatDate(task.updated_at)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const FilterButton = ({ active, children, onClick, darkMode }) => (
+  <button
+    onClick={onClick}
+    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+      active
+        ? 'bg-[rgb(119,136,115)] text-white shadow-md'
+        : darkMode
+        ? 'bg-[rgb(30,36,30)]/50 text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)] hover:text-[rgb(210,220,182)]'
+        : 'bg-white text-[rgb(119,136,115)] border border-[rgb(210,220,182)] hover:bg-[rgb(210,220,182)]/30 hover:text-[rgb(60,68,58)]'
+    }`}
+  >
+    {children}
+  </button>
+);
+
+/**
+ * MODAL COMPONENTS
+ */
+const Modal = ({ isOpen, onClose, title, children, darkMode }) => {
+  if (!isOpen) return null;
+
+  // Prevent body scroll when modal is open
+  React.useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    const originalPaddingRight = document.body.style.paddingRight;
+    
+    // Prevent scroll
+    document.body.style.overflow = 'hidden';
+    
+    // Prevent scrollbar shift by adding padding
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+    
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.paddingRight = originalPaddingRight;
+    };
+  }, []);
+
+  return (
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-hidden" 
+      onClick={onClose}
+      onWheel={(e) => e.preventDefault()}
+      onTouchMove={(e) => e.preventDefault()}
+    >
+      <div 
+        className={`w-full max-w-2xl rounded-xl shadow-2xl max-h-[90vh] overflow-y-auto ${
+          darkMode ? 'bg-[rgb(30,36,30)] border border-[rgb(45,52,45)]' : 'bg-white border border-[rgb(210,220,182)]'
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className={`flex items-center justify-between p-6 border-b ${
+          darkMode ? 'border-[rgb(45,52,45)]' : 'border-[rgb(210,220,182)]'
+        }`}>
+          <h2 className={`text-2xl font-bold ${
+            darkMode ? 'text-white' : 'text-[rgb(60,68,58)]'
+          }`}>{title}</h2>
+          <button
+            onClick={onClose}
+            className={`p-2 rounded-lg transition-colors ${
+              darkMode ? 'hover:bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'hover:bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)]'
+            }`}
+          >
+            ✕
+          </button>
+        </div>
+        <div className="p-6">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CreateTaskModal = ({ isOpen, onClose, onSubmit, projectMembers, darkMode }) => {
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    status: 'todo',
+    priority: 'medium',
+    assignee_ids: [],
+    due_date: ''
+  });
+  const [localError, setLocalError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Clear error when modal opens/closes
+  React.useEffect(() => {
+    if (!isOpen) {
+      setLocalError(null);
+      setIsSubmitting(false);
+    }
+  }, [isOpen]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLocalError(null);
+    setIsSubmitting(true);
+    
+    try {
+      await onSubmit(formData);
+      // Only reset form and close if submission succeeds
+      setFormData({ title: '', description: '', status: 'todo', priority: 'medium', assignee_ids: [], due_date: '' });
+      onClose();
+    } catch (err) {
+      // Display error within modal, keep form data
+      setLocalError(err.message || 'Failed to create task');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${
+    darkMode ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-[rgb(210,220,182)]' : 'bg-[rgb(210,220,182)]/30 border border-[rgb(161,188,152)] text-[rgb(60,68,58)]'
+  }`;
+
+  const labelClass = `block text-sm font-bold mb-2 ${
+    darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'
+  }`;
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Create New Task" darkMode={darkMode}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {localError && (
+          <div className={`p-4 rounded-lg border-2 ${
+            darkMode ? 'bg-red-500/10 border-red-500/30' : 'bg-red-50 border-red-200'
+          }`}>
+            <div className="flex items-start gap-3">
+              <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+              <div className="flex-1">
+                <h4 className={`font-bold text-sm mb-1 ${
+                  darkMode ? 'text-red-400' : 'text-red-600'
+                }`}>Error Creating Task</h4>
+                <p className={`text-sm ${
+                  darkMode ? 'text-red-300' : 'text-red-500'
+                }`}>{localError}</p>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        <div>
+          <label className={labelClass}>Title *</label>
+          <input
+            type="text"
+            required
+            maxLength={255}
+            value={formData.title}
+            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            className={inputClass}
+            placeholder="Enter task title"
+          />
+        </div>
+
+        <div>
+          <label className={labelClass}>Description</label>
+          <textarea
+            rows={4}
+            maxLength={5000}
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            className={inputClass}
+            placeholder="Enter task description"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>Status</label>
+            <select
+              value={formData.status}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+              className={inputClass}
+            >
+              <option value="todo">To Do</option>
+              <option value="in_progress">In Progress</option>
+              <option value="review">Review</option>
+              <option value="done">Done</option>
+            </select>
+          </div>
+
+          <div>
+            <label className={labelClass}>Priority</label>
+            <select
+              value={formData.priority}
+              onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+              className={inputClass}
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>Assignees</label>
+            <div className={`rounded-lg px-4 py-2 text-sm max-h-32 overflow-y-auto ${inputClass}`}>
+              {projectMembers.map(member => (
+                <label key={member.user_id} className="flex items-center gap-2 py-1 cursor-pointer hover:opacity-80">
+                  <input
+                    type="checkbox"
+                    checked={formData.assignee_ids.includes(member.user_id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setFormData({ ...formData, assignee_ids: [...formData.assignee_ids, member.user_id] });
+                      } else {
+                        setFormData({ ...formData, assignee_ids: formData.assignee_ids.filter(id => id !== member.user_id) });
+                      }
+                    }}
+                    className="rounded border-2 border-[rgb(119,136,115)]"
+                  />
+                  <span>{member.username}</span>
+                </label>
+              ))}
+              {projectMembers.length === 0 && (
+                <span className="text-xs opacity-60">No members available</span>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className={labelClass}>Due Date</label>
+            <input
+              type="date"
+              value={formData.due_date}
+              onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+              className={inputClass}
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3 pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+              darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)]/70' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]'
+            }`}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="flex-1 px-6 py-3 bg-[rgb(119,136,115)] hover:bg-[rgb(161,188,152)] text-white rounded-lg font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? 'Creating...' : 'Create Task'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+const EditTaskModal = ({ isOpen, onClose, onSubmit, task, projectMembers, darkMode }) => {
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    status: 'todo',
+    priority: 'medium',
+    assignee_ids: [],
+    due_date: ''
+  });
+  const [localError, setLocalError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Update form when task changes
+  React.useEffect(() => {
+    if (task) {
+      // Extract assignee IDs from assignees array
+      const assigneeIds = Array.isArray(task.assignees) 
+        ? task.assignees.filter(a => a.user_id).map(a => a.user_id)
+        : [];
+      
+      setFormData({
+        title: task.title || '',
+        description: task.description || '',
+        status: task.status || 'todo',
+        priority: task.priority || 'medium',
+        assignee_ids: assigneeIds,
+        due_date: task.due_date ? task.due_date.split('T')[0] : ''
+      });
+    }
+  }, [task]);
+
+  // Clear error when modal opens/closes
+  React.useEffect(() => {
+    if (!isOpen) {
+      setLocalError(null);
+      setIsSubmitting(false);
+    }
+  }, [isOpen]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLocalError(null);
+    setIsSubmitting(true);
+    
+    try {
+      await onSubmit(formData);
+      // Only close if submission succeeds
+      onClose();
+    } catch (err) {
+      // Display error within modal, keep form data
+      setLocalError(err.message || 'Failed to update task');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${
+    darkMode ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-[rgb(210,220,182)]' : 'bg-[rgb(210,220,182)]/30 border border-[rgb(161,188,152)] text-[rgb(60,68,58)]'
+  }`;
+
+  const labelClass = `block text-sm font-bold mb-2 ${
+    darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'
+  }`;
+
+  if (!task) return null;
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Edit Task" darkMode={darkMode}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {localError && (
+          <div className={`p-4 rounded-lg border-2 ${
+            darkMode ? 'bg-red-500/10 border-red-500/30' : 'bg-red-50 border-red-200'
+          }`}>
+            <div className="flex items-start gap-3">
+              <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+              <div className="flex-1">
+                <h4 className={`font-bold text-sm mb-1 ${
+                  darkMode ? 'text-red-400' : 'text-red-600'
+                }`}>Error Updating Task</h4>
+                <p className={`text-sm ${
+                  darkMode ? 'text-red-300' : 'text-red-500'
+                }`}>{localError}</p>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        <div>
+          <label className={labelClass}>Title *</label>
+          <input
+            type="text"
+            required
+            maxLength={255}
+            value={formData.title}
+            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            className={inputClass}
+          />
+        </div>
+
+        <div>
+          <label className={labelClass}>Description</label>
+          <textarea
+            rows={4}
+            maxLength={5000}
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            className={inputClass}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>Status</label>
+            <select
+              value={formData.status}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+              className={inputClass}
+            >
+              <option value="todo">To Do</option>
+              <option value="in_progress">In Progress</option>
+              <option value="review">Review</option>
+              <option value="done">Done</option>
+            </select>
+          </div>
+
+          <div>
+            <label className={labelClass}>Priority</label>
+            <select
+              value={formData.priority}
+              onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+              className={inputClass}
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>Assignees</label>
+            <div className={`rounded-lg px-4 py-2 text-sm max-h-32 overflow-y-auto ${inputClass}`}>
+              {projectMembers.map(member => (
+                <label key={member.user_id} className="flex items-center gap-2 py-1 cursor-pointer hover:opacity-80">
+                  <input
+                    type="checkbox"
+                    checked={formData.assignee_ids.includes(member.user_id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setFormData({ ...formData, assignee_ids: [...formData.assignee_ids, member.user_id] });
+                      } else {
+                        setFormData({ ...formData, assignee_ids: formData.assignee_ids.filter(id => id !== member.user_id) });
+                      }
+                    }}
+                    className="rounded border-2 border-[rgb(119,136,115)]"
+                  />
+                  <span>{member.username}</span>
+                </label>
+              ))}
+              {projectMembers.length === 0 && (
+                <span className="text-xs opacity-60">No members available</span>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className={labelClass}>Due Date</label>
+            <input
+              type="date"
+              value={formData.due_date}
+              onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+              className={inputClass}
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3 pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+              darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)]/70' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]'
+            }`}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="flex-1 px-6 py-3 bg-[rgb(119,136,115)] hover:bg-[rgb(161,188,152)] text-white rounded-lg font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+const DeleteTaskModal = ({ isOpen, onClose, onConfirm, task, darkMode }) => {
+  const [localError, setLocalError] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Clear error when modal opens/closes
+  React.useEffect(() => {
+    if (!isOpen) {
+      setLocalError(null);
+      setIsDeleting(false);
+    }
+  }, [isOpen]);
+
+  const handleDelete = async () => {
+    setLocalError(null);
+    setIsDeleting(true);
+    
+    try {
+      await onConfirm();
+      // Only close if deletion succeeds
+      onClose();
+    } catch (err) {
+      // Display error within modal
+      setLocalError(err.message || 'Failed to delete task');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  if (!task) return null;
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Delete Task" darkMode={darkMode}>
+      <div className="space-y-4">
+        {localError && (
+          <div className={`p-4 rounded-lg border-2 ${
+            darkMode ? 'bg-red-500/10 border-red-500/30' : 'bg-red-50 border-red-200'
+          }`}>
+            <div className="flex items-start gap-3">
+              <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+              <div className="flex-1">
+                <h4 className={`font-bold text-sm mb-1 ${
+                  darkMode ? 'text-red-400' : 'text-red-600'
+                }`}>Error Deleting Task</h4>
+                <p className={`text-sm ${
+                  darkMode ? 'text-red-300' : 'text-red-500'
+                }`}>{localError}</p>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        <div className={`p-4 rounded-lg border-2 ${
+          darkMode ? 'bg-red-500/10 border-red-500/30' : 'bg-red-50 border-red-200'
+        }`}>
+          <div className="flex items-start gap-3">
+            <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+            <div>
+              <h3 className={`font-bold mb-1 ${
+                darkMode ? 'text-red-400' : 'text-red-600'
+              }`}>Are you sure you want to delete this task?</h3>
+              <p className={`text-sm ${
+                darkMode ? 'text-red-300' : 'text-red-500'
+              }`}>This action cannot be undone.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className={`p-4 rounded-lg ${
+          darkMode ? 'bg-[rgb(24,28,24)]' : 'bg-[rgb(210,220,182)]/20'
+        }`}>
+          <p className={`text-sm font-medium mb-2 ${
+            darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'
+          }`}>Task Details:</p>
+          <h4 className={`font-bold text-lg ${
+            darkMode ? 'text-white' : 'text-[rgb(60,68,58)]'
+          }`}>{sanitizeText(task.title)}</h4>
+          {task.description && (
+            <p className={`text-sm mt-2 ${
+              darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'
+            }`}>{sanitizeText(task.description).substring(0, 100)}...</p>
+          )}
+        </div>
+
+        <div className="flex gap-3 pt-4">
+          <button
+            onClick={onClose}
+            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+              darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)]/70' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]'
+            }`}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="flex-1 px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isDeleting ? 'Deleting...' : 'Delete Task'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+/**
+ * MAIN PROJECT PAGE COMPONENT
+ */
+export default function ProjectPage() {
+  const { isDarkMode } = useOutletContext();
+  const [tasks, setTasks] = useState([]);
+  const [projectData, setProjectData] = useState(null);
+  const [projectMembers, setProjectMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [assigneeFilter, setAssigneeFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('due_date');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedTask, setSelectedTask] = useState(null);
+
+  const projectId = 1; // Hardcoded for testing with project ID 1
+  const userRole = projectData?.user_role || 'viewer'; // Get role from API response
+
+  // Fetch project data on component mount
+  useEffect(() => {
+    async function fetchProjectData() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Fetch all data in parallel
+        const [projectRes, tasksRes, membersRes] = await Promise.all([
+          projectApi.getProject(projectId),
+          projectApi.getProjectTasks(projectId),
+          projectApi.getProjectMembers(projectId),
+        ]);
+
+        if (projectRes.success) {
+          setProjectData(projectRes.data);
+        }
+
+        if (tasksRes.success) {
+          setTasks(tasksRes.data);
+        }
+
+        if (membersRes.success) {
+          setProjectMembers(membersRes.data);
+        }
+
+        setLoading(false);
+      } catch (err) {
+        console.error('Failed to fetch project data:', err);
+        setError(err.message || 'Failed to load project data');
+        setLoading(false);
+      }
+    }
+
+    fetchProjectData();
+  }, [projectId]);
+
+  // Helper function to refetch tasks after mutations
+  const refetchTasks = async () => {
+    try {
+      const tasksRes = await projectApi.getProjectTasks(projectId);
+      if (tasksRes.success) {
+        setTasks(tasksRes.data);
+      }
+    } catch (err) {
+      console.error('Failed to refetch tasks:', err);
+    }
+  };
+
+  // Theme classes (only page-specific)
+  const cardBg = isDarkMode ? 'bg-[rgb(30,36,30)]/50 border-[rgb(45,52,45)]/50' : 'bg-white border-[rgb(210,220,182)] shadow-sm';
+  const inputBg = isDarkMode ? 'bg-[rgb(30,36,30)] border-[rgb(45,52,45)] text-[rgb(210,220,182)] placeholder:text-[rgb(119,136,115)]' : 'bg-[rgb(210,220,182)]/30 border-[rgb(161,188,152)] text-[rgb(60,68,58)] placeholder:text-[rgb(119,136,115)]';
+
+  // Filter and sort tasks
+  const filteredTasks = tasks.filter(task => {
+    if (searchQuery && !sanitizeText(task.title.toLowerCase()).includes(sanitizeText(searchQuery.toLowerCase())) && 
+        !sanitizeText(task.description?.toLowerCase() || '').includes(sanitizeText(searchQuery.toLowerCase()))) {
+      return false;
+    }
+    if (statusFilter !== 'all' && task.status !== statusFilter) return false;
+    if (priorityFilter !== 'all' && task.priority !== priorityFilter) return false;
+    if (assigneeFilter !== 'all') {
+      if (assigneeFilter === 'unassigned' && task.assignees && task.assignees.length > 0) return false;
+      if (assigneeFilter !== 'unassigned' && (!task.assignees || !task.assignees.some(a => a.user_id === parseInt(assigneeFilter)))) return false;
+    }
+    return true;
+  }).sort((a, b) => {
+    switch (sortBy) {
+      case 'due_date':
+        return new Date(a.due_date || '9999-12-31') - new Date(b.due_date || '9999-12-31');
+      case 'priority':
+        const priorityOrder = { urgent: 0, high: 1, medium: 2, low: 3 };
+        return priorityOrder[a.priority] - priorityOrder[b.priority];
+      case 'status':
+        const statusOrder = { todo: 0, in_progress: 1, review: 2, done: 3 };
+        return statusOrder[a.status] - statusOrder[b.status];
+      case 'created_at':
+        return new Date(b.created_at) - new Date(a.created_at);
+      default:
+        return 0;
+    }
+  });
+
+  const stats = {
+    total: tasks.length,
+    todo: tasks.filter(t => t.status === 'todo').length,
+    in_progress: tasks.filter(t => t.status === 'in_progress').length,
+    review: tasks.filter(t => t.status === 'review').length,
+    done: tasks.filter(t => t.status === 'done').length,
+    overdue: tasks.filter(t => getDaysUntilDue(t.due_date) !== null && getDaysUntilDue(t.due_date) < 0 && t.status !== 'done').length,
+  };
+
+  const handleEditTask = (task) => {
+    setSelectedTask(task);
+    setShowEditModal(true);
+  };
+
+  const handleEditSubmit = async (formData) => {
+    const updates = { ...formData };
+    if (updates.due_date) updates.due_date = new Date(updates.due_date).toISOString();
+    
+    const response = await projectApi.updateTask(projectId, selectedTask.id, updates);
+    
+    if (response.success) {
+      // Refetch tasks to get updated assignees array
+      await refetchTasks();
+      setSelectedTask(null);
+      console.log('✅ Task updated:', response.message);
+    } else {
+      throw new Error(response.message || 'Failed to update task');
+    }
+  };
+
+  const handleDeleteTask = (task) => {
+    setSelectedTask(task);
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    const response = await projectApi.deleteTask(projectId, selectedTask.id);
+    
+    if (response.success) {
+      setTasks(tasks.filter(t => t.id !== selectedTask.id));
+      setSelectedTask(null);
+      console.log('✅ Task deleted:', response.message);
+    } else {
+      throw new Error(response.message || 'Failed to delete task');
+    }
+  };
+
+  const handleCreateTask = () => {
+    setShowCreateModal(true);
+  };
+
+  const handleCreateSubmit = async (formData) => {
+    const taskData = { ...formData };
+    // assignee_ids is already an array of integers from the checkbox handler
+    if (taskData.due_date) taskData.due_date = new Date(taskData.due_date).toISOString();
+    
+    const response = await projectApi.createTask(projectId, taskData);
+    
+    if (response.success) {
+      // Refetch tasks to get new task with populated assignees array
+      await refetchTasks();
+      console.log('✅ Task created:', response.message);
+    } else {
+      throw new Error(response.message || 'Failed to create task');
+    }
+  };
+
+  return (
+    <>
+      <div className="p-6 md:p-8">
+        <div className="max-w-7xl mx-auto">
+          
+          {/* Back Button */}
+          <button className={`flex items-center gap-2 mb-6 ${isDarkMode ? 'text-[rgb(161,188,152)] hover:text-[rgb(210,220,182)]' : 'text-[rgb(119,136,115)] hover:text-[rgb(60,68,58)]'} transition-colors`}>
+            <ArrowLeft size={20} />
+            <span className="font-medium">Back to Projects</span>
+          </button>
+
+          {/* Loading State */}
+          {loading && (
+            <div className={`${cardBg} border rounded-xl p-12 text-center`}>
+              <div className="animate-spin w-12 h-12 border-4 border-[rgb(119,136,115)] border-t-transparent rounded-full mx-auto mb-4"></div>
+              <p className={`text-lg ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>Loading project data...</p>
+            </div>
+          )}
+
+          {/* Error State */}
+          {error && !loading && (
+            <div className={`border border-red-500 bg-red-500/10 rounded-xl p-6 text-center`}>
+              <AlertCircle size={48} className="text-red-500 mx-auto mb-4" />
+              <h3 className="text-lg font-bold text-red-500 mb-2">Failed to Load Project</h3>
+              <p className="text-red-400">{error}</p>
+              <button 
+                onClick={() => window.location.reload()}
+                className="mt-4 bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {/* Project Content (Only show when loaded successfully) */}
+          {!loading && !error && projectData && (
+            <>
+              {/* Project Header */}
+              <div className={`${cardBg} border rounded-xl p-6 mb-8`}>
+                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
+                  <div className="flex-1">
+                    <h1 className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
+                      {sanitizeText(projectData.name)}
+                    </h1>
+                    <p className={`${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'} mb-4`}>
+                      {sanitizeText(projectData.description)}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider ${projectData.status === 'active' ? 'text-green-500 bg-green-500/10' : projectData.status === 'completed' ? 'text-blue-500 bg-blue-500/10' : 'text-slate-500 bg-slate-500/10'}`}>
+                        <CheckCircle2 size={12} />
+                        {projectData.status}
+                      </span>
+                      <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full ${isDarkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'bg-[rgb(210,220,182)] text-[rgb(119,136,115)]'}`}>
+                        <Calendar size={12} />
+                        {formatDate(projectData.start_date)} - {formatDate(projectData.end_date)}
+                      </span>
+                      <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full ${
+                        userRole === 'lead' ? 'bg-purple-500/10 text-purple-500' :
+                        userRole === 'editor' ? 'bg-blue-500/10 text-blue-500' :
+                        'bg-slate-500/10 text-slate-500'
+                      }`}>
+                        <User size={12} />
+                        Your Role: {userRole}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-end gap-3">
+                    <div className="flex -space-x-2">
+                      {projectMembers.map((member) => (
+                        <div key={member.id} className="relative group">
+                          <div className={`h-10 w-10 rounded-full border-2 flex items-center justify-center text-sm font-medium transition-all cursor-pointer group-hover:scale-110 group-hover:z-10 ${isDarkMode ? 'border-[rgb(30,36,30)] bg-[rgb(119,136,115)] text-white' : 'border-white bg-[rgb(210,220,182)] text-[rgb(60,68,58)]'}`}>
+                            {member.username.charAt(0).toUpperCase()}
+                          </div>
+                          <div className={`absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none ${isDarkMode ? 'bg-[rgb(45,52,45)] text-white' : 'bg-[rgb(60,68,58)] text-white'}`}>
+                            {member.username} ({member.role})
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <span className={`text-xs ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+                      {projectMembers.length} team members
+                    </span>
+                  </div>
+                </div>
+
+                <div className={`pt-4 border-t ${isDarkMode ? 'border-[rgb(45,52,45)]/50' : 'border-[rgb(210,220,182)]'}`}>
+                  <span className={`inline-flex items-center gap-2 text-xs font-medium ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+                    <User size={14} />
+                    Your role: <span className={`font-bold uppercase ${isDarkMode ? 'text-[rgb(210,220,182)]' : 'text-[rgb(60,68,58)]'}`}>{userRole}</span>
+                    {canEditTasks(userRole) && <span className="text-green-500">(Can edit tasks)</span>}
+                  </span>
+                </div>
+              </div>
+
+              {/* Statistics */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                {[
+                  { label: 'Total', value: stats.total, icon: FolderKanban, color: 'bg-blue-500/10 text-blue-500' },
+                  { label: 'To Do', value: stats.todo, icon: Circle, color: 'bg-slate-500/10 text-slate-500' },
+                  { label: 'In Progress', value: stats.in_progress, icon: PlayCircle, color: 'bg-blue-500/10 text-blue-500' },
+                  { label: 'Review', value: stats.review, icon: Eye, color: 'bg-purple-500/10 text-purple-500' },
+                  { label: 'Done', value: stats.done, icon: CheckCircle2, color: 'bg-green-500/10 text-green-500' },
+                  { label: 'Overdue', value: stats.overdue, icon: AlertCircle, color: 'bg-red-500/10 text-red-500' },
+                ].map((stat, i) => (
+                  <div key={i} className={`${cardBg} border p-4 rounded-xl transition-all hover:scale-105 cursor-pointer`}>
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-3 ${stat.color}`}>
+                      <stat.icon size={16} />
+                    </div>
+                    <h3 className={`text-2xl font-bold mb-1 ${isDarkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>{stat.value}</h3>
+                    <p className={`text-xs font-medium ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>{stat.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Filters */}
+              <div className={`${cardBg} border rounded-xl p-6 mb-6`}>
+                <div className="flex flex-col md:flex-row gap-4 mb-6">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[rgb(119,136,115)]" size={18} />
+                    <input
+                      type="text"
+                      placeholder="Search tasks..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className={`w-full rounded-lg py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${inputBg}`}
+                    />
+                  </div>
+
+                  {canEditTasks(userRole) && (
+                    <button
+                      onClick={handleCreateTask}
+                      className="flex items-center justify-center gap-2 bg-[rgb(119,136,115)] hover:bg-[rgb(161,188,152)] text-white px-6 py-2.5 rounded-lg font-semibold shadow-lg shadow-[rgb(119,136,115)]/20 transition-all active:scale-95 whitespace-nowrap"
+                    >
+                      <Plus size={18} />
+                      Create Task
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+                      Status
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <FilterButton active={statusFilter === 'all'} onClick={() => setStatusFilter('all')} darkMode={isDarkMode}>All</FilterButton>
+                      <FilterButton active={statusFilter === 'todo'} onClick={() => setStatusFilter('todo')} darkMode={isDarkMode}>To Do</FilterButton>
+                      <FilterButton active={statusFilter === 'in_progress'} onClick={() => setStatusFilter('in_progress')} darkMode={isDarkMode}>In Progress</FilterButton>
+                      <FilterButton active={statusFilter === 'review'} onClick={() => setStatusFilter('review')} darkMode={isDarkMode}>Review</FilterButton>
+                      <FilterButton active={statusFilter === 'done'} onClick={() => setStatusFilter('done')} darkMode={isDarkMode}>Done</FilterButton>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+                      Priority
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      <FilterButton active={priorityFilter === 'all'} onClick={() => setPriorityFilter('all')} darkMode={isDarkMode}>All</FilterButton>
+                      <FilterButton active={priorityFilter === 'urgent'} onClick={() => setPriorityFilter('urgent')} darkMode={isDarkMode}>Urgent</FilterButton>
+                      <FilterButton active={priorityFilter === 'high'} onClick={() => setPriorityFilter('high')} darkMode={isDarkMode}>High</FilterButton>
+                      <FilterButton active={priorityFilter === 'medium'} onClick={() => setPriorityFilter('medium')} darkMode={isDarkMode}>Medium</FilterButton>
+                      <FilterButton active={priorityFilter === 'low'} onClick={() => setPriorityFilter('low')} darkMode={isDarkMode}>Low</FilterButton>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex-1">
+                      <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>Sort By</label>
+                      <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={`w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${inputBg}`}>
+                        <option value="due_date">Due Date</option>
+                        <option value="priority">Priority</option>
+                        <option value="status">Status</option>
+                        <option value="created_at">Recently Created</option>
+                      </select>
+                    </div>
+
+                    <div className="flex-1">
+                      <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>Assignee</label>
+                      <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)} className={`w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${inputBg}`}>
+                        <option value="all">All Members</option>
+                        {projectMembers.map(member => (
+                          <option key={member.user_id} value={member.user_id}>{member.username}</option>
+                        ))}
+                        <option value="unassigned">Unassigned</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tasks List */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
+                    Tasks ({filteredTasks.length})
+                  </h2>
+                  {filteredTasks.length !== tasks.length && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery('');
+                        setStatusFilter('all');
+                        setPriorityFilter('all');
+                        setAssigneeFilter('all');
+                      }}
+                      className={`text-sm font-medium ${isDarkMode ? 'text-[rgb(119,136,115)] hover:text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)] hover:text-[rgb(60,68,58)]'}`}
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+                </div>
+
+                {filteredTasks.length === 0 ? (
+                  <div className={`${cardBg} border rounded-xl p-12 text-center`}>
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${isDarkMode ? 'bg-[rgb(45,52,45)]' : 'bg-[rgb(210,220,182)]'}`}>
+                      <Search size={32} className={isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'} />
+                    </div>
+                    <h3 className={`text-lg font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>No tasks found</h3>
+                    <p className={`${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>Try adjusting your filters or search query</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {filteredTasks.map(task => (
+                      <TaskCard
+                        key={task.id}
+                        task={task}
+                        darkMode={isDarkMode}
+                        userRole={userRole}
+                        onEdit={handleEditTask}
+                        onDelete={handleDeleteTask}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Modals */}
+      <CreateTaskModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSubmit={handleCreateSubmit}
+        projectMembers={projectMembers}
+        darkMode={isDarkMode}
+      />
+
+      <EditTaskModal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedTask(null);
+        }}
+        onSubmit={handleEditSubmit}
+        task={selectedTask}
+        projectMembers={projectMembers}
+        darkMode={isDarkMode}
+      />
+
+      <DeleteTaskModal
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setSelectedTask(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        task={selectedTask}
+        darkMode={isDarkMode}
+      />
+    </>
+  );
+}
