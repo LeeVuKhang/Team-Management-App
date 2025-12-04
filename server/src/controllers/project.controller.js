@@ -121,7 +121,7 @@ export const getProjectStats = async (req, res, next) => {
 /**
  * Create a new task in a project
  * @route POST /api/v1/projects/:projectId/tasks
- * @body {title, description?, status?, priority?, assignee_id?, due_date?}
+ * @body {title, description?, status?, priority?, assignee_ids?, due_date?}
  */
 export const createTask = async (req, res, next) => {
   try {
@@ -152,10 +152,10 @@ export const createTask = async (req, res, next) => {
       });
     }
 
-    if (error.message.includes('Assignee must be a project member')) {
+    if (error.message.includes('All assignees must be project members')) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid assignee: User must be a project member',
+        message: 'Invalid assignees: All users must be project members',
       });
     }
 
@@ -166,7 +166,7 @@ export const createTask = async (req, res, next) => {
 /**
  * Update an existing task
  * @route PUT /api/v1/projects/:projectId/tasks/:taskId
- * @body {title?, description?, status?, priority?, assignee_id?, due_date?}
+ * @body {title?, description?, status?, priority?, assignee_ids?, due_date?}
  */
 export const updateTask = async (req, res, next) => {
   try {
@@ -210,10 +210,10 @@ export const updateTask = async (req, res, next) => {
       });
     }
 
-    if (error.message.includes('Assignee must be a project member')) {
+    if (error.message.includes('All assignees must be project members')) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid assignee: User must be a project member',
+        message: 'Invalid assignees: All users must be project members',
       });
     }
 

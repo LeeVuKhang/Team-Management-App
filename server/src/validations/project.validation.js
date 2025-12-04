@@ -29,11 +29,13 @@ export const createTaskSchema = z.object({
   
   priority: taskPriorityEnum.default('medium'),
   
-  assignee_id: z.number()
-    .int('Assignee ID must be an integer')
-    .positive('Assignee ID must be positive')
-    .optional()
-    .nullable(),
+  assignee_ids: z.array(
+    z.number()
+      .int('Assignee ID must be an integer')
+      .positive('Assignee ID must be positive')
+  )
+    .default([])
+    .optional(),
   
   due_date: z.string()
     .datetime('Invalid datetime format')
@@ -61,11 +63,12 @@ export const updateTaskSchema = z.object({
   
   priority: taskPriorityEnum.optional(),
   
-  assignee_id: z.number()
-    .int('Assignee ID must be an integer')
-    .positive('Assignee ID must be positive')
-    .optional()
-    .nullable(),
+  assignee_ids: z.array(
+    z.number()
+      .int('Assignee ID must be an integer')
+      .positive('Assignee ID must be positive')
+  )
+    .optional(),
   
   due_date: z.string()
     .datetime('Invalid datetime format')

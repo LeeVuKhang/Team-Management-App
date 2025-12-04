@@ -174,12 +174,61 @@ const TaskCard = ({ task, darkMode, userRole, onEdit, onDelete }) => {
             Assigned to:
           </span>
           <div className="flex items-center gap-2">
-            <div className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-medium ${task.assignee_id ? (darkMode ? 'bg-[rgb(119,136,115)] text-white' : 'bg-[rgb(210,220,182)] text-[rgb(60,68,58)]') : (darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)]')}`}>
-              {task.assignee_name ? task.assignee_name.charAt(0).toUpperCase() : '?'}
-            </div>
-            <span className={`text-sm font-medium ${darkMode ? 'text-[rgb(210,220,182)]' : 'text-[rgb(60,68,58)]'}`}>
-              {sanitizeText(task.assignee_name)}
-            </span>
+            {(() => {
+              // Filter out null/invalid assignees and ensure we have valid data
+              const validAssignees = Array.isArray(task.assignees) 
+                ? task.assignees.filter(a => a && a.user_id) 
+                : [];
+              
+              if (validAssignees.length > 0) {
+                return (
+                  <>
+                    <div className="flex -space-x-2">
+                      {validAssignees.slice(0, 3).map((assignee, idx) => (
+                        <div
+                          key={assignee.user_id || idx}
+                          className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-medium border-2 ${
+                            darkMode 
+                              ? 'bg-[rgb(119,136,115)] text-white border-[rgb(30,36,30)]' 
+                              : 'bg-[rgb(210,220,182)] text-[rgb(60,68,58)] border-white'
+                          }`}
+                          title={assignee.username}
+                        >
+                          {assignee.username ? assignee.username.charAt(0).toUpperCase() : '?'}
+                        </div>
+                      ))}
+                      {validAssignees.length > 3 && (
+                        <div
+                          className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-medium border-2 ${
+                            darkMode 
+                              ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] border-[rgb(30,36,30)]' 
+                              : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] border-white'
+                          }`}
+                        >
+                          +{validAssignees.length - 3}
+                        </div>
+                      )}
+                    </div>
+                    <span className={`text-sm font-medium ${darkMode ? 'text-[rgb(210,220,182)]' : 'text-[rgb(60,68,58)]'}`}>
+                      {validAssignees.length} {validAssignees.length === 1 ? 'person' : 'people'}
+                    </span>
+                  </>
+                );
+              } else {
+                return (
+                  <>
+                    <div className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                      darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)]'
+                    }`}>
+                      ?
+                    </div>
+                    <span className={`text-sm font-medium ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+                      Unassigned
+                    </span>
+                  </>
+                );
+              }
+            })()}
           </div>
         </div>
 
@@ -298,7 +347,7 @@ const CreateTaskModal = ({ isOpen, onClose, onSubmit, projectMembers, darkMode }
     description: '',
     status: 'todo',
     priority: 'medium',
-    assignee_id: '',
+    assignee_ids: [],
     due_date: ''
   });
   const [localError, setLocalError] = useState(null);
@@ -320,7 +369,7 @@ const CreateTaskModal = ({ isOpen, onClose, onSubmit, projectMembers, darkMode }
     try {
       await onSubmit(formData);
       // Only reset form and close if submission succeeds
-      setFormData({ title: '', description: '', status: 'todo', priority: 'medium', assignee_id: '', due_date: '' });
+      setFormData({ title: '', description: '', status: 'todo', priority: 'medium', assignee_ids: [], due_date: '' });
       onClose();
     } catch (err) {
       // Display error within modal, keep form data
@@ -416,17 +465,29 @@ const CreateTaskModal = ({ isOpen, onClose, onSubmit, projectMembers, darkMode }
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className={labelClass}>Assignee</label>
-            <select
-              value={formData.assignee_id}
-              onChange={(e) => setFormData({ ...formData, assignee_id: e.target.value })}
-              className={inputClass}
-            >
-              <option value="">Unassigned</option>
+            <label className={labelClass}>Assignees</label>
+            <div className={`rounded-lg px-4 py-2 text-sm max-h-32 overflow-y-auto ${inputClass}`}>
               {projectMembers.map(member => (
-                <option key={member.user_id} value={member.user_id}>{member.username}</option>
+                <label key={member.user_id} className="flex items-center gap-2 py-1 cursor-pointer hover:opacity-80">
+                  <input
+                    type="checkbox"
+                    checked={formData.assignee_ids.includes(member.user_id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setFormData({ ...formData, assignee_ids: [...formData.assignee_ids, member.user_id] });
+                      } else {
+                        setFormData({ ...formData, assignee_ids: formData.assignee_ids.filter(id => id !== member.user_id) });
+                      }
+                    }}
+                    className="rounded border-2 border-[rgb(119,136,115)]"
+                  />
+                  <span>{member.username}</span>
+                </label>
               ))}
-            </select>
+              {projectMembers.length === 0 && (
+                <span className="text-xs opacity-60">No members available</span>
+              )}
+            </div>
           </div>
 
           <div>
@@ -469,7 +530,7 @@ const EditTaskModal = ({ isOpen, onClose, onSubmit, task, projectMembers, darkMo
     description: '',
     status: 'todo',
     priority: 'medium',
-    assignee_id: '',
+    assignee_ids: [],
     due_date: ''
   });
   const [localError, setLocalError] = useState(null);
@@ -478,12 +539,17 @@ const EditTaskModal = ({ isOpen, onClose, onSubmit, task, projectMembers, darkMo
   // Update form when task changes
   React.useEffect(() => {
     if (task) {
+      // Extract assignee IDs from assignees array
+      const assigneeIds = Array.isArray(task.assignees) 
+        ? task.assignees.filter(a => a.user_id).map(a => a.user_id)
+        : [];
+      
       setFormData({
         title: task.title || '',
         description: task.description || '',
         status: task.status || 'todo',
         priority: task.priority || 'medium',
-        assignee_id: task.assignee_id || '',
+        assignee_ids: assigneeIds,
         due_date: task.due_date ? task.due_date.split('T')[0] : ''
       });
     }
@@ -600,17 +666,29 @@ const EditTaskModal = ({ isOpen, onClose, onSubmit, task, projectMembers, darkMo
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className={labelClass}>Assignee</label>
-            <select
-              value={formData.assignee_id}
-              onChange={(e) => setFormData({ ...formData, assignee_id: e.target.value })}
-              className={inputClass}
-            >
-              <option value="">Unassigned</option>
+            <label className={labelClass}>Assignees</label>
+            <div className={`rounded-lg px-4 py-2 text-sm max-h-32 overflow-y-auto ${inputClass}`}>
               {projectMembers.map(member => (
-                <option key={member.user_id} value={member.user_id}>{member.username}</option>
+                <label key={member.user_id} className="flex items-center gap-2 py-1 cursor-pointer hover:opacity-80">
+                  <input
+                    type="checkbox"
+                    checked={formData.assignee_ids.includes(member.user_id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setFormData({ ...formData, assignee_ids: [...formData.assignee_ids, member.user_id] });
+                      } else {
+                        setFormData({ ...formData, assignee_ids: formData.assignee_ids.filter(id => id !== member.user_id) });
+                      }
+                    }}
+                    className="rounded border-2 border-[rgb(119,136,115)]"
+                  />
+                  <span>{member.username}</span>
+                </label>
               ))}
-            </select>
+              {projectMembers.length === 0 && (
+                <span className="text-xs opacity-60">No members available</span>
+              )}
+            </div>
           </div>
 
           <div>
@@ -812,6 +890,18 @@ export default function ProjectPage() {
     fetchProjectData();
   }, [projectId]);
 
+  // Helper function to refetch tasks after mutations
+  const refetchTasks = async () => {
+    try {
+      const tasksRes = await projectApi.getProjectTasks(projectId);
+      if (tasksRes.success) {
+        setTasks(tasksRes.data);
+      }
+    } catch (err) {
+      console.error('Failed to refetch tasks:', err);
+    }
+  };
+
   // Theme classes (only page-specific)
   const cardBg = isDarkMode ? 'bg-[rgb(30,36,30)]/50 border-[rgb(45,52,45)]/50' : 'bg-white border-[rgb(210,220,182)] shadow-sm';
   const inputBg = isDarkMode ? 'bg-[rgb(30,36,30)] border-[rgb(45,52,45)] text-[rgb(210,220,182)] placeholder:text-[rgb(119,136,115)]' : 'bg-[rgb(210,220,182)]/30 border-[rgb(161,188,152)] text-[rgb(60,68,58)] placeholder:text-[rgb(119,136,115)]';
@@ -862,15 +952,15 @@ export default function ProjectPage() {
 
   const handleEditSubmit = async (formData) => {
     const updates = { ...formData };
-    if (updates.assignee_id === '') updates.assignee_id = null;
     if (updates.due_date) updates.due_date = new Date(updates.due_date).toISOString();
     
     const response = await projectApi.updateTask(projectId, selectedTask.id, updates);
     
     if (response.success) {
-      setTasks(tasks.map(t => t.id === selectedTask.id ? response.data : t));
+      // Refetch tasks to get updated assignees array
+      await refetchTasks();
       setSelectedTask(null);
-      console.log('Task updated:', response.message);
+      console.log('✅ Task updated:', response.message);
     } else {
       throw new Error(response.message || 'Failed to update task');
     }
@@ -899,14 +989,14 @@ export default function ProjectPage() {
 
   const handleCreateSubmit = async (formData) => {
     const taskData = { ...formData };
-    if (taskData.assignee_id === '') taskData.assignee_id = null;
-    else taskData.assignee_id = parseInt(taskData.assignee_id);
+    // assignee_ids is already an array of integers from the checkbox handler
     if (taskData.due_date) taskData.due_date = new Date(taskData.due_date).toISOString();
     
     const response = await projectApi.createTask(projectId, taskData);
     
     if (response.success) {
-      setTasks([...tasks, response.data]);
+      // Refetch tasks to get new task with populated assignees array
+      await refetchTasks();
       console.log('✅ Task created:', response.message);
     } else {
       throw new Error(response.message || 'Failed to create task');

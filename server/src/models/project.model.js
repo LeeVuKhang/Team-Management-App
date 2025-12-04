@@ -99,9 +99,6 @@ export async function getProjectTasks(projectId, userId) {
         SELECT 
           t.id,
           t.project_id,
-          t.assignee_id,
-          u.username as assignee_name,
-          u.avatar_url as assignee_avatar,
           t.title,
           t.description,
           t.status,
@@ -110,6 +107,16 @@ export async function getProjectTasks(projectId, userId) {
           t.created_at,
           t.updated_at,
           COALESCE(
+            json_agg(
+              json_build_object(
+                'user_id', u.id,
+                'username', u.username,
+                'avatar_url', u.avatar_url
+              )
+            ) FILTER (WHERE u.id IS NOT NULL),
+            '[]'
+          ) as assignees,
+          COALESCE(
             (SELECT COUNT(*) FROM messages m 
              INNER JOIN channels c ON m.channel_id = c.id 
              WHERE c.project_id = t.project_id), 
@@ -117,8 +124,10 @@ export async function getProjectTasks(projectId, userId) {
           ) as comments_count,
           0 as attachments_count
         FROM tasks t
-        LEFT JOIN users u ON t.assignee_id = u.id
+        LEFT JOIN task_assignees ta ON t.id = ta.task_id
+        LEFT JOIN users u ON ta.user_id = u.id
         WHERE t.project_id = ${projectId}
+        GROUP BY t.id
         ORDER BY 
           CASE t.priority
             WHEN 'urgent' THEN 1
@@ -152,22 +161,22 @@ export async function createTask(projectId, userId, taskData) {
         throw new Error('Access denied: Only lead or editor can create tasks');
       }
 
-      // Validate assignee is a project member (if assigned)
-      if (taskData.assignee_id) {
-        const [assigneeExists] = await db`
-          SELECT 1 FROM project_members
-          WHERE project_id = ${projectId} AND user_id = ${taskData.assignee_id}
+      // Validate all assignees are project members (if provided)
+      if (taskData.assignee_ids && taskData.assignee_ids.length > 0) {
+        const assigneeCheck = await db`
+          SELECT user_id FROM project_members
+          WHERE project_id = ${projectId} AND user_id = ANY(${taskData.assignee_ids})
         `;
 
-        if (!assigneeExists) {
-          throw new Error('Assignee must be a project member');
+        if (assigneeCheck.length !== taskData.assignee_ids.length) {
+          throw new Error('All assignees must be project members');
         }
       }
 
+      // Create task
       const [newTask] = await db`
         INSERT INTO tasks (
           project_id,
-          assignee_id,
           title,
           description,
           status,
@@ -175,7 +184,6 @@ export async function createTask(projectId, userId, taskData) {
           due_date
         ) VALUES (
           ${projectId},
-          ${taskData.assignee_id || null},
           ${taskData.title},
           ${taskData.description || null},
           ${taskData.status || 'todo'},
@@ -184,6 +192,15 @@ export async function createTask(projectId, userId, taskData) {
         )
         RETURNING *
       `;
+
+      // Insert assignees into task_assignees table
+      if (taskData.assignee_ids && taskData.assignee_ids.length > 0) {
+        await db`
+          INSERT INTO task_assignees (task_id, user_id)
+          SELECT ${newTask.id}, user_id
+          FROM unnest(${taskData.assignee_ids}::int[]) AS user_id
+        `;
+      }
 
       return newTask;
     } catch (error) {
@@ -238,24 +255,35 @@ export async function updateTask(taskId, projectId, userId, updates) {
         updateFields.push('priority');
         values.push(updates.priority);
       }
-      if (updates.assignee_id !== undefined) {
-        // Validate assignee is a project member (if assigned and not null)
-        if (updates.assignee_id !== null) {
-          const [assigneeExists] = await db`
-            SELECT 1 FROM project_members
-            WHERE project_id = ${projectId} AND user_id = ${updates.assignee_id}
-          `;
-
-          if (!assigneeExists) {
-            throw new Error('Assignee must be a project member');
-          }
-        }
-        updateFields.push('assignee_id');
-        values.push(updates.assignee_id);
-      }
       if (updates.due_date !== undefined) {
         updateFields.push('due_date');
         values.push(updates.due_date);
+      }
+
+      // Handle assignees separately (in task_assignees table)
+      if (updates.assignee_ids !== undefined) {
+        // Validate all assignees are project members
+        if (updates.assignee_ids.length > 0) {
+          const assigneeCheck = await db`
+            SELECT user_id FROM project_members
+            WHERE project_id = ${projectId} AND user_id = ANY(${updates.assignee_ids})
+          `;
+
+          if (assigneeCheck.length !== updates.assignee_ids.length) {
+            throw new Error('All assignees must be project members');
+          }
+        }
+
+        // Delete existing assignees and insert new ones
+        await db`DELETE FROM task_assignees WHERE task_id = ${taskId}`;
+        
+        if (updates.assignee_ids.length > 0) {
+          await db`
+            INSERT INTO task_assignees (task_id, user_id)
+            SELECT ${taskId}, user_id
+            FROM unnest(${updates.assignee_ids}::int[]) AS user_id
+          `;
+        }
       }
 
       updateFields.push('updated_at');
