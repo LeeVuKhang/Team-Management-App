@@ -236,8 +236,33 @@ const FilterButton = ({ active, children, onClick, darkMode }) => (
 const Modal = ({ isOpen, onClose, title, children, darkMode }) => {
   if (!isOpen) return null;
 
+  // Prevent body scroll when modal is open
+  React.useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    const originalPaddingRight = document.body.style.paddingRight;
+    
+    // Prevent scroll
+    document.body.style.overflow = 'hidden';
+    
+    // Prevent scrollbar shift by adding padding
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+    
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.paddingRight = originalPaddingRight;
+    };
+  }, []);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-hidden" 
+      onClick={onClose}
+      onWheel={(e) => e.preventDefault()}
+      onTouchMove={(e) => e.preventDefault()}
+    >
       <div 
         className={`w-full max-w-2xl rounded-xl shadow-2xl max-h-[90vh] overflow-y-auto ${
           darkMode ? 'bg-[rgb(30,36,30)] border border-[rgb(45,52,45)]' : 'bg-white border border-[rgb(210,220,182)]'
@@ -276,11 +301,33 @@ const CreateTaskModal = ({ isOpen, onClose, onSubmit, projectMembers, darkMode }
     assignee_id: '',
     due_date: ''
   });
+  const [localError, setLocalError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e) => {
+  // Clear error when modal opens/closes
+  React.useEffect(() => {
+    if (!isOpen) {
+      setLocalError(null);
+      setIsSubmitting(false);
+    }
+  }, [isOpen]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSubmit(formData);
-    setFormData({ title: '', description: '', status: 'todo', priority: 'medium', assignee_id: '', due_date: '' });
+    setLocalError(null);
+    setIsSubmitting(true);
+    
+    try {
+      await onSubmit(formData);
+      // Only reset form and close if submission succeeds
+      setFormData({ title: '', description: '', status: 'todo', priority: 'medium', assignee_id: '', due_date: '' });
+      onClose();
+    } catch (err) {
+      // Display error within modal, keep form data
+      setLocalError(err.message || 'Failed to create task');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${
@@ -294,6 +341,24 @@ const CreateTaskModal = ({ isOpen, onClose, onSubmit, projectMembers, darkMode }
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Create New Task" darkMode={darkMode}>
       <form onSubmit={handleSubmit} className="space-y-4">
+        {localError && (
+          <div className={`p-4 rounded-lg border-2 ${
+            darkMode ? 'bg-red-500/10 border-red-500/30' : 'bg-red-50 border-red-200'
+          }`}>
+            <div className="flex items-start gap-3">
+              <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+              <div className="flex-1">
+                <h4 className={`font-bold text-sm mb-1 ${
+                  darkMode ? 'text-red-400' : 'text-red-600'
+                }`}>Error Creating Task</h4>
+                <p className={`text-sm ${
+                  darkMode ? 'text-red-300' : 'text-red-500'
+                }`}>{localError}</p>
+              </div>
+            </div>
+          </div>
+        )}
+        
         <div>
           <label className={labelClass}>Title *</label>
           <input
@@ -387,9 +452,10 @@ const CreateTaskModal = ({ isOpen, onClose, onSubmit, projectMembers, darkMode }
           </button>
           <button
             type="submit"
-            className="flex-1 px-6 py-3 bg-[rgb(119,136,115)] hover:bg-[rgb(161,188,152)] text-white rounded-lg font-semibold shadow-lg transition-all"
+            disabled={isSubmitting}
+            className="flex-1 px-6 py-3 bg-[rgb(119,136,115)] hover:bg-[rgb(161,188,152)] text-white rounded-lg font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Create Task
+            {isSubmitting ? 'Creating...' : 'Create Task'}
           </button>
         </div>
       </form>
@@ -406,6 +472,8 @@ const EditTaskModal = ({ isOpen, onClose, onSubmit, task, projectMembers, darkMo
     assignee_id: '',
     due_date: ''
   });
+  const [localError, setLocalError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Update form when task changes
   React.useEffect(() => {
@@ -421,9 +489,29 @@ const EditTaskModal = ({ isOpen, onClose, onSubmit, task, projectMembers, darkMo
     }
   }, [task]);
 
-  const handleSubmit = (e) => {
+  // Clear error when modal opens/closes
+  React.useEffect(() => {
+    if (!isOpen) {
+      setLocalError(null);
+      setIsSubmitting(false);
+    }
+  }, [isOpen]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onSubmit(formData);
+    setLocalError(null);
+    setIsSubmitting(true);
+    
+    try {
+      await onSubmit(formData);
+      // Only close if submission succeeds
+      onClose();
+    } catch (err) {
+      // Display error within modal, keep form data
+      setLocalError(err.message || 'Failed to update task');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${
@@ -439,6 +527,24 @@ const EditTaskModal = ({ isOpen, onClose, onSubmit, task, projectMembers, darkMo
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Edit Task" darkMode={darkMode}>
       <form onSubmit={handleSubmit} className="space-y-4">
+        {localError && (
+          <div className={`p-4 rounded-lg border-2 ${
+            darkMode ? 'bg-red-500/10 border-red-500/30' : 'bg-red-50 border-red-200'
+          }`}>
+            <div className="flex items-start gap-3">
+              <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+              <div className="flex-1">
+                <h4 className={`font-bold text-sm mb-1 ${
+                  darkMode ? 'text-red-400' : 'text-red-600'
+                }`}>Error Updating Task</h4>
+                <p className={`text-sm ${
+                  darkMode ? 'text-red-300' : 'text-red-500'
+                }`}>{localError}</p>
+              </div>
+            </div>
+          </div>
+        )}
+        
         <div>
           <label className={labelClass}>Title *</label>
           <input
@@ -530,9 +636,10 @@ const EditTaskModal = ({ isOpen, onClose, onSubmit, task, projectMembers, darkMo
           </button>
           <button
             type="submit"
-            className="flex-1 px-6 py-3 bg-[rgb(119,136,115)] hover:bg-[rgb(161,188,152)] text-white rounded-lg font-semibold shadow-lg transition-all"
+            disabled={isSubmitting}
+            className="flex-1 px-6 py-3 bg-[rgb(119,136,115)] hover:bg-[rgb(161,188,152)] text-white rounded-lg font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Save Changes
+            {isSubmitting ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
       </form>
@@ -541,11 +648,56 @@ const EditTaskModal = ({ isOpen, onClose, onSubmit, task, projectMembers, darkMo
 };
 
 const DeleteTaskModal = ({ isOpen, onClose, onConfirm, task, darkMode }) => {
+  const [localError, setLocalError] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Clear error when modal opens/closes
+  React.useEffect(() => {
+    if (!isOpen) {
+      setLocalError(null);
+      setIsDeleting(false);
+    }
+  }, [isOpen]);
+
+  const handleDelete = async () => {
+    setLocalError(null);
+    setIsDeleting(true);
+    
+    try {
+      await onConfirm();
+      // Only close if deletion succeeds
+      onClose();
+    } catch (err) {
+      // Display error within modal
+      setLocalError(err.message || 'Failed to delete task');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (!task) return null;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Delete Task" darkMode={darkMode}>
       <div className="space-y-4">
+        {localError && (
+          <div className={`p-4 rounded-lg border-2 ${
+            darkMode ? 'bg-red-500/10 border-red-500/30' : 'bg-red-50 border-red-200'
+          }`}>
+            <div className="flex items-start gap-3">
+              <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+              <div className="flex-1">
+                <h4 className={`font-bold text-sm mb-1 ${
+                  darkMode ? 'text-red-400' : 'text-red-600'
+                }`}>Error Deleting Task</h4>
+                <p className={`text-sm ${
+                  darkMode ? 'text-red-300' : 'text-red-500'
+                }`}>{localError}</p>
+              </div>
+            </div>
+          </div>
+        )}
+        
         <div className={`p-4 rounded-lg border-2 ${
           darkMode ? 'bg-red-500/10 border-red-500/30' : 'bg-red-50 border-red-200'
         }`}>
@@ -588,13 +740,11 @@ const DeleteTaskModal = ({ isOpen, onClose, onConfirm, task, darkMode }) => {
             Cancel
           </button>
           <button
-            onClick={() => {
-              onConfirm();
-              onClose();
-            }}
-            className="flex-1 px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold shadow-lg transition-all"
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="flex-1 px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Delete Task
+            {isDeleting ? 'Deleting...' : 'Delete Task'}
           </button>
         </div>
       </div>
@@ -711,22 +861,18 @@ export default function ProjectPage() {
   };
 
   const handleEditSubmit = async (formData) => {
-    try {
-      const updates = { ...formData };
-      if (updates.assignee_id === '') updates.assignee_id = null;
-      if (updates.due_date) updates.due_date = new Date(updates.due_date).toISOString();
-      
-      const response = await projectApi.updateTask(projectId, selectedTask.id, updates);
-      
-      if (response.success) {
-        setTasks(tasks.map(t => t.id === selectedTask.id ? response.data : t));
-        setShowEditModal(false);
-        setSelectedTask(null);
-        console.log('✅ Task updated:', response.message);
-      }
-    } catch (err) {
-      setError(`Failed to update task: ${err.message}`);
-      console.error('Update task error:', err);
+    const updates = { ...formData };
+    if (updates.assignee_id === '') updates.assignee_id = null;
+    if (updates.due_date) updates.due_date = new Date(updates.due_date).toISOString();
+    
+    const response = await projectApi.updateTask(projectId, selectedTask.id, updates);
+    
+    if (response.success) {
+      setTasks(tasks.map(t => t.id === selectedTask.id ? response.data : t));
+      setSelectedTask(null);
+      console.log('Task updated:', response.message);
+    } else {
+      throw new Error(response.message || 'Failed to update task');
     }
   };
 
@@ -736,17 +882,14 @@ export default function ProjectPage() {
   };
 
   const handleDeleteConfirm = async () => {
-    try {
-      const response = await projectApi.deleteTask(projectId, selectedTask.id);
-      
-      if (response.success) {
-        setTasks(tasks.filter(t => t.id !== selectedTask.id));
-        setSelectedTask(null);
-        console.log('✅ Task deleted:', response.message);
-      }
-    } catch (err) {
-      setError(`Failed to delete task: ${err.message}`);
-      console.error('Delete task error:', err);
+    const response = await projectApi.deleteTask(projectId, selectedTask.id);
+    
+    if (response.success) {
+      setTasks(tasks.filter(t => t.id !== selectedTask.id));
+      setSelectedTask(null);
+      console.log('✅ Task deleted:', response.message);
+    } else {
+      throw new Error(response.message || 'Failed to delete task');
     }
   };
 
@@ -755,22 +898,18 @@ export default function ProjectPage() {
   };
 
   const handleCreateSubmit = async (formData) => {
-    try {
-      const taskData = { ...formData };
-      if (taskData.assignee_id === '') taskData.assignee_id = null;
-      else taskData.assignee_id = parseInt(taskData.assignee_id);
-      if (taskData.due_date) taskData.due_date = new Date(taskData.due_date).toISOString();
-      
-      const response = await projectApi.createTask(projectId, taskData);
-      
-      if (response.success) {
-        setTasks([...tasks, response.data]);
-        setShowCreateModal(false);
-        console.log('✅ Task created:', response.message);
-      }
-    } catch (err) {
-      setError(`Failed to create task: ${err.message}`);
-      console.error('Create task error:', err);
+    const taskData = { ...formData };
+    if (taskData.assignee_id === '') taskData.assignee_id = null;
+    else taskData.assignee_id = parseInt(taskData.assignee_id);
+    if (taskData.due_date) taskData.due_date = new Date(taskData.due_date).toISOString();
+    
+    const response = await projectApi.createTask(projectId, taskData);
+    
+    if (response.success) {
+      setTasks([...tasks, response.data]);
+      console.log('✅ Task created:', response.message);
+    } else {
+      throw new Error(response.message || 'Failed to create task');
     }
   };
 
