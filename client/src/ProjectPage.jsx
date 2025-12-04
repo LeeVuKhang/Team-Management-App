@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import * as projectApi from './services/projectApi';
 import { 
   LayoutDashboard, 
   FolderKanban, 
@@ -30,128 +31,6 @@ import {
   Flag,
   Paperclip
 } from 'lucide-react';
-
-/**
- * MOCK DATA - Based on schema.sql structure
- * Security Notes:
- * - All data fetching should validate user's project_member role
- * - Never expose sensitive data (password_hash, internal IDs) to frontend
- * - Implement RBAC checks: only 'lead' and 'editor' can modify tasks
- * - All inputs must be validated with Zod schemas on backend
- */
-
-const PROJECT_DATA = {
-  id: 1,
-  team_id: 1,
-  name: 'Design Revamp Project',
-  description: 'Complete UI/UX redesign of the main product platform with modern aesthetics and improved user experience.',
-  status: 'active',
-  start_date: '2024-11-01T00:00:00Z',
-  end_date: '2024-12-25T00:00:00Z',
-  created_at: '2024-11-01T00:00:00Z'
-};
-
-const CURRENT_USER_ROLE = 'lead';
-
-const PROJECT_MEMBERS = [
-  { id: 1, user_id: 1, username: 'Alex Johnson', avatar_url: null, role: 'lead', added_at: '2024-11-01T00:00:00Z' },
-  { id: 2, user_id: 2, username: 'Sarah Kim', avatar_url: null, role: 'editor', added_at: '2024-11-02T00:00:00Z' },
-  { id: 3, user_id: 3, username: 'Mike Chen', avatar_url: null, role: 'editor', added_at: '2024-11-02T00:00:00Z' },
-  { id: 4, user_id: 4, username: 'Emma Davis', avatar_url: null, role: 'viewer', added_at: '2024-11-05T00:00:00Z' },
-];
-
-const MOCK_TASKS = [
-  {
-    id: 1,
-    project_id: 1,
-    assignee_id: 1,
-    assignee_name: 'Alex Johnson',
-    title: 'Design new login page mockup',
-    description: 'Create high-fidelity mockups for the new authentication flow including login, signup, and password reset screens.',
-    status: 'in_progress',
-    priority: 'high',
-    due_date: '2024-12-10T00:00:00Z',
-    created_at: '2024-11-03T00:00:00Z',
-    updated_at: '2024-11-20T00:00:00Z',
-    comments_count: 3,
-    attachments_count: 2
-  },
-  {
-    id: 2,
-    project_id: 1,
-    assignee_id: 2,
-    assignee_name: 'Sarah Kim',
-    title: 'Implement responsive navigation component',
-    description: 'Build a mobile-first navigation bar with hamburger menu and smooth animations.',
-    status: 'review',
-    priority: 'urgent',
-    due_date: '2024-12-08T00:00:00Z',
-    created_at: '2024-11-05T00:00:00Z',
-    updated_at: '2024-12-02T00:00:00Z',
-    comments_count: 5,
-    attachments_count: 0
-  },
-  {
-    id: 3,
-    project_id: 1,
-    assignee_id: 3,
-    assignee_name: 'Mike Chen',
-    title: 'User research and feedback analysis',
-    description: 'Compile and analyze user feedback from the beta testing group. Create summary report with actionable insights.',
-    status: 'done',
-    priority: 'medium',
-    due_date: '2024-11-30T00:00:00Z',
-    created_at: '2024-11-02T00:00:00Z',
-    updated_at: '2024-11-28T00:00:00Z',
-    comments_count: 8,
-    attachments_count: 1
-  },
-  {
-    id: 4,
-    project_id: 1,
-    assignee_id: 1,
-    assignee_name: 'Alex Johnson',
-    title: 'Design system documentation',
-    description: 'Document all design tokens, color palettes, typography scales, and component guidelines in Figma.',
-    status: 'todo',
-    priority: 'low',
-    due_date: '2024-12-20T00:00:00Z',
-    created_at: '2024-11-10T00:00:00Z',
-    updated_at: '2024-11-10T00:00:00Z',
-    comments_count: 0,
-    attachments_count: 0
-  },
-  {
-    id: 5,
-    project_id: 1,
-    assignee_id: 2,
-    assignee_name: 'Sarah Kim',
-    title: 'Accessibility audit and improvements',
-    description: 'Run WCAG 2.1 AA compliance checks and fix all critical accessibility issues.',
-    status: 'in_progress',
-    priority: 'high',
-    due_date: '2024-12-15T00:00:00Z',
-    created_at: '2024-11-12T00:00:00Z',
-    updated_at: '2024-12-01T00:00:00Z',
-    comments_count: 2,
-    attachments_count: 1
-  },
-  {
-    id: 6,
-    project_id: 1,
-    assignee_id: null,
-    assignee_name: 'Unassigned',
-    title: 'Performance optimization review',
-    description: 'Analyze bundle size, lazy loading opportunities, and identify performance bottlenecks.',
-    status: 'todo',
-    priority: 'medium',
-    due_date: '2024-12-18T00:00:00Z',
-    created_at: '2024-11-15T00:00:00Z',
-    updated_at: '2024-11-15T00:00:00Z',
-    comments_count: 0,
-    attachments_count: 0
-  },
-];
 
 /**
  * UTILITY FUNCTIONS
@@ -388,12 +267,56 @@ export default function ProjectPage() {
   const [isSidebarOpen, setSidebarOpen] = useState(true);
   const [isDarkMode, setDarkMode] = useState(true);
   const [isDropdownOpen, setDropdownOpen] = useState(false);
-  const [tasks, setTasks] = useState(MOCK_TASKS);
+  const [tasks, setTasks] = useState([]);
+  const [projectData, setProjectData] = useState(null);
+  const [projectMembers, setProjectMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [assigneeFilter, setAssigneeFilter] = useState('all');
   const [sortBy, setSortBy] = useState('due_date');
+
+  const projectId = 1; // Hardcoded for testing with project ID 1
+  const userRole = projectData?.user_role || 'viewer'; // Get role from API response
+
+  // Fetch project data on component mount
+  useEffect(() => {
+    async function fetchProjectData() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Fetch all data in parallel
+        const [projectRes, tasksRes, membersRes] = await Promise.all([
+          projectApi.getProject(projectId),
+          projectApi.getProjectTasks(projectId),
+          projectApi.getProjectMembers(projectId),
+        ]);
+
+        if (projectRes.success) {
+          setProjectData(projectRes.data);
+        }
+
+        if (tasksRes.success) {
+          setTasks(tasksRes.data);
+        }
+
+        if (membersRes.success) {
+          setProjectMembers(membersRes.data);
+        }
+
+        setLoading(false);
+      } catch (err) {
+        console.error('Failed to fetch project data:', err);
+        setError(err.message || 'Failed to load project data');
+        setLoading(false);
+      }
+    }
+
+    fetchProjectData();
+  }, [projectId]);
 
   // Theme classes
   const bgMain = isDarkMode ? 'bg-[rgb(24,28,24)]' : 'bg-[rgb(241,243,224)]';
@@ -442,19 +365,33 @@ export default function ProjectPage() {
     overdue: tasks.filter(t => getDaysUntilDue(t.due_date) !== null && getDaysUntilDue(t.due_date) < 0 && t.status !== 'done').length,
   };
 
-  const handleEditTask = (task) => {
+  const handleEditTask = async (task) => {
     console.log('Edit task:', task.id);
-    alert(`Edit task: ${task.title}\n\nNote: Backend must validate 'lead' or 'editor' role with Zod schemas.`);
+    // TODO: Implement edit dialog
+    alert(`Edit task: ${task.title}\n\nNote: Backend validates 'lead' or 'editor' role with Zod schemas.`);
   };
 
-  const handleDeleteTask = (task) => {
-    console.log('Delete task:', task.id);
-    if (confirm(`Are you sure you want to delete "${task.title}"?`)) {
-      setTasks(tasks.filter(t => t.id !== task.id));
+  const handleDeleteTask = async (task) => {
+    if (!confirm(`Are you sure you want to delete "${task.title}"?`)) {
+      return;
+    }
+
+    try {
+      const response = await projectApi.deleteTask(projectId, task.id);
+      
+      if (response.success) {
+        // Remove task from local state
+        setTasks(tasks.filter(t => t.id !== task.id));
+        console.log('✅ Task deleted:', response.message);
+      }
+    } catch (err) {
+      alert(`Failed to delete task: ${err.message}`);
+      console.error('Delete task error:', err);
     }
   };
 
-  const handleCreateTask = () => {
+  const handleCreateTask = async () => {
+    // TODO: Implement create task dialog with form
     console.log('Create new task');
     alert('Create new task\n\nNote: Requires proper authentication and RBAC validation.');
   };
@@ -595,55 +532,89 @@ export default function ProjectPage() {
                 <span className="font-medium">Back to Projects</span>
               </button>
 
-              {/* Project Header */}
-              <div className={`${cardBg} border rounded-xl p-6 mb-8`}>
-                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
-                  <div className="flex-1">
-                    <h1 className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
-                      {sanitizeText(PROJECT_DATA.name)}
-                    </h1>
-                    <p className={`${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'} mb-4`}>
-                      {sanitizeText(PROJECT_DATA.description)}
-                    </p>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider ${PROJECT_DATA.status === 'active' ? 'text-green-500 bg-green-500/10' : PROJECT_DATA.status === 'completed' ? 'text-blue-500 bg-blue-500/10' : 'text-slate-500 bg-slate-500/10'}`}>
-                        <CheckCircle2 size={12} />
-                        {PROJECT_DATA.status}
-                      </span>
-                      <span className={`flex items-center gap-1.5 text-sm ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
-                        <Calendar size={14} />
-                        {formatDate(PROJECT_DATA.start_date)} - {formatDate(PROJECT_DATA.end_date)}
-                      </span>
-                    </div>
-                  </div>
+              {/* Loading State */}
+              {loading && (
+                <div className={`${cardBg} border rounded-xl p-12 text-center`}>
+                  <div className="animate-spin w-12 h-12 border-4 border-[rgb(119,136,115)] border-t-transparent rounded-full mx-auto mb-4"></div>
+                  <p className={`text-lg ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>Loading project data...</p>
+                </div>
+              )}
 
-                  <div className="flex flex-col items-end gap-3">
-                    <div className="flex -space-x-2">
-                      {PROJECT_MEMBERS.map((member) => (
-                        <div key={member.id} className="relative group">
-                          <div className={`h-10 w-10 rounded-full border-2 flex items-center justify-center text-sm font-medium transition-all cursor-pointer group-hover:scale-110 group-hover:z-10 ${isDarkMode ? 'border-[rgb(30,36,30)] bg-[rgb(119,136,115)] text-white' : 'border-white bg-[rgb(210,220,182)] text-[rgb(60,68,58)]'}`}>
-                            {member.username.charAt(0).toUpperCase()}
-                          </div>
-                          <div className={`absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none ${isDarkMode ? 'bg-[rgb(45,52,45)] text-white' : 'bg-[rgb(60,68,58)] text-white'}`}>
-                            {member.username} ({member.role})
-                          </div>
+              {/* Error State */}
+              {error && !loading && (
+                <div className={`border border-red-500 bg-red-500/10 rounded-xl p-6 text-center`}>
+                  <AlertCircle size={48} className="text-red-500 mx-auto mb-4" />
+                  <h3 className="text-lg font-bold text-red-500 mb-2">Failed to Load Project</h3>
+                  <p className="text-red-400">{error}</p>
+                  <button 
+                    onClick={() => window.location.reload()}
+                    className="mt-4 bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {/* Project Content (Only show when loaded successfully) */}
+              {!loading && !error && projectData && (
+                <>
+                  {/* Project Header */}
+                  <div className={`${cardBg} border rounded-xl p-6 mb-8`}>
+                    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
+                      <div className="flex-1">
+                        <h1 className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
+                          {sanitizeText(projectData.name)}
+                        </h1>
+                        <p className={`${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'} mb-4`}>
+                          {sanitizeText(projectData.description)}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider ${projectData.status === 'active' ? 'text-green-500 bg-green-500/10' : projectData.status === 'completed' ? 'text-blue-500 bg-blue-500/10' : 'text-slate-500 bg-slate-500/10'}`}>
+                            <CheckCircle2 size={12} />
+                            {projectData.status}
+                          </span>
+                          <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full ${isDarkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'bg-[rgb(210,220,182)] text-[rgb(119,136,115)]'}`}>
+                            <Calendar size={12} />
+                            {formatDate(projectData.start_date)} - {formatDate(projectData.end_date)}
+                          </span>
+                          <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full ${
+                            userRole === 'lead' ? 'bg-purple-500/10 text-purple-500' :
+                            userRole === 'editor' ? 'bg-blue-500/10 text-blue-500' :
+                            'bg-slate-500/10 text-slate-500'
+                          }`}>
+                            <User size={12} />
+                            Your Role: {userRole}
+                          </span>
                         </div>
-                      ))}
-                    </div>
-                    <span className={`text-xs ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
-                      {PROJECT_MEMBERS.length} team members
-                    </span>
-                  </div>
-                </div>
+                      </div>
 
-                <div className={`pt-4 border-t ${isDarkMode ? 'border-[rgb(45,52,45)]/50' : 'border-[rgb(210,220,182)]'}`}>
-                  <span className={`inline-flex items-center gap-2 text-xs font-medium ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
-                    <User size={14} />
-                    Your role: <span className={`font-bold uppercase ${isDarkMode ? 'text-[rgb(210,220,182)]' : 'text-[rgb(60,68,58)]'}`}>{CURRENT_USER_ROLE}</span>
-                    {canEditTasks(CURRENT_USER_ROLE) && <span className="text-green-500">(Can edit tasks)</span>}
-                  </span>
-                </div>
-              </div>
+                      <div className="flex flex-col items-end gap-3">
+                        <div className="flex -space-x-2">
+                          {projectMembers.map((member) => (
+                            <div key={member.id} className="relative group">
+                              <div className={`h-10 w-10 rounded-full border-2 flex items-center justify-center text-sm font-medium transition-all cursor-pointer group-hover:scale-110 group-hover:z-10 ${isDarkMode ? 'border-[rgb(30,36,30)] bg-[rgb(119,136,115)] text-white' : 'border-white bg-[rgb(210,220,182)] text-[rgb(60,68,58)]'}`}>
+                                {member.username.charAt(0).toUpperCase()}
+                              </div>
+                              <div className={`absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none ${isDarkMode ? 'bg-[rgb(45,52,45)] text-white' : 'bg-[rgb(60,68,58)] text-white'}`}>
+                                {member.username} ({member.role})
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <span className={`text-xs ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+                          {projectMembers.length} team members
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className={`pt-4 border-t ${isDarkMode ? 'border-[rgb(45,52,45)]/50' : 'border-[rgb(210,220,182)]'}`}>
+                      <span className={`inline-flex items-center gap-2 text-xs font-medium ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+                        <User size={14} />
+                        Your role: <span className={`font-bold uppercase ${isDarkMode ? 'text-[rgb(210,220,182)]' : 'text-[rgb(60,68,58)]'}`}>{userRole}</span>
+                        {canEditTasks(userRole) && <span className="text-green-500">(Can edit tasks)</span>}
+                      </span>
+                    </div>
+                  </div>
 
               {/* Statistics */}
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
@@ -679,7 +650,7 @@ export default function ProjectPage() {
                     />
                   </div>
 
-                  {canEditTasks(CURRENT_USER_ROLE) && (
+                  {canEditTasks(userRole) && (
                     <button
                       onClick={handleCreateTask}
                       className="flex items-center justify-center gap-2 bg-[rgb(119,136,115)] hover:bg-[rgb(161,188,152)] text-white px-6 py-2.5 rounded-lg font-semibold shadow-lg shadow-[rgb(119,136,115)]/20 transition-all active:scale-95 whitespace-nowrap"
@@ -732,7 +703,7 @@ export default function ProjectPage() {
                       <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>Assignee</label>
                       <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)} className={`w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${inputBg}`}>
                         <option value="all">All Members</option>
-                        {PROJECT_MEMBERS.map(member => (
+                        {projectMembers.map(member => (
                           <option key={member.user_id} value={member.user_id}>{member.username}</option>
                         ))}
                         <option value="unassigned">Unassigned</option>
@@ -778,7 +749,7 @@ export default function ProjectPage() {
                         key={task.id}
                         task={task}
                         darkMode={isDarkMode}
-                        userRole={CURRENT_USER_ROLE}
+                        userRole={userRole}
                         onEdit={handleEditTask}
                         onDelete={handleDeleteTask}
                       />
@@ -786,7 +757,8 @@ export default function ProjectPage() {
                   </div>
                 )}
               </div>
-
+                </>
+              )}
             </div>
           </div>
         </main>
