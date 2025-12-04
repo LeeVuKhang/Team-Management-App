@@ -38,8 +38,7 @@ export const createTaskSchema = z.object({
   due_date: z.string()
     .datetime('Invalid datetime format')
     .optional()
-    .nullable()
-    .or(z.null()),
+    .nullable(),
 });
 
 /**

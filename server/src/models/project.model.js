@@ -239,6 +239,17 @@ export async function updateTask(taskId, projectId, userId, updates) {
         values.push(updates.priority);
       }
       if (updates.assignee_id !== undefined) {
+        // Validate assignee is a project member (if assigned and not null)
+        if (updates.assignee_id !== null) {
+          const [assigneeExists] = await db`
+            SELECT 1 FROM project_members
+            WHERE project_id = ${projectId} AND user_id = ${updates.assignee_id}
+          `;
+
+          if (!assigneeExists) {
+            throw new Error('Assignee must be a project member');
+          }
+        }
         updateFields.push('assignee_id');
         values.push(updates.assignee_id);
       }

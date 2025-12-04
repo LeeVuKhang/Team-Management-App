@@ -145,14 +145,14 @@ export const createTask = async (req, res, next) => {
       });
     }
     
-    if (error.message.includes('Only lead and editor')) {
+    if (error.message.includes('Only lead or editor')) {
       return res.status(403).json({
         success: false,
         message: 'Permission denied: Only project leads and editors can create tasks',
       });
     }
 
-    if (error.message.includes('Assignee is not a member')) {
+    if (error.message.includes('Assignee must be a project member')) {
       return res.status(400).json({
         success: false,
         message: 'Invalid assignee: User must be a project member',
@@ -196,7 +196,7 @@ export const updateTask = async (req, res, next) => {
       });
     }
 
-    if (error.message.includes('Only lead and editor')) {
+    if (error.message.includes('Only lead or editor')) {
       return res.status(403).json({
         success: false,
         message: 'Permission denied: Only project leads and editors can update tasks',
@@ -210,7 +210,7 @@ export const updateTask = async (req, res, next) => {
       });
     }
 
-    if (error.message.includes('Assignee is not a member')) {
+    if (error.message.includes('Assignee must be a project member')) {
       return res.status(400).json({
         success: false,
         message: 'Invalid assignee: User must be a project member',

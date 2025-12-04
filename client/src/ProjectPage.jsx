@@ -25,6 +25,10 @@ import {
 /**
  * UTILITY FUNCTIONS
  */
+// Note: React automatically escapes text content to prevent XSS.
+// This function is kept for additional defense-in-depth, removing angle brackets
+// that could be used in HTML injection attempts. For user-generated HTML content,
+// consider using a library like DOMPurify.
 const sanitizeText = (text) => {
   if (!text) return '';
   return text.replace(/[<>]/g, '');
@@ -721,7 +725,7 @@ export default function ProjectPage() {
         console.log('✅ Task updated:', response.message);
       }
     } catch (err) {
-      alert(`Failed to update task: ${err.message}`);
+      setError(`Failed to update task: ${err.message}`);
       console.error('Update task error:', err);
     }
   };
@@ -741,7 +745,7 @@ export default function ProjectPage() {
         console.log('✅ Task deleted:', response.message);
       }
     } catch (err) {
-      alert(`Failed to delete task: ${err.message}`);
+      setError(`Failed to delete task: ${err.message}`);
       console.error('Delete task error:', err);
     }
   };
@@ -765,7 +769,7 @@ export default function ProjectPage() {
         console.log('✅ Task created:', response.message);
       }
     } catch (err) {
-      alert(`Failed to create task: ${err.message}`);
+      setError(`Failed to create task: ${err.message}`);
       console.error('Create task error:', err);
     }
   };
