@@ -261,6 +261,378 @@ const FilterButton = ({ active, children, onClick, darkMode }) => (
 );
 
 /**
+ * MODAL COMPONENTS
+ */
+const Modal = ({ isOpen, onClose, title, children, darkMode }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <div 
+        className={`w-full max-w-2xl rounded-xl shadow-2xl max-h-[90vh] overflow-y-auto ${
+          darkMode ? 'bg-[rgb(30,36,30)] border border-[rgb(45,52,45)]' : 'bg-white border border-[rgb(210,220,182)]'
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className={`flex items-center justify-between p-6 border-b ${
+          darkMode ? 'border-[rgb(45,52,45)]' : 'border-[rgb(210,220,182)]'
+        }`}>
+          <h2 className={`text-2xl font-bold ${
+            darkMode ? 'text-white' : 'text-[rgb(60,68,58)]'
+          }`}>{title}</h2>
+          <button
+            onClick={onClose}
+            className={`p-2 rounded-lg transition-colors ${
+              darkMode ? 'hover:bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'hover:bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)]'
+            }`}
+          >
+            ✕
+          </button>
+        </div>
+        <div className="p-6">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CreateTaskModal = ({ isOpen, onClose, onSubmit, projectMembers, darkMode }) => {
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    status: 'todo',
+    priority: 'medium',
+    assignee_id: '',
+    due_date: ''
+  });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSubmit(formData);
+    setFormData({ title: '', description: '', status: 'todo', priority: 'medium', assignee_id: '', due_date: '' });
+  };
+
+  const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${
+    darkMode ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-[rgb(210,220,182)]' : 'bg-[rgb(210,220,182)]/30 border border-[rgb(161,188,152)] text-[rgb(60,68,58)]'
+  }`;
+
+  const labelClass = `block text-sm font-bold mb-2 ${
+    darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'
+  }`;
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Create New Task" darkMode={darkMode}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className={labelClass}>Title *</label>
+          <input
+            type="text"
+            required
+            maxLength={255}
+            value={formData.title}
+            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            className={inputClass}
+            placeholder="Enter task title"
+          />
+        </div>
+
+        <div>
+          <label className={labelClass}>Description</label>
+          <textarea
+            rows={4}
+            maxLength={5000}
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            className={inputClass}
+            placeholder="Enter task description"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>Status</label>
+            <select
+              value={formData.status}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+              className={inputClass}
+            >
+              <option value="todo">To Do</option>
+              <option value="in_progress">In Progress</option>
+              <option value="review">Review</option>
+              <option value="done">Done</option>
+            </select>
+          </div>
+
+          <div>
+            <label className={labelClass}>Priority</label>
+            <select
+              value={formData.priority}
+              onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+              className={inputClass}
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>Assignee</label>
+            <select
+              value={formData.assignee_id}
+              onChange={(e) => setFormData({ ...formData, assignee_id: e.target.value })}
+              className={inputClass}
+            >
+              <option value="">Unassigned</option>
+              {projectMembers.map(member => (
+                <option key={member.user_id} value={member.user_id}>{member.username}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className={labelClass}>Due Date</label>
+            <input
+              type="date"
+              value={formData.due_date}
+              onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+              className={inputClass}
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3 pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+              darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)]/70' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]'
+            }`}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="flex-1 px-6 py-3 bg-[rgb(119,136,115)] hover:bg-[rgb(161,188,152)] text-white rounded-lg font-semibold shadow-lg transition-all"
+          >
+            Create Task
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+const EditTaskModal = ({ isOpen, onClose, onSubmit, task, projectMembers, darkMode }) => {
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    status: 'todo',
+    priority: 'medium',
+    assignee_id: '',
+    due_date: ''
+  });
+
+  // Update form when task changes
+  React.useEffect(() => {
+    if (task) {
+      setFormData({
+        title: task.title || '',
+        description: task.description || '',
+        status: task.status || 'todo',
+        priority: task.priority || 'medium',
+        assignee_id: task.assignee_id || '',
+        due_date: task.due_date ? task.due_date.split('T')[0] : ''
+      });
+    }
+  }, [task]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSubmit(formData);
+  };
+
+  const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${
+    darkMode ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-[rgb(210,220,182)]' : 'bg-[rgb(210,220,182)]/30 border border-[rgb(161,188,152)] text-[rgb(60,68,58)]'
+  }`;
+
+  const labelClass = `block text-sm font-bold mb-2 ${
+    darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'
+  }`;
+
+  if (!task) return null;
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Edit Task" darkMode={darkMode}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className={labelClass}>Title *</label>
+          <input
+            type="text"
+            required
+            maxLength={255}
+            value={formData.title}
+            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+            className={inputClass}
+          />
+        </div>
+
+        <div>
+          <label className={labelClass}>Description</label>
+          <textarea
+            rows={4}
+            maxLength={5000}
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            className={inputClass}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>Status</label>
+            <select
+              value={formData.status}
+              onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+              className={inputClass}
+            >
+              <option value="todo">To Do</option>
+              <option value="in_progress">In Progress</option>
+              <option value="review">Review</option>
+              <option value="done">Done</option>
+            </select>
+          </div>
+
+          <div>
+            <label className={labelClass}>Priority</label>
+            <select
+              value={formData.priority}
+              onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+              className={inputClass}
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>Assignee</label>
+            <select
+              value={formData.assignee_id}
+              onChange={(e) => setFormData({ ...formData, assignee_id: e.target.value })}
+              className={inputClass}
+            >
+              <option value="">Unassigned</option>
+              {projectMembers.map(member => (
+                <option key={member.user_id} value={member.user_id}>{member.username}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className={labelClass}>Due Date</label>
+            <input
+              type="date"
+              value={formData.due_date}
+              onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+              className={inputClass}
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3 pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+              darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)]/70' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]'
+            }`}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="flex-1 px-6 py-3 bg-[rgb(119,136,115)] hover:bg-[rgb(161,188,152)] text-white rounded-lg font-semibold shadow-lg transition-all"
+          >
+            Save Changes
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+const DeleteTaskModal = ({ isOpen, onClose, onConfirm, task, darkMode }) => {
+  if (!task) return null;
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Delete Task" darkMode={darkMode}>
+      <div className="space-y-4">
+        <div className={`p-4 rounded-lg border-2 ${
+          darkMode ? 'bg-red-500/10 border-red-500/30' : 'bg-red-50 border-red-200'
+        }`}>
+          <div className="flex items-start gap-3">
+            <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+            <div>
+              <h3 className={`font-bold mb-1 ${
+                darkMode ? 'text-red-400' : 'text-red-600'
+              }`}>Are you sure you want to delete this task?</h3>
+              <p className={`text-sm ${
+                darkMode ? 'text-red-300' : 'text-red-500'
+              }`}>This action cannot be undone.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className={`p-4 rounded-lg ${
+          darkMode ? 'bg-[rgb(24,28,24)]' : 'bg-[rgb(210,220,182)]/20'
+        }`}>
+          <p className={`text-sm font-medium mb-2 ${
+            darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'
+          }`}>Task Details:</p>
+          <h4 className={`font-bold text-lg ${
+            darkMode ? 'text-white' : 'text-[rgb(60,68,58)]'
+          }`}>{sanitizeText(task.title)}</h4>
+          {task.description && (
+            <p className={`text-sm mt-2 ${
+              darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'
+            }`}>{sanitizeText(task.description).substring(0, 100)}...</p>
+          )}
+        </div>
+
+        <div className="flex gap-3 pt-4">
+          <button
+            onClick={onClose}
+            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+              darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)]/70' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]'
+            }`}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              onConfirm();
+              onClose();
+            }}
+            className="flex-1 px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold shadow-lg transition-all"
+          >
+            Delete Task
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+/**
  * MAIN PROJECT PAGE COMPONENT
  */
 export default function ProjectPage() {
@@ -277,6 +649,10 @@ export default function ProjectPage() {
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [assigneeFilter, setAssigneeFilter] = useState('all');
   const [sortBy, setSortBy] = useState('due_date');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedTask, setSelectedTask] = useState(null);
 
   const projectId = 1; // Hardcoded for testing with project ID 1
   const userRole = projectData?.user_role || 'viewer'; // Get role from API response
@@ -365,23 +741,43 @@ export default function ProjectPage() {
     overdue: tasks.filter(t => getDaysUntilDue(t.due_date) !== null && getDaysUntilDue(t.due_date) < 0 && t.status !== 'done').length,
   };
 
-  const handleEditTask = async (task) => {
-    console.log('Edit task:', task.id);
-    // TODO: Implement edit dialog
-    alert(`Edit task: ${task.title}\n\nNote: Backend validates 'lead' or 'editor' role with Zod schemas.`);
+  const handleEditTask = (task) => {
+    setSelectedTask(task);
+    setShowEditModal(true);
   };
 
-  const handleDeleteTask = async (task) => {
-    if (!confirm(`Are you sure you want to delete "${task.title}"?`)) {
-      return;
-    }
-
+  const handleEditSubmit = async (formData) => {
     try {
-      const response = await projectApi.deleteTask(projectId, task.id);
+      const updates = { ...formData };
+      if (updates.assignee_id === '') updates.assignee_id = null;
+      if (updates.due_date) updates.due_date = new Date(updates.due_date).toISOString();
+      
+      const response = await projectApi.updateTask(projectId, selectedTask.id, updates);
       
       if (response.success) {
-        // Remove task from local state
-        setTasks(tasks.filter(t => t.id !== task.id));
+        setTasks(tasks.map(t => t.id === selectedTask.id ? response.data : t));
+        setShowEditModal(false);
+        setSelectedTask(null);
+        console.log('✅ Task updated:', response.message);
+      }
+    } catch (err) {
+      alert(`Failed to update task: ${err.message}`);
+      console.error('Update task error:', err);
+    }
+  };
+
+  const handleDeleteTask = (task) => {
+    setSelectedTask(task);
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    try {
+      const response = await projectApi.deleteTask(projectId, selectedTask.id);
+      
+      if (response.success) {
+        setTasks(tasks.filter(t => t.id !== selectedTask.id));
+        setSelectedTask(null);
         console.log('✅ Task deleted:', response.message);
       }
     } catch (err) {
@@ -390,10 +786,28 @@ export default function ProjectPage() {
     }
   };
 
-  const handleCreateTask = async () => {
-    // TODO: Implement create task dialog with form
-    console.log('Create new task');
-    alert('Create new task\n\nNote: Requires proper authentication and RBAC validation.');
+  const handleCreateTask = () => {
+    setShowCreateModal(true);
+  };
+
+  const handleCreateSubmit = async (formData) => {
+    try {
+      const taskData = { ...formData };
+      if (taskData.assignee_id === '') taskData.assignee_id = null;
+      else taskData.assignee_id = parseInt(taskData.assignee_id);
+      if (taskData.due_date) taskData.due_date = new Date(taskData.due_date).toISOString();
+      
+      const response = await projectApi.createTask(projectId, taskData);
+      
+      if (response.success) {
+        setTasks([...tasks, response.data]);
+        setShowCreateModal(false);
+        console.log('✅ Task created:', response.message);
+      }
+    } catch (err) {
+      alert(`Failed to create task: ${err.message}`);
+      console.error('Create task error:', err);
+    }
   };
 
   return (
@@ -763,6 +1177,38 @@ export default function ProjectPage() {
           </div>
         </main>
       </div>
+
+      {/* Modals */}
+      <CreateTaskModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSubmit={handleCreateSubmit}
+        projectMembers={projectMembers}
+        darkMode={isDarkMode}
+      />
+
+      <EditTaskModal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setSelectedTask(null);
+        }}
+        onSubmit={handleEditSubmit}
+        task={selectedTask}
+        projectMembers={projectMembers}
+        darkMode={isDarkMode}
+      />
+
+      <DeleteTaskModal
+        isOpen={showDeleteModal}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setSelectedTask(null);
+        }}
+        onConfirm={handleDeleteConfirm}
+        task={selectedTask}
+        darkMode={isDarkMode}
+      />
     </div>
   );
 }
