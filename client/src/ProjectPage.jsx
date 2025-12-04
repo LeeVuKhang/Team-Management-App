@@ -491,7 +491,7 @@ const CreateTaskModal = ({ isOpen, onClose, onSubmit, projectMembers, darkMode }
           </div>
 
           <div>
-            <label className={labelClass}>Due Date</label>
+            <label className={labelClass}>Due Date *</label>
             <input
               type="date"
               value={formData.due_date}
