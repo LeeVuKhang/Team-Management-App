@@ -9,9 +9,9 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Layout />}>
-          <Route index element={<Navigate to="/team/1" replace />} />
-          <Route path="team/:teamId" element={<TeamPage />} />
-          <Route path="project" element={<ProjectPage />} />
+          <Route index element={<Navigate to="/teams/1" replace />} />
+          <Route path="teams/:teamId" element={<TeamPage />} />
+          <Route path="teams/:teamId/projects/:projectId" element={<ProjectPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

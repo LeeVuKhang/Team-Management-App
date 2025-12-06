@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useParams, useNavigate } from 'react-router-dom';
 import * as projectApi from './services/projectApi';
 import { 
   CheckCircle2,
@@ -835,6 +835,9 @@ const DeleteTaskModal = ({ isOpen, onClose, onConfirm, task, darkMode }) => {
  */
 export default function ProjectPage() {
   const { isDarkMode } = useOutletContext();
+  const { teamId, projectId } = useParams();
+  const navigate = useNavigate();
+  
   const [tasks, setTasks] = useState([]);
   const [projectData, setProjectData] = useState(null);
   const [projectMembers, setProjectMembers] = useState([]);
@@ -850,7 +853,6 @@ export default function ProjectPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
 
-  const projectId = 1; // Hardcoded for testing with project ID 1
   const userRole = projectData?.user_role || 'viewer'; // Get role from API response
 
   // Fetch project data on component mount
@@ -1009,9 +1011,12 @@ export default function ProjectPage() {
         <div className="max-w-7xl mx-auto">
           
           {/* Back Button */}
-          <button className={`flex items-center gap-2 mb-6 ${isDarkMode ? 'text-[rgb(161,188,152)] hover:text-[rgb(210,220,182)]' : 'text-[rgb(119,136,115)] hover:text-[rgb(60,68,58)]'} transition-colors`}>
+          <button 
+            onClick={() => navigate(`/teams/${teamId}`)}
+            className={`flex items-center gap-2 mb-6 ${isDarkMode ? 'text-[rgb(161,188,152)] hover:text-[rgb(210,220,182)]' : 'text-[rgb(119,136,115)] hover:text-[rgb(60,68,58)]'} transition-colors`}
+          >
             <ArrowLeft size={20} />
-            <span className="font-medium">Back to Projects</span>
+            <span className="font-medium">Back to Teams</span>
           </button>
 
           {/* Loading State */}

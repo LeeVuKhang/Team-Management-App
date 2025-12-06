@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useOutletContext, useParams } from 'react-router-dom';
+import { useOutletContext, useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getTeam, getTeamProjects, getTeamStats, getTeamMembers } from './services/projectApi';
 import { 
@@ -34,7 +34,7 @@ const FilterButton = ({ active, onClick, children, darkMode }) => (
   </button>
 );
 
-const ProjectCard = ({ project, darkMode }) => {
+const ProjectCard = ({ project, darkMode, onClick }) => {
   // Calculate progress percentage
   const progress = project.total_tasks > 0 
     ? Math.round((project.completed_tasks / project.total_tasks) * 100) 
@@ -51,7 +51,10 @@ const ProjectCard = ({ project, darkMode }) => {
   };
 
   return (
-    <div className={`${darkMode ? 'bg-[rgb(30,36,30)]/50 border-[rgb(45,52,45)]/50' : 'bg-white border-[rgb(210,220,182)] shadow-sm'} border rounded-xl p-5 hover:border-[rgb(161,188,152)] transition-all flex flex-col h-full`}>
+    <div 
+      onClick={onClick}
+      className={`${darkMode ? 'bg-[rgb(30,36,30)]/50 border-[rgb(45,52,45)]/50' : 'bg-white border-[rgb(210,220,182)] shadow-sm'} border rounded-xl p-5 hover:border-[rgb(161,188,152)] transition-all flex flex-col h-full cursor-pointer hover:shadow-lg hover:-translate-y-1`}
+    >
       <div className="flex justify-between items-start mb-3">
         <h3 className={`font-semibold text-lg ${darkMode ? 'text-[rgb(241,243,224)]' : 'text-[rgb(60,68,58)]'}`}>{project.name}</h3>
         <span className={`text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${getStatusColor(project.status)}`}>
@@ -106,6 +109,7 @@ const ProjectCard = ({ project, darkMode }) => {
 export default function TeamPage() {
   const { isDarkMode } = useOutletContext();
   const { teamId } = useParams();
+  const navigate = useNavigate();
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
@@ -440,7 +444,12 @@ export default function TeamPage() {
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredProjects.map((project) => (
-                <ProjectCard key={project.id} project={project} darkMode={isDarkMode} />
+                <ProjectCard 
+                  key={project.id} 
+                  project={project} 
+                  darkMode={isDarkMode}
+                  onClick={() => navigate(`/teams/${teamId}/projects/${project.id}`)}
+                />
               ))}
             </div>
           )}
