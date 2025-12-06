@@ -1,6 +1,6 @@
 /**
  * Project API Service
- * Handles all API calls related to projects and tasks
+ * Handles all API calls related to projects, tasks, and teams
  * 
  * Security Notes:
  * - Uses credentials: 'include' to send HTTP-only cookies with JWT
@@ -110,4 +110,50 @@ export async function deleteTask(projectId, taskId) {
   return apiFetch(`/projects/${projectId}/tasks/${taskId}`, {
     method: 'DELETE',
   });
+}
+
+// ==================== TEAM API FUNCTIONS ====================
+
+/**
+ * Get all teams for the authenticated user
+ * @returns {Promise<{success: boolean, data: array}>}
+ */
+export async function getUserTeams() {
+  return apiFetch('/teams');
+}
+
+/**
+ * Get team details by ID
+ * @param {number} teamId 
+ * @returns {Promise<{success: boolean, data: object}>}
+ */
+export async function getTeam(teamId) {
+  return apiFetch(`/teams/${teamId}`);
+}
+
+/**
+ * Get all members of a team
+ * @param {number} teamId 
+ * @returns {Promise<{success: boolean, data: array}>}
+ */
+export async function getTeamMembers(teamId) {
+  return apiFetch(`/teams/${teamId}/members`);
+}
+
+/**
+ * Get all projects in a team
+ * @param {number} teamId 
+ * @returns {Promise<{success: boolean, data: array}>}
+ */
+export async function getTeamProjects(teamId) {
+  return apiFetch(`/teams/${teamId}/projects`);
+}
+
+/**
+ * Get team statistics (overview metrics)
+ * @param {number} teamId 
+ * @returns {Promise<{success: boolean, data: object}>}
+ */
+export async function getTeamStats(teamId) {
+  return apiFetch(`/teams/${teamId}/stats`);
 }
