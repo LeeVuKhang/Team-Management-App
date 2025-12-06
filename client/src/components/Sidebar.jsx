@@ -49,7 +49,7 @@ export default function Sidebar({ isOpen, darkMode, activePage }) {
           teams.map((team) => (
             <Link 
               key={team.id} 
-              to={`/team/${team.id}`}
+              to={`/teams/${team.id}`}
               className={`w-full flex items-center px-4 py-2 text-sm rounded-lg transition-colors ${
                 teamId === String(team.id)
                   ? darkMode 
