@@ -1,7 +1,7 @@
 import './App.css'
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './Layout.jsx';
-import Homepage from './homepage.jsx';
+import TeamPage from './TeamPage.jsx';
 import ProjectPage from './ProjectPage.jsx';
 
 function App() {
@@ -9,7 +9,8 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Layout />}>
-          <Route index element={<Homepage />} />
+          <Route index element={<Navigate to="/team/1" replace />} />
+          <Route path="team/:teamId" element={<TeamPage />} />
           <Route path="project" element={<ProjectPage />} />
         </Route>
       </Routes>
