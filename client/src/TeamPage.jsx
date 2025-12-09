@@ -587,29 +587,46 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
 };
 
 // Edit Project Modal
-const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode }) => {
+const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMembers, teamId }) => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     status: 'active',
     start_date: '',
-    end_date: ''
+    end_date: '',
+    selectedMembers: [] // {userId, role}
   });
   const [error, setError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [initialMembers, setInitialMembers] = useState([]); // Track initial state for comparison
 
+  // Fetch current project members when modal opens
   React.useEffect(() => {
-    if (project) {
-      setFormData({
-        name: project.name || '',
-        description: project.description || '',
-        status: project.status || 'active',
-        start_date: project.start_date ? new Date(project.start_date).toISOString().split('T')[0] : '',
-        end_date: project.end_date ? new Date(project.end_date).toISOString().split('T')[0] : ''
-      });
+    if (project && isOpen) {
+      const fetchProjectMembers = async () => {
+        try {
+          const response = await getProjectMembers(project.id);
+          const members = response.data.map(m => ({ userId: m.user_id, role: m.role }));
+          setInitialMembers(members);
+          
+          setFormData({
+            name: project.name || '',
+            description: project.description || '',
+            status: project.status || 'active',
+            start_date: project.start_date ? new Date(project.start_date).toISOString().split('T')[0] : '',
+            end_date: project.end_date ? new Date(project.end_date).toISOString().split('T')[0] : '',
+            selectedMembers: members
+          });
+          setError(null);
+        } catch (err) {
+          console.error('Failed to fetch project members:', err);
+          setError('Failed to load project members');
+        }
+      };
+      
+      fetchProjectMembers();
     }
-    setError(null);
-  }, [project]);
+  }, [project, isOpen]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -633,6 +650,7 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode }) => {
     setIsSubmitting(true);
 
     try {
+      // Handle project detail updates
       const dataToSubmit = {};
       
       if (formData.name.trim() !== project.name) {
@@ -657,18 +675,109 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode }) => {
         dataToSubmit.end_date = formData.end_date ? new Date(formData.end_date).toISOString() : null;
       }
 
-      if (Object.keys(dataToSubmit).length === 0) {
+      // Update project if there are changes
+      if (Object.keys(dataToSubmit).length > 0) {
+        await onSubmit(dataToSubmit);
+      }
+
+      // Handle member changes
+      const currentMemberIds = initialMembers.map(m => m.userId);
+      const selectedMemberIds = formData.selectedMembers.map(m => m.userId);
+
+      // Members to add (in selected but not in current)
+      const membersToAdd = formData.selectedMembers.filter(m => !currentMemberIds.includes(m.userId));
+
+      // Members to remove (in current but not in selected)
+      const membersToRemove = initialMembers.filter(m => !selectedMemberIds.includes(m.userId));
+
+      // Members to update role (in both but role changed)
+      const membersToUpdate = formData.selectedMembers.filter(m => {
+        const initial = initialMembers.find(im => im.userId === m.userId);
+        return initial && initial.role !== m.role;
+      });
+
+      // Execute member operations
+      for (const member of membersToAdd) {
+        try {
+          await addProjectMember(project.id, member.userId, member.role);
+        } catch (err) {
+          console.error(`Failed to add member ${member.userId}:`, err);
+          throw new Error(`Failed to add member: ${err.message}`);
+        }
+      }
+
+      for (const member of membersToRemove) {
+        try {
+          // Try to remove without force first
+          await removeProjectMember(project.id, member.userId, false);
+        } catch (err) {
+          // If member has tasks, ask for confirmation
+          if (err.message.includes('has assigned tasks')) {
+            const confirmRemove = window.confirm(
+              `This member has assigned tasks in the project. Remove them anyway? (Tasks will be unassigned)`
+            );
+            if (confirmRemove) {
+              await removeProjectMember(project.id, member.userId, true);
+            } else {
+              throw new Error('Member removal cancelled');
+            }
+          } else {
+            throw new Error(`Failed to remove member: ${err.message}`);
+          }
+        }
+      }
+
+      for (const member of membersToUpdate) {
+        try {
+          await updateProjectMemberRole(project.id, member.userId, member.role);
+        } catch (err) {
+          console.error(`Failed to update member ${member.userId}:`, err);
+          throw new Error(`Failed to update member role: ${err.message}`);
+        }
+      }
+
+      // If no project changes and no member changes, show error
+      if (Object.keys(dataToSubmit).length === 0 && 
+          membersToAdd.length === 0 && 
+          membersToRemove.length === 0 && 
+          membersToUpdate.length === 0) {
         setError('No changes detected');
+        setIsSubmitting(false);
         return;
       }
 
-      await onSubmit(dataToSubmit);
       onClose();
     } catch (err) {
       setError(err.message || 'Failed to update project');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const toggleMember = (member) => {
+    setFormData(prev => {
+      const exists = prev.selectedMembers.find(m => m.userId === member.user_id);
+      if (exists) {
+        return {
+          ...prev,
+          selectedMembers: prev.selectedMembers.filter(m => m.userId !== member.user_id)
+        };
+      } else {
+        return {
+          ...prev,
+          selectedMembers: [...prev.selectedMembers, { userId: member.user_id, role: 'viewer' }]
+        };
+      }
+    });
+  };
+
+  const updateMemberRole = (userId, newRole) => {
+    setFormData(prev => ({
+      ...prev,
+      selectedMembers: prev.selectedMembers.map(m => 
+        m.userId === userId ? { ...m, role: newRole } : m
+      )
+    }));
   };
 
   const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${
@@ -758,6 +867,76 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode }) => {
               className={inputClass}
             />
           </div>
+        </div>
+
+        {/* Member Selection */}
+        <div>
+          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+            Project Members
+          </label>
+          <div className={`max-h-48 overflow-y-auto rounded-lg border ${
+            darkMode ? 'border-[rgb(45,52,45)] bg-[rgb(24,28,24)]' : 'border-[rgb(210,220,182)] bg-white'
+          }`}>
+            {teamMembers && teamMembers.length > 0 ? (
+              <div className="divide-y divide-[rgb(45,52,45)]">
+                {teamMembers.map((member) => {
+                  const isSelected = formData.selectedMembers.find(m => m.userId === member.user_id);
+                  return (
+                    <div key={member.user_id} className={`p-3 flex items-center justify-between hover:bg-[rgb(45,52,45)]/30 transition-colors`}>
+                      <div className="flex items-center gap-3 flex-1">
+                        <input
+                          type="checkbox"
+                          checked={!!isSelected}
+                          onChange={() => toggleMember(member)}
+                          className="w-4 h-4 rounded border-[rgb(119,136,115)] text-[rgb(119,136,115)] focus:ring-[rgb(119,136,115)]"
+                        />
+                        <div className="flex items-center gap-2">
+                          {member.avatar_url ? (
+                            <img src={member.avatar_url} alt={member.username} className="w-8 h-8 rounded-full" />
+                          ) : (
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                              darkMode ? 'bg-[rgb(119,136,115)] text-white' : 'bg-[rgb(210,220,182)] text-[rgb(60,68,58)]'
+                            }`}>
+                              {member.username[0].toUpperCase()}
+                            </div>
+                          )}
+                          <span className={`text-sm ${darkMode ? 'text-[rgb(241,243,224)]' : 'text-[rgb(60,68,58)]'}`}>
+                            {member.username}
+                          </span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)]'
+                          }`}>
+                            {member.role}
+                          </span>
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <select
+                          value={isSelected.role}
+                          onChange={(e) => updateMemberRole(member.user_id, e.target.value)}
+                          className={`text-xs px-2 py-1 rounded border focus:outline-none focus:ring-1 focus:ring-[rgb(119,136,115)] ${
+                            darkMode ? 'bg-[rgb(30,36,30)] border-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'bg-white border-[rgb(210,220,182)] text-[rgb(119,136,115)]'
+                          }`}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <option value="lead">Lead</option>
+                          <option value="editor">Editor</option>
+                          <option value="viewer">Viewer</option>
+                        </select>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className={`p-4 text-center text-sm ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+                No team members available
+              </div>
+            )}
+          </div>
+          <p className={`text-xs mt-1 ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
+            {formData.selectedMembers.length} member(s) selected
+          </p>
         </div>
 
         <div className="flex gap-3 pt-4">
@@ -1565,6 +1744,8 @@ export default function TeamPage() {
         project={selectedProject}
         onSubmit={(updates) => updateProjectMutation.mutate({ projectId: selectedProject.id, updates })}
         darkMode={isDarkMode}
+        teamMembers={membersData?.data}
+        teamId={teamData?.data?.id}
       />
 
       <DeleteProjectModal
