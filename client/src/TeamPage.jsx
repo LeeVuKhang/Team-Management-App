@@ -7,7 +7,14 @@ import {
   getTeamStats, 
   getTeamMembers,
   updateTeam,
-  deleteTeam 
+  deleteTeam,
+  createProject,
+  updateProject,
+  deleteProject,
+  getProjectMembers,
+  addProjectMember,
+  removeProjectMember,
+  updateProjectMemberRole
 } from './services/projectApi';
 import { 
   LayoutDashboard, 
@@ -22,7 +29,8 @@ import {
   X,
   Edit3,
   Trash2,
-  Settings
+  Settings,
+  Calendar
 } from 'lucide-react';
 
 /**
@@ -49,17 +57,17 @@ const Modal = ({ isOpen, onClose, title, children, darkMode }) => {
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto"
       onClick={onClose}
     >
       <div 
-        className={`w-full max-w-lg rounded-xl shadow-2xl ${
+        className={`w-full max-w-lg rounded-xl shadow-2xl my-8 ${
           darkMode ? 'bg-[rgb(30,36,30)] border border-[rgb(45,52,45)]' : 'bg-white border border-[rgb(210,220,182)]'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className={`flex items-center justify-between p-6 border-b ${
-          darkMode ? 'border-[rgb(45,52,45)]' : 'border-[rgb(210,220,182)]'
+        <div className={`flex items-center justify-between p-6 border-b sticky top-0 z-10 ${
+          darkMode ? 'border-[rgb(45,52,45)] bg-[rgb(30,36,30)]' : 'border-[rgb(210,220,182)] bg-white'
         }`}>
           <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
             {title}
@@ -73,7 +81,7 @@ const Modal = ({ isOpen, onClose, title, children, darkMode }) => {
             <X size={20} />
           </button>
         </div>
-        <div className="p-6">
+        <div className="p-6 max-h-[calc(100vh-200px)] overflow-y-auto">
           {children}
         </div>
       </div>
@@ -289,6 +297,602 @@ const DeleteTeamModal = ({ isOpen, onClose, team, onConfirm, darkMode }) => {
   );
 };
 
+// Create Project Modal
+const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, darkMode }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    status: 'active',
+    start_date: '',
+    end_date: '',
+    selectedMembers: [] // Array of {userId, role}
+  });
+  const [error, setError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setFormData({
+        name: '',
+        description: '',
+        status: 'active',
+        start_date: '',
+        end_date: '',
+        selectedMembers: [] // Creator will be auto-added as lead on backend
+      });
+      setError(null);
+    }
+  }, [isOpen]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!formData.name.trim()) {
+      setError('Project name is required');
+      return;
+    }
+
+    if (formData.name.length > 100) {
+      setError('Project name must be 100 characters or less');
+      return;
+    }
+
+    if (formData.description && formData.description.length > 500) {
+      setError('Description must be 500 characters or less');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const dataToSubmit = {
+        name: formData.name.trim(),
+        status: formData.status
+      };
+      
+      if (formData.description?.trim()) {
+        dataToSubmit.description = formData.description.trim();
+      }
+      
+      if (formData.start_date) {
+        dataToSubmit.start_date = new Date(formData.start_date).toISOString();
+      }
+      
+      if (formData.end_date) {
+        dataToSubmit.end_date = new Date(formData.end_date).toISOString();
+      }
+
+      // Pass selected members separately
+      dataToSubmit.members = formData.selectedMembers;
+
+      await onSubmit(dataToSubmit);
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to create project');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const toggleMember = (member) => {
+    setFormData(prev => {
+      const exists = prev.selectedMembers.find(m => m.userId === member.user_id);
+      if (exists) {
+        return {
+          ...prev,
+          selectedMembers: prev.selectedMembers.filter(m => m.userId !== member.user_id)
+        };
+      } else {
+        return {
+          ...prev,
+          selectedMembers: [...prev.selectedMembers, { userId: member.user_id, role: 'viewer' }]
+        };
+      }
+    });
+  };
+
+  const updateMemberRole = (userId, newRole) => {
+    setFormData(prev => ({
+      ...prev,
+      selectedMembers: prev.selectedMembers.map(m => 
+        m.userId === userId ? { ...m, role: newRole } : m
+      )
+    }));
+  };
+
+  const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${
+    darkMode ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white placeholder-[rgb(119,136,115)]' : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)] placeholder-[rgb(119,136,115)]'
+  }`;
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Create New Project" darkMode={darkMode}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {error && (
+          <div className={`p-3 rounded-lg border ${
+            darkMode ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-red-50 border-red-200 text-red-600'
+          }`}>
+            <p className="text-sm">{error}</p>
+          </div>
+        )}
+
+        <div>
+          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+            Project Name <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={formData.name}
+            onChange={(e) => setFormData({...formData, name: e.target.value})}
+            className={inputClass}
+            placeholder="Enter project name"
+            maxLength={100}
+          />
+          <p className={`text-xs mt-1 ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
+            {formData.name.length}/100 characters
+          </p>
+        </div>
+
+        <div>
+          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+            Description
+          </label>
+          <textarea
+            value={formData.description}
+            onChange={(e) => setFormData({...formData, description: e.target.value})}
+            className={inputClass}
+            placeholder="Project description (optional)"
+            rows={3}
+            maxLength={500}
+          />
+          <p className={`text-xs mt-1 ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
+            {formData.description.length}/500 characters
+          </p>
+        </div>
+
+        <div>
+          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+            Status
+          </label>
+          <select
+            value={formData.status}
+            onChange={(e) => setFormData({...formData, status: e.target.value})}
+            className={inputClass}
+          >
+            <option value="active">Active</option>
+            <option value="archived">Archived</option>
+            <option value="completed">Completed</option>
+          </select>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+              Start Date
+            </label>
+            <input
+              type="date"
+              value={formData.start_date}
+              onChange={(e) => setFormData({...formData, start_date: e.target.value})}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+              End Date
+            </label>
+            <input
+              type="date"
+              value={formData.end_date}
+              onChange={(e) => setFormData({...formData, end_date: e.target.value})}
+              className={inputClass}
+            />
+          </div>
+        </div>
+
+        {/* Member Selection */}
+        <div>
+          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+            Team Members <span className="text-xs font-normal">(You will be added as lead automatically)</span>
+          </label>
+          <div className={`max-h-48 overflow-y-auto rounded-lg border ${
+            darkMode ? 'border-[rgb(45,52,45)] bg-[rgb(24,28,24)]' : 'border-[rgb(210,220,182)] bg-white'
+          }`}>
+            {teamMembers && teamMembers.length > 0 ? (
+              <div className="divide-y divide-[rgb(45,52,45)]">
+                {teamMembers.map((member) => {
+                  const isSelected = formData.selectedMembers.find(m => m.userId === member.user_id);
+                  return (
+                    <div key={member.user_id} className={`p-3 flex items-center justify-between hover:bg-[rgb(45,52,45)]/30 transition-colors`}>
+                      <div className="flex items-center gap-3 flex-1">
+                        <input
+                          type="checkbox"
+                          checked={!!isSelected}
+                          onChange={() => toggleMember(member)}
+                          className="w-4 h-4 rounded border-[rgb(119,136,115)] text-[rgb(119,136,115)] focus:ring-[rgb(119,136,115)]"
+                        />
+                        <div className="flex items-center gap-2">
+                          {member.avatar_url ? (
+                            <img src={member.avatar_url} alt={member.username} className="w-8 h-8 rounded-full" />
+                          ) : (
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                              darkMode ? 'bg-[rgb(119,136,115)] text-white' : 'bg-[rgb(210,220,182)] text-[rgb(60,68,58)]'
+                            }`}>
+                              {member.username[0].toUpperCase()}
+                            </div>
+                          )}
+                          <span className={`text-sm ${darkMode ? 'text-[rgb(241,243,224)]' : 'text-[rgb(60,68,58)]'}`}>
+                            {member.username}
+                          </span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)]'
+                          }`}>
+                            {member.role}
+                          </span>
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <select
+                          value={isSelected.role}
+                          onChange={(e) => updateMemberRole(member.user_id, e.target.value)}
+                          className={`text-xs px-2 py-1 rounded border focus:outline-none focus:ring-1 focus:ring-[rgb(119,136,115)] ${
+                            darkMode ? 'bg-[rgb(30,36,30)] border-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'bg-white border-[rgb(210,220,182)] text-[rgb(119,136,115)]'
+                          }`}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <option value="lead">Lead</option>
+                          <option value="editor">Editor</option>
+                          <option value="viewer">Viewer</option>
+                        </select>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className={`p-4 text-center text-sm ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+                No team members available
+              </div>
+            )}
+          </div>
+          <p className={`text-xs mt-1 ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
+            {formData.selectedMembers.length} member(s) selected (+ you as lead)
+          </p>
+        </div>
+
+        <div className="flex gap-3 pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+              darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)]/70' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]'
+            } disabled:opacity-50`}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting || !formData.name.trim()}
+            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+              darkMode ? 'bg-[rgb(119,136,115)] hover:bg-[rgb(119,136,115)]/80 text-white' : 'bg-[rgb(119,136,115)] hover:bg-[rgb(119,136,115)]/90 text-white'
+            }`}
+          >
+            {isSubmitting ? 'Creating...' : 'Create Project'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+// Edit Project Modal
+const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    status: 'active',
+    start_date: '',
+    end_date: ''
+  });
+  const [error, setError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  React.useEffect(() => {
+    if (project) {
+      setFormData({
+        name: project.name || '',
+        description: project.description || '',
+        status: project.status || 'active',
+        start_date: project.start_date ? new Date(project.start_date).toISOString().split('T')[0] : '',
+        end_date: project.end_date ? new Date(project.end_date).toISOString().split('T')[0] : ''
+      });
+    }
+    setError(null);
+  }, [project]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!formData.name.trim()) {
+      setError('Project name is required');
+      return;
+    }
+
+    if (formData.name.length > 100) {
+      setError('Project name must be 100 characters or less');
+      return;
+    }
+
+    if (formData.description && formData.description.length > 500) {
+      setError('Description must be 500 characters or less');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const dataToSubmit = {};
+      
+      if (formData.name.trim() !== project.name) {
+        dataToSubmit.name = formData.name.trim();
+      }
+      
+      if (formData.description?.trim() !== project.description) {
+        dataToSubmit.description = formData.description.trim();
+      }
+      
+      if (formData.status !== project.status) {
+        dataToSubmit.status = formData.status;
+      }
+
+      const projectStartDate = project.start_date ? new Date(project.start_date).toISOString().split('T')[0] : '';
+      if (formData.start_date !== projectStartDate) {
+        dataToSubmit.start_date = formData.start_date ? new Date(formData.start_date).toISOString() : null;
+      }
+
+      const projectEndDate = project.end_date ? new Date(project.end_date).toISOString().split('T')[0] : '';
+      if (formData.end_date !== projectEndDate) {
+        dataToSubmit.end_date = formData.end_date ? new Date(formData.end_date).toISOString() : null;
+      }
+
+      if (Object.keys(dataToSubmit).length === 0) {
+        setError('No changes detected');
+        return;
+      }
+
+      await onSubmit(dataToSubmit);
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to update project');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${
+    darkMode ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white placeholder-[rgb(119,136,115)]' : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)] placeholder-[rgb(119,136,115)]'
+  }`;
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Edit Project" darkMode={darkMode}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {error && (
+          <div className={`p-3 rounded-lg border ${
+            darkMode ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-red-50 border-red-200 text-red-600'
+          }`}>
+            <p className="text-sm">{error}</p>
+          </div>
+        )}
+
+        <div>
+          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+            Project Name <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={formData.name}
+            onChange={(e) => setFormData({...formData, name: e.target.value})}
+            className={inputClass}
+            placeholder="Enter project name"
+            maxLength={100}
+          />
+          <p className={`text-xs mt-1 ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
+            {formData.name.length}/100 characters
+          </p>
+        </div>
+
+        <div>
+          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+            Description
+          </label>
+          <textarea
+            value={formData.description}
+            onChange={(e) => setFormData({...formData, description: e.target.value})}
+            className={inputClass}
+            placeholder="Project description (optional)"
+            rows={3}
+            maxLength={500}
+          />
+          <p className={`text-xs mt-1 ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
+            {formData.description.length}/500 characters
+          </p>
+        </div>
+
+        <div>
+          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+            Status
+          </label>
+          <select
+            value={formData.status}
+            onChange={(e) => setFormData({...formData, status: e.target.value})}
+            className={inputClass}
+          >
+            <option value="active">Active</option>
+            <option value="archived">Archived</option>
+            <option value="completed">Completed</option>
+          </select>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+              Start Date
+            </label>
+            <input
+              type="date"
+              value={formData.start_date}
+              onChange={(e) => setFormData({...formData, start_date: e.target.value})}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+              End Date
+            </label>
+            <input
+              type="date"
+              value={formData.end_date}
+              onChange={(e) => setFormData({...formData, end_date: e.target.value})}
+              className={inputClass}
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3 pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+              darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)]/70' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]'
+            } disabled:opacity-50`}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting || !formData.name.trim()}
+            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+              darkMode ? 'bg-[rgb(119,136,115)] hover:bg-[rgb(119,136,115)]/80 text-white' : 'bg-[rgb(119,136,115)] hover:bg-[rgb(119,136,115)]/90 text-white'
+            }`}
+          >
+            {isSubmitting ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+// Delete Project Modal
+const DeleteProjectModal = ({ isOpen, onClose, project, onConfirm, darkMode }) => {
+  const [confirmText, setConfirmText] = useState('');
+  const [error, setError] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setConfirmText('');
+      setError(null);
+    }
+  }, [isOpen]);
+
+  const handleDelete = async () => {
+    if (confirmText !== project?.name) {
+      setError('Project name does not match');
+      return;
+    }
+
+    setError(null);
+    setIsDeleting(true);
+
+    try {
+      await onConfirm();
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to delete project');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all ${
+    darkMode ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white' : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)]'
+  }`;
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Delete Project" darkMode={darkMode}>
+      <div className="space-y-4">
+        <div className={`p-4 rounded-lg border-2 ${
+          darkMode ? 'bg-red-500/10 border-red-500/30' : 'bg-red-50 border-red-200'
+        }`}>
+          <div className="flex items-start gap-3">
+            <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+            <div>
+              <h4 className={`font-bold text-sm mb-1 ${darkMode ? 'text-red-400' : 'text-red-600'}`}>
+                Warning: This action cannot be undone
+              </h4>
+              <p className={`text-sm ${darkMode ? 'text-red-300' : 'text-red-500'}`}>
+                Deleting this project will permanently remove:
+              </p>
+              <ul className={`text-xs mt-2 space-y-1 list-disc list-inside ${darkMode ? 'text-red-300' : 'text-red-500'}`}>
+                <li>All tasks in this project</li>
+                <li>All project members</li>
+                <li>All related channels</li>
+                <li>All related data</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        {error && (
+          <div className={`p-3 rounded-lg border ${
+            darkMode ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-red-50 border-red-200 text-red-600'
+          }`}>
+            <p className="text-sm">{error}</p>
+          </div>
+        )}
+
+        <div>
+          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+            Type <span className="font-mono text-red-500">"{project?.name}"</span> to confirm:
+          </label>
+          <input
+            type="text"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            className={inputClass}
+            placeholder={project?.name}
+          />
+        </div>
+
+        <div className="flex gap-3 pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isDeleting}
+            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+              darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)]/70' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]'
+            } disabled:opacity-50`}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={isDeleting || confirmText !== project?.name}
+            className="flex-1 px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isDeleting ? 'Deleting...' : 'Delete Project'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 const FilterButton = ({ active, onClick, children, darkMode }) => (
   <button
     onClick={onClick}
@@ -304,7 +908,24 @@ const FilterButton = ({ active, onClick, children, darkMode }) => (
   </button>
 );
 
-const ProjectCard = ({ project, darkMode, onClick }) => {
+const ProjectCard = ({ project, darkMode, onClick, onEdit, onDelete }) => {
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = React.useRef(null);
+
+  // Close menu when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setShowMenu(false);
+      }
+    };
+
+    if (showMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showMenu]);
+
   // Calculate progress percentage
   const progress = project.total_tasks > 0 
     ? Math.round((project.completed_tasks / project.total_tasks) * 100) 
@@ -322,21 +943,82 @@ const ProjectCard = ({ project, darkMode, onClick }) => {
 
   return (
     <div 
-      onClick={onClick}
-      className={`${darkMode ? 'bg-[rgb(30,36,30)]/50 border-[rgb(45,52,45)]/50' : 'bg-white border-[rgb(210,220,182)] shadow-sm'} border rounded-xl p-5 hover:border-[rgb(161,188,152)] transition-all flex flex-col h-full cursor-pointer hover:shadow-lg hover:-translate-y-1`}
+      className={`${darkMode ? 'bg-[rgb(30,36,30)]/50 border-[rgb(45,52,45)]/50' : 'bg-white border-[rgb(210,220,182)] shadow-sm'} border rounded-xl p-5 hover:border-[rgb(161,188,152)] transition-all flex flex-col h-full relative group`}
     >
+      {/* Project card header with menu */}
       <div className="flex justify-between items-start mb-3">
-        <h3 className={`font-semibold text-lg ${darkMode ? 'text-[rgb(241,243,224)]' : 'text-[rgb(60,68,58)]'}`}>{project.name}</h3>
-        <span className={`text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${getStatusColor(project.status)}`}>
-          {project.status}
-        </span>
+        <h3 
+          onClick={onClick}
+          className={`font-semibold text-lg cursor-pointer hover:text-[rgb(119,136,115)] transition-colors ${darkMode ? 'text-[rgb(241,243,224)]' : 'text-[rgb(60,68,58)]'}`}
+        >
+          {project.name}
+        </h3>
+        
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${getStatusColor(project.status)}`}>
+            {project.status}
+          </span>
+          
+          {/* Actions menu */}
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowMenu(!showMenu);
+              }}
+              className={`p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all ${
+                darkMode ? 'hover:bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'hover:bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)]'
+              } ${showMenu ? 'opacity-100' : ''}`}
+            >
+              <MoreVertical size={16} />
+            </button>
+
+            {showMenu && (
+              <div 
+                className={`absolute right-0 mt-2 w-40 rounded-lg shadow-lg border z-10 ${
+                  darkMode ? 'bg-[rgb(30,36,30)] border-[rgb(45,52,45)]' : 'bg-white border-[rgb(210,220,182)]'
+                }`}
+              >
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowMenu(false);
+                    onEdit(project);
+                  }}
+                  className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${
+                    darkMode ? 'hover:bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'hover:bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)]'
+                  }`}
+                >
+                  <Edit3 size={14} />
+                  Edit Project
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowMenu(false);
+                    onDelete(project);
+                  }}
+                  className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-500 transition-colors ${
+                    darkMode ? 'hover:bg-red-500/10' : 'hover:bg-red-50'
+                  }`}
+                >
+                  <Trash2 size={14} />
+                  Delete Project
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
       
-      <p className={`${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'} text-sm mb-6 line-clamp-2 flex-grow`}>
+      <p 
+        onClick={onClick}
+        className={`${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'} text-sm mb-6 line-clamp-2 flex-grow cursor-pointer`}
+      >
         {project.description || 'No description provided'}
       </p>
 
-      <div className="mt-auto space-y-4">
+      <div onClick={onClick} className="mt-auto space-y-4 cursor-pointer">
         <div className="flex items-center gap-2">
           <Users size={14} className={darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'} />
           <span className={`text-xs ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
@@ -391,6 +1073,11 @@ export default function TeamPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
+  const [showEditProjectModal, setShowEditProjectModal] = useState(false);
+  const [showDeleteProjectModal, setShowDeleteProjectModal] = useState(false);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [projectMenuOpen, setProjectMenuOpen] = useState(null);
 
   // Fetch team data
   const { data: teamData, isLoading: teamLoading, error: teamError } = useQuery({
@@ -435,6 +1122,50 @@ export default function TeamPage() {
     onSuccess: () => {
       queryClient.invalidateQueries(['teams']); // Refresh sidebar
       navigate('/teams/1'); // Navigate to first team (or could show "no teams" page)
+    },
+  });
+
+  // Create project mutation
+  const createProjectMutation = useMutation({
+    mutationFn: async (projectData) => {
+      const { members, ...projectInfo } = projectData;
+      
+      // Create the project first
+      const result = await createProject(teamId, projectInfo);
+      const newProjectId = result.data.id;
+      
+      // Add members to the project (creator is already added as lead on backend)
+      if (members && members.length > 0) {
+        await Promise.all(
+          members.map(member => 
+            addProjectMember(newProjectId, member.userId, member.role)
+          )
+        );
+      }
+      
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(['teamProjects', teamId]);
+      queryClient.invalidateQueries(['teamStats', teamId]);
+    },
+  });
+
+  // Update project mutation
+  const updateProjectMutation = useMutation({
+    mutationFn: ({ projectId, updates }) => updateProject(teamId, projectId, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['teamProjects', teamId]);
+      queryClient.invalidateQueries(['teamStats', teamId]);
+    },
+  });
+
+  // Delete project mutation
+  const deleteProjectMutation = useMutation({
+    mutationFn: (projectId) => deleteProject(teamId, projectId),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['teamProjects', teamId]);
+      queryClient.invalidateQueries(['teamStats', teamId]);
     },
   });
 
@@ -698,7 +1429,7 @@ export default function TeamPage() {
               </div>
 
               <button
-                onClick={() => alert('Create Project feature coming soon!')}
+                onClick={() => setShowCreateProjectModal(true)}
                 className="flex items-center justify-center gap-2 bg-[rgb(119,136,115)] hover:bg-[rgb(161,188,152)] text-white px-6 py-2.5 rounded-lg font-semibold shadow-lg shadow-[rgb(119,136,115)]/20 transition-all active:scale-95 whitespace-nowrap"
               >
                 <Plus size={18} />
@@ -783,6 +1514,14 @@ export default function TeamPage() {
                   project={project} 
                   darkMode={isDarkMode}
                   onClick={() => navigate(`/teams/${teamId}/projects/${project.id}`)}
+                  onEdit={(proj) => {
+                    setSelectedProject(proj);
+                    setShowEditProjectModal(true);
+                  }}
+                  onDelete={(proj) => {
+                    setSelectedProject(proj);
+                    setShowDeleteProjectModal(true);
+                  }}
                 />
               ))}
             </div>
@@ -805,6 +1544,37 @@ export default function TeamPage() {
         onClose={() => setShowDeleteModal(false)}
         team={team}
         onConfirm={() => deleteTeamMutation.mutate()}
+        darkMode={isDarkMode}
+      />
+
+      <CreateProjectModal
+        isOpen={showCreateProjectModal}
+        onClose={() => setShowCreateProjectModal(false)}
+        teamId={teamId}
+        teamMembers={members}
+        onSubmit={(projectData) => createProjectMutation.mutate(projectData)}
+        darkMode={isDarkMode}
+      />
+
+      <EditProjectModal
+        isOpen={showEditProjectModal}
+        onClose={() => {
+          setShowEditProjectModal(false);
+          setSelectedProject(null);
+        }}
+        project={selectedProject}
+        onSubmit={(updates) => updateProjectMutation.mutate({ projectId: selectedProject.id, updates })}
+        darkMode={isDarkMode}
+      />
+
+      <DeleteProjectModal
+        isOpen={showDeleteProjectModal}
+        onClose={() => {
+          setShowDeleteProjectModal(false);
+          setSelectedProject(null);
+        }}
+        project={selectedProject}
+        onConfirm={() => deleteProjectMutation.mutate(selectedProject.id)}
         darkMode={isDarkMode}
       />
     </div>

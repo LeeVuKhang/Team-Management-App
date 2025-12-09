@@ -385,3 +385,457 @@ export async function getProjectStats(projectId, userId) {
       throw error;
     }
 }
+
+/**
+ * Create a new project
+ * SECURITY: Only team owner/admin can create projects
+ * Auto-adds creator as project lead
+ */
+export async function createProject(teamId, userId, projectData) {
+  try {
+    // SECURITY: Verify user is team owner or admin
+    const [membership] = await db`
+      SELECT role FROM team_members
+      WHERE team_id = ${teamId} AND user_id = ${userId}
+    `;
+
+    if (!membership) {
+      throw new Error('Access denied: You are not a member of this team');
+    }
+
+    if (membership.role !== 'owner' && membership.role !== 'admin') {
+      throw new Error('Access denied: Only team owner or admin can create projects');
+    }
+
+    // Create project and add creator as lead in a transaction-like manner
+    const [newProject] = await db`
+      INSERT INTO projects (team_id, name, description, status, start_date, end_date)
+      VALUES (
+        ${teamId},
+        ${projectData.name},
+        ${projectData.description || null},
+        ${projectData.status || 'active'},
+        ${projectData.start_date || null},
+        ${projectData.end_date || null}
+      )
+      RETURNING *
+    `;
+
+    // Auto-add creator as project lead
+    await db`
+      INSERT INTO project_members (project_id, user_id, role)
+      VALUES (${newProject.id}, ${userId}, 'lead')
+    `;
+
+    return newProject;
+  } catch (error) {
+    console.error('Error creating project:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update a project
+ * SECURITY: Only project lead, team owner, or team admin can update
+ */
+export async function updateProject(projectId, teamId, userId, updates) {
+  try {
+    // SECURITY: Verify user has permission to update
+    const [projectMember] = await db`
+      SELECT pm.role as project_role
+      FROM project_members pm
+      WHERE pm.project_id = ${projectId} AND pm.user_id = ${userId}
+    `;
+
+    const [teamMember] = await db`
+      SELECT tm.role as team_role
+      FROM team_members tm
+      INNER JOIN projects p ON tm.team_id = p.team_id
+      WHERE p.id = ${projectId} AND tm.user_id = ${userId}
+    `;
+
+    if (!projectMember && !teamMember) {
+      throw new Error('Access denied: You are not a member of this project or team');
+    }
+
+    // Check if user has update permission (lead, team owner, or team admin)
+    const isProjectLead = projectMember?.project_role === 'lead';
+    const isTeamOwner = teamMember?.team_role === 'owner';
+    const isTeamAdmin = teamMember?.team_role === 'admin';
+
+    if (!isProjectLead && !isTeamOwner && !isTeamAdmin) {
+      throw new Error('Access denied: Only project lead, team owner, or team admin can update projects');
+    }
+
+    // Verify project belongs to the specified team (IDOR prevention)
+    const [projectCheck] = await db`
+      SELECT id FROM projects WHERE id = ${projectId} AND team_id = ${teamId}
+    `;
+
+    if (!projectCheck) {
+      throw new Error('Project not found in this team');
+    }
+
+    // Build dynamic update query
+    const updateFields = [];
+    const updateValues = [];
+
+    if (updates.name !== undefined) {
+      updateFields.push('name');
+      updateValues.push(updates.name);
+    }
+    if (updates.description !== undefined) {
+      updateFields.push('description');
+      updateValues.push(updates.description);
+    }
+    if (updates.status !== undefined) {
+      updateFields.push('status');
+      updateValues.push(updates.status);
+    }
+    if (updates.start_date !== undefined) {
+      updateFields.push('start_date');
+      updateValues.push(updates.start_date);
+    }
+    if (updates.end_date !== undefined) {
+      updateFields.push('end_date');
+      updateValues.push(updates.end_date);
+    }
+
+    if (updateFields.length === 0) {
+      throw new Error('No valid fields to update');
+    }
+
+    const setClause = updateFields.map((field, idx) => `${field} = $${idx + 1}`).join(', ');
+    
+    const [updatedProject] = await db.unsafe(
+      `UPDATE projects SET ${setClause} WHERE id = $${updateFields.length + 1} AND team_id = $${updateFields.length + 2} RETURNING *`,
+      [...updateValues, projectId, teamId]
+    );
+
+    if (!updatedProject) {
+      throw new Error('Project not found');
+    }
+
+    return updatedProject;
+  } catch (error) {
+    console.error('Error updating project:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete a project
+ * SECURITY: Only project lead, team owner, or team admin can delete
+ * CASCADE: Database will automatically delete all related tasks, channels, etc.
+ */
+export async function deleteProject(projectId, teamId, userId) {
+  try {
+    // SECURITY: Same permission check as update
+    const [projectMember] = await db`
+      SELECT pm.role as project_role
+      FROM project_members pm
+      WHERE pm.project_id = ${projectId} AND pm.user_id = ${userId}
+    `;
+
+    const [teamMember] = await db`
+      SELECT tm.role as team_role
+      FROM team_members tm
+      INNER JOIN projects p ON tm.team_id = p.team_id
+      WHERE p.id = ${projectId} AND tm.user_id = ${userId}
+    `;
+
+    if (!projectMember && !teamMember) {
+      throw new Error('Access denied: You are not a member of this project or team');
+    }
+
+    const isProjectLead = projectMember?.project_role === 'lead';
+    const isTeamOwner = teamMember?.team_role === 'owner';
+    const isTeamAdmin = teamMember?.team_role === 'admin';
+
+    if (!isProjectLead && !isTeamOwner && !isTeamAdmin) {
+      throw new Error('Access denied: Only project lead, team owner, or team admin can delete projects');
+    }
+
+    // Verify project belongs to the specified team (IDOR prevention)
+    const [projectCheck] = await db`
+      SELECT id FROM projects WHERE id = ${projectId} AND team_id = ${teamId}
+    `;
+
+    if (!projectCheck) {
+      throw new Error('Project not found in this team');
+    }
+
+    // Delete project (CASCADE will handle related data)
+    const result = await db`
+      DELETE FROM projects
+      WHERE id = ${projectId} AND team_id = ${teamId}
+      RETURNING id
+    `;
+
+    if (result.length === 0) {
+      throw new Error('Project not found');
+    }
+
+    return { success: true, message: 'Project deleted successfully' };
+  } catch (error) {
+    console.error('Error deleting project:', error);
+    throw error;
+  }
+}
+
+/**
+ * Add a member to a project
+ * SECURITY: Only project lead, team owner, or team admin can add members
+ * VALIDATION: User must be a team member first
+ */
+export async function addProjectMember(projectId, requesterId, userIdToAdd, role = 'viewer') {
+  try {
+    // Get project's team_id
+    const [project] = await db`
+      SELECT team_id FROM projects WHERE id = ${projectId}
+    `;
+
+    if (!project) {
+      throw new Error('Project not found');
+    }
+
+    const teamId = project.team_id;
+
+    // SECURITY: Verify requester has permission
+    const [projectMember] = await db`
+      SELECT pm.role as project_role
+      FROM project_members pm
+      WHERE pm.project_id = ${projectId} AND pm.user_id = ${requesterId}
+    `;
+
+    const [teamMember] = await db`
+      SELECT tm.role as team_role
+      FROM team_members tm
+      WHERE tm.team_id = ${teamId} AND tm.user_id = ${requesterId}
+    `;
+
+    if (!projectMember && !teamMember) {
+      throw new Error('Access denied: You are not a member of this project or team');
+    }
+
+    const isProjectLead = projectMember?.project_role === 'lead';
+    const isTeamOwner = teamMember?.team_role === 'owner';
+    const isTeamAdmin = teamMember?.team_role === 'admin';
+
+    if (!isProjectLead && !isTeamOwner && !isTeamAdmin) {
+      throw new Error('Access denied: Only project lead, team owner, or team admin can add members');
+    }
+
+    // VALIDATION: Check if user to add is a team member
+    const [isTeamMember] = await db`
+      SELECT 1 FROM team_members
+      WHERE team_id = ${teamId} AND user_id = ${userIdToAdd}
+    `;
+
+    if (!isTeamMember) {
+      throw new Error('User must be a team member before being added to project');
+    }
+
+    // Check if already a project member
+    const [existingMember] = await db`
+      SELECT 1 FROM project_members
+      WHERE project_id = ${projectId} AND user_id = ${userIdToAdd}
+    `;
+
+    if (existingMember) {
+      throw new Error('User is already a member of this project');
+    }
+
+    // Add member
+    const [newMember] = await db`
+      INSERT INTO project_members (project_id, user_id, role)
+      VALUES (${projectId}, ${userIdToAdd}, ${role})
+      RETURNING *
+    `;
+
+    return newMember;
+  } catch (error) {
+    console.error('Error adding project member:', error);
+    throw error;
+  }
+}
+
+/**
+ * Remove a member from a project
+ * SECURITY: Only project lead, team owner, or team admin can remove members
+ * VALIDATION: Check if member has assigned tasks - provide options
+ */
+export async function removeProjectMember(projectId, requesterId, userIdToRemove, forceRemove = false) {
+  try {
+    // Get project's team_id
+    const [project] = await db`
+      SELECT team_id FROM projects WHERE id = ${projectId}
+    `;
+
+    if (!project) {
+      throw new Error('Project not found');
+    }
+
+    const teamId = project.team_id;
+
+    // SECURITY: Verify requester has permission
+    const [projectMember] = await db`
+      SELECT pm.role as project_role
+      FROM project_members pm
+      WHERE pm.project_id = ${projectId} AND pm.user_id = ${requesterId}
+    `;
+
+    const [teamMember] = await db`
+      SELECT tm.role as team_role
+      FROM team_members tm
+      WHERE tm.team_id = ${teamId} AND tm.user_id = ${requesterId}
+    `;
+
+    if (!projectMember && !teamMember) {
+      throw new Error('Access denied: You are not a member of this project or team');
+    }
+
+    const isProjectLead = projectMember?.project_role === 'lead';
+    const isTeamOwner = teamMember?.team_role === 'owner';
+    const isTeamAdmin = teamMember?.team_role === 'admin';
+
+    if (!isProjectLead && !isTeamOwner && !isTeamAdmin) {
+      throw new Error('Access denied: Only project lead, team owner, or team admin can remove members');
+    }
+
+    // Cannot remove yourself if you're the only lead
+    if (userIdToRemove === requesterId) {
+      const leadCount = await db`
+        SELECT COUNT(*) as count FROM project_members
+        WHERE project_id = ${projectId} AND role = 'lead'
+      `;
+      
+      if (parseInt(leadCount[0].count) <= 1) {
+        throw new Error('Cannot remove yourself as the only project lead');
+      }
+    }
+
+    // VALIDATION: Check for assigned tasks
+    const assignedTasks = await db`
+      SELECT t.id, t.title
+      FROM task_assignees ta
+      INNER JOIN tasks t ON ta.task_id = t.id
+      WHERE ta.user_id = ${userIdToRemove} AND t.project_id = ${projectId}
+    `;
+
+    if (assignedTasks.length > 0 && !forceRemove) {
+      // Return task information for client to decide
+      return {
+        canRemove: false,
+        assignedTaskCount: assignedTasks.length,
+        assignedTasks: assignedTasks.slice(0, 5), // First 5 tasks
+        message: `User has ${assignedTasks.length} assigned task(s). Use forceRemove=true to unassign and remove.`
+      };
+    }
+
+    // If forceRemove, unassign all tasks first
+    if (assignedTasks.length > 0 && forceRemove) {
+      await db`
+        DELETE FROM task_assignees
+        WHERE user_id = ${userIdToRemove}
+        AND task_id IN (
+          SELECT id FROM tasks WHERE project_id = ${projectId}
+        )
+      `;
+    }
+
+    // Remove member
+    const result = await db`
+      DELETE FROM project_members
+      WHERE project_id = ${projectId} AND user_id = ${userIdToRemove}
+      RETURNING id
+    `;
+
+    if (result.length === 0) {
+      throw new Error('Member not found in this project');
+    }
+
+    return {
+      canRemove: true,
+      message: assignedTasks.length > 0 
+        ? `Member removed and unassigned from ${assignedTasks.length} task(s)`
+        : 'Member removed successfully'
+    };
+  } catch (error) {
+    console.error('Error removing project member:', error);
+    throw error;
+  }
+}
+
+/**
+ * Update project member role
+ * SECURITY: Only project lead, team owner, or team admin can update roles
+ */
+export async function updateProjectMemberRole(projectId, requesterId, userIdToUpdate, newRole) {
+  try {
+    // Get project's team_id
+    const [project] = await db`
+      SELECT team_id FROM projects WHERE id = ${projectId}
+    `;
+
+    if (!project) {
+      throw new Error('Project not found');
+    }
+
+    const teamId = project.team_id;
+
+    // SECURITY: Verify requester has permission
+    const [projectMember] = await db`
+      SELECT pm.role as project_role
+      FROM project_members pm
+      WHERE pm.project_id = ${projectId} AND pm.user_id = ${requesterId}
+    `;
+
+    const [teamMember] = await db`
+      SELECT tm.role as team_role
+      FROM team_members tm
+      WHERE tm.team_id = ${teamId} AND tm.user_id = ${requesterId}
+    `;
+
+    if (!projectMember && !teamMember) {
+      throw new Error('Access denied: You are not a member of this project or team');
+    }
+
+    const isProjectLead = projectMember?.project_role === 'lead';
+    const isTeamOwner = teamMember?.team_role === 'owner';
+    const isTeamAdmin = teamMember?.team_role === 'admin';
+
+    if (!isProjectLead && !isTeamOwner && !isTeamAdmin) {
+      throw new Error('Access denied: Only project lead, team owner, or team admin can update roles');
+    }
+
+    // Cannot demote yourself if you're the only lead
+    if (userIdToUpdate === requesterId && newRole !== 'lead') {
+      const leadCount = await db`
+        SELECT COUNT(*) as count FROM project_members
+        WHERE project_id = ${projectId} AND role = 'lead'
+      `;
+      
+      if (parseInt(leadCount[0].count) <= 1) {
+        throw new Error('Cannot change your role as the only project lead');
+      }
+    }
+
+    // Update role
+    const [updatedMember] = await db`
+      UPDATE project_members
+      SET role = ${newRole}
+      WHERE project_id = ${projectId} AND user_id = ${userIdToUpdate}
+      RETURNING *
+    `;
+
+    if (!updatedMember) {
+      throw new Error('Member not found in this project');
+    }
+
+    return updatedMember;
+  } catch (error) {
+    console.error('Error updating project member role:', error);
+    throw error;
+  }
+}

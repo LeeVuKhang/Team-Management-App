@@ -193,3 +193,83 @@ export async function deleteTeam(teamId) {
     method: 'DELETE',
   });
 }
+
+/**
+ * Create a new project
+ * @param {number} teamId 
+ * @param {object} projectData - {name, description?, status?, start_date?, end_date?}
+ * @returns {Promise<{success: boolean, message: string, data: object}>}
+ */
+export async function createProject(teamId, projectData) {
+  return apiFetch(`/teams/${teamId}/projects`, {
+    method: 'POST',
+    body: JSON.stringify(projectData),
+  });
+}
+
+/**
+ * Update a project
+ * @param {number} teamId 
+ * @param {number} projectId 
+ * @param {object} updates - {name?, description?, status?, start_date?, end_date?}
+ * @returns {Promise<{success: boolean, message: string, data: object}>}
+ */
+export async function updateProject(teamId, projectId, updates) {
+  return apiFetch(`/teams/${teamId}/projects/${projectId}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+}
+
+/**
+ * Delete a project
+ * @param {number} teamId 
+ * @param {number} projectId 
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export async function deleteProject(teamId, projectId) {
+  return apiFetch(`/teams/${teamId}/projects/${projectId}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Add a member to a project
+ * @param {number} projectId 
+ * @param {number} userId 
+ * @param {string} role - 'lead', 'editor', or 'viewer'
+ * @returns {Promise<{success: boolean, message: string, data: object}>}
+ */
+export async function addProjectMember(projectId, userId, role = 'viewer') {
+  return apiFetch(`/projects/${projectId}/members`, {
+    method: 'POST',
+    body: JSON.stringify({ userId, role }),
+  });
+}
+
+/**
+ * Remove a member from a project
+ * @param {number} projectId 
+ * @param {number} userId 
+ * @param {boolean} forceRemove - If true, unassign tasks before removing
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export async function removeProjectMember(projectId, userId, forceRemove = false) {
+  return apiFetch(`/projects/${projectId}/members/${userId}?forceRemove=${forceRemove}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Update a project member's role
+ * @param {number} projectId 
+ * @param {number} userId 
+ * @param {string} role - 'lead', 'editor', or 'viewer'
+ * @returns {Promise<{success: boolean, message: string, data: object}>}
+ */
+export async function updateProjectMemberRole(projectId, userId, role) {
+  return apiFetch(`/projects/${projectId}/members/${userId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role }),
+  });
+}
