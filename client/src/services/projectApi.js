@@ -157,3 +157,39 @@ export async function getTeamProjects(teamId) {
 export async function getTeamStats(teamId) {
   return apiFetch(`/teams/${teamId}/stats`);
 }
+
+/**
+ * Create a new team
+ * @param {object} teamData - {name, description?}
+ * @returns {Promise<{success: boolean, message: string, data: object}>}
+ */
+export async function createTeam(teamData) {
+  return apiFetch('/teams', {
+    method: 'POST',
+    body: JSON.stringify(teamData),
+  });
+}
+
+/**
+ * Update team details
+ * @param {number} teamId 
+ * @param {object} updates - {name?, description?}
+ * @returns {Promise<{success: boolean, message: string, data: object}>}
+ */
+export async function updateTeam(teamId, updates) {
+  return apiFetch(`/teams/${teamId}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+}
+
+/**
+ * Delete a team
+ * @param {number} teamId 
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export async function deleteTeam(teamId) {
+  return apiFetch(`/teams/${teamId}`, {
+    method: 'DELETE',
+  });
+}

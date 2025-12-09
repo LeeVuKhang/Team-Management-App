@@ -2,7 +2,11 @@ import express from 'express';
 import * as TeamController from '../controllers/team.controller.js';
 import { validate } from '../middlewares/validate.js';
 import { mockAuth } from '../middlewares/auth.js'; // Temporary mock auth
-import { teamIdParamSchema } from '../validations/team.validation.js';
+import { 
+  teamIdParamSchema, 
+  createTeamSchema, 
+  updateTeamSchema 
+} from '../validations/team.validation.js';
 
 const router = express.Router();
 
@@ -64,6 +68,40 @@ router.get(
   '/:teamId/stats',
   validate(teamIdParamSchema, 'params'),
   TeamController.getTeamStats
+);
+
+/**
+ * @route   POST /api/v1/teams
+ * @desc    Create a new team
+ * @access  Private (Authenticated user becomes owner)
+ */
+router.post(
+  '/',
+  validate(createTeamSchema, 'body'),
+  TeamController.createTeam
+);
+
+/**
+ * @route   PUT /api/v1/teams/:teamId
+ * @desc    Update team details
+ * @access  Private (Owner or Admin only)
+ */
+router.put(
+  '/:teamId',
+  validate(teamIdParamSchema, 'params'),
+  validate(updateTeamSchema, 'body'),
+  TeamController.updateTeam
+);
+
+/**
+ * @route   DELETE /api/v1/teams/:teamId
+ * @desc    Delete a team (CASCADE deletes all projects, tasks, etc.)
+ * @access  Private (Owner only)
+ */
+router.delete(
+  '/:teamId',
+  validate(teamIdParamSchema, 'params'),
+  TeamController.deleteTeam
 );
 
 export default router;

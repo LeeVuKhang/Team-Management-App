@@ -1,7 +1,14 @@
 import React, { useState } from 'react';
 import { useOutletContext, useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { getTeam, getTeamProjects, getTeamStats, getTeamMembers } from './services/projectApi';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { 
+  getTeam, 
+  getTeamProjects, 
+  getTeamStats, 
+  getTeamMembers,
+  updateTeam,
+  deleteTeam 
+} from './services/projectApi';
 import { 
   LayoutDashboard, 
   FolderKanban, 
@@ -12,12 +19,275 @@ import {
   Plus,
   Users,
   Search,
-  X
+  X,
+  Edit3,
+  Trash2,
+  Settings
 } from 'lucide-react';
 
 /**
  * COMPONENTS
  */
+
+// Modal wrapper component
+const Modal = ({ isOpen, onClose, title, children, darkMode }) => {
+  if (!isOpen) return null;
+
+  React.useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen, onClose]);
+
+  return (
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div 
+        className={`w-full max-w-lg rounded-xl shadow-2xl ${
+          darkMode ? 'bg-[rgb(30,36,30)] border border-[rgb(45,52,45)]' : 'bg-white border border-[rgb(210,220,182)]'
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className={`flex items-center justify-between p-6 border-b ${
+          darkMode ? 'border-[rgb(45,52,45)]' : 'border-[rgb(210,220,182)]'
+        }`}>
+          <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
+            {title}
+          </h2>
+          <button
+            onClick={onClose}
+            className={`p-2 rounded-lg transition-colors ${
+              darkMode ? 'hover:bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'hover:bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)]'
+            }`}
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <div className="p-6">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Edit Team Modal
+const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode }) => {
+  const [formData, setFormData] = useState({
+    name: '',
+    description: ''
+  });
+  const [error, setError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  React.useEffect(() => {
+    if (team) {
+      setFormData({
+        name: team.name || '',
+        description: team.description || ''
+      });
+    }
+    setError(null);
+  }, [team, isOpen]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      await onSubmit(formData);
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to update team');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${
+    darkMode ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white' : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)]'
+  }`;
+
+  const labelClass = `block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`;
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Edit Team" darkMode={darkMode}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {error && (
+          <div className={`p-3 rounded-lg border ${
+            darkMode ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-red-50 border-red-200 text-red-600'
+          }`}>
+            <div className="flex items-start gap-2">
+              <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
+              <p className="text-sm">{error}</p>
+            </div>
+          </div>
+        )}
+
+        <div>
+          <label className={labelClass}>Team Name *</label>
+          <input
+            type="text"
+            required
+            maxLength={100}
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            className={inputClass}
+            placeholder="Enter team name"
+          />
+        </div>
+
+        <div>
+          <label className={labelClass}>Description</label>
+          <textarea
+            rows={4}
+            maxLength={500}
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            className={inputClass}
+            placeholder="Enter team description"
+          />
+        </div>
+
+        <div className="flex gap-3 pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+              darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)]/70' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]'
+            } disabled:opacity-50`}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="flex-1 px-6 py-3 bg-[rgb(119,136,115)] hover:bg-[rgb(161,188,152)] text-white rounded-lg font-semibold transition-all disabled:opacity-50"
+          >
+            {isSubmitting ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+// Delete Team Modal
+const DeleteTeamModal = ({ isOpen, onClose, team, onConfirm, darkMode }) => {
+  const [confirmText, setConfirmText] = useState('');
+  const [error, setError] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  React.useEffect(() => {
+    setConfirmText('');
+    setError(null);
+  }, [isOpen]);
+
+  const handleDelete = async () => {
+    if (confirmText !== team?.name) {
+      setError('Team name does not match');
+      return;
+    }
+
+    setError(null);
+    setIsDeleting(true);
+
+    try {
+      await onConfirm();
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to delete team');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all ${
+    darkMode ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white' : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)]'
+  }`;
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Delete Team" darkMode={darkMode}>
+      <div className="space-y-4">
+        <div className={`p-4 rounded-lg border-2 ${
+          darkMode ? 'bg-red-500/10 border-red-500/30' : 'bg-red-50 border-red-200'
+        }`}>
+          <div className="flex items-start gap-3">
+            <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+            <div>
+              <h4 className={`font-bold text-sm mb-1 ${darkMode ? 'text-red-400' : 'text-red-600'}`}>
+                Warning: This action cannot be undone
+              </h4>
+              <p className={`text-sm ${darkMode ? 'text-red-300' : 'text-red-500'}`}>
+                Deleting this team will permanently remove:
+              </p>
+              <ul className={`text-xs mt-2 space-y-1 list-disc list-inside ${darkMode ? 'text-red-300' : 'text-red-500'}`}>
+                <li>All projects in this team</li>
+                <li>All tasks in those projects</li>
+                <li>All team members</li>
+                <li>All related data</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        {error && (
+          <div className={`p-3 rounded-lg border ${
+            darkMode ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-red-50 border-red-200 text-red-600'
+          }`}>
+            <p className="text-sm">{error}</p>
+          </div>
+        )}
+
+        <div>
+          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+            Type <span className="font-mono text-red-500">"{team?.name}"</span> to confirm:
+          </label>
+          <input
+            type="text"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            className={inputClass}
+            placeholder={team?.name}
+          />
+        </div>
+
+        <div className="flex gap-3 pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isDeleting}
+            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+              darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)]/70' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]'
+            } disabled:opacity-50`}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={isDeleting || confirmText !== team?.name}
+            className="flex-1 px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isDeleting ? 'Deleting...' : 'Delete Team'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
 
 const FilterButton = ({ active, onClick, children, darkMode }) => (
   <button
@@ -110,11 +380,17 @@ export default function TeamPage() {
   const { isDarkMode } = useOutletContext();
   const { teamId } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortBy, setSortBy] = useState('created_at');
+
+  // Modal states
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
 
   // Fetch team data
   const { data: teamData, isLoading: teamLoading, error: teamError } = useQuery({
@@ -142,6 +418,24 @@ export default function TeamPage() {
     queryKey: ['teamMembers', teamId],
     queryFn: () => getTeamMembers(teamId),
     enabled: !!teamId,
+  });
+
+  // Update team mutation
+  const updateTeamMutation = useMutation({
+    mutationFn: (updates) => updateTeam(teamId, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['team', teamId]);
+      queryClient.invalidateQueries(['teams']); // Refresh sidebar
+    },
+  });
+
+  // Delete team mutation
+  const deleteTeamMutation = useMutation({
+    mutationFn: () => deleteTeam(teamId),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['teams']); // Refresh sidebar
+      navigate('/teams/1'); // Navigate to first team (or could show "no teams" page)
+    },
   });
 
   const cardBg = isDarkMode ? 'bg-[rgb(30,36,30)]/50 border-[rgb(45,52,45)]/50' : 'bg-white border-[rgb(210,220,182)] shadow-sm';
@@ -224,13 +518,53 @@ export default function TeamPage() {
       <div className="max-w-7xl mx-auto">
         
         {/* WELCOME */}
-        <div className="mb-8">
-          <h1 className={`text-2xl md:text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
-            {team?.name || 'Team Dashboard'} 👋
-          </h1>
-          <p className={`${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
-            {team?.description || "Here's what's happening with team projects today."}
-          </p>
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div className="flex-1">
+            <h1 className={`text-2xl md:text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
+              {team?.name || 'Team Dashboard'} 👋
+            </h1>
+            <p className={`${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+              {team?.description || "Here's what's happening with team projects today."}
+            </p>
+          </div>
+
+          {/* Settings Menu */}
+          <div className="relative">
+            <button
+              onClick={() => setShowSettingsMenu(!showSettingsMenu)}
+              className={`p-2.5 rounded-lg transition-colors ${
+                isDarkMode ? 'hover:bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'hover:bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)]'
+              }`}
+              title="Team Settings"
+            >
+              <Settings size={20} />
+            </button>
+
+            {showSettingsMenu && (
+              <div className={`absolute right-0 mt-2 w-48 rounded-lg shadow-lg border overflow-hidden z-10 ${
+                isDarkMode ? 'bg-[rgb(30,36,30)] border-[rgb(45,52,45)]' : 'bg-white border-[rgb(210,220,182)]'
+              }`}>
+                <button
+                  onClick={() => { setShowEditModal(true); setShowSettingsMenu(false); }}
+                  className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${
+                    isDarkMode ? 'hover:bg-[rgb(45,52,45)] text-[rgb(210,220,182)]' : 'hover:bg-[rgb(210,220,182)]/30 text-[rgb(60,68,58)]'
+                  }`}
+                >
+                  <Edit3 size={14} />
+                  Edit Team
+                </button>
+                <button
+                  onClick={() => { setShowDeleteModal(true); setShowSettingsMenu(false); }}
+                  className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${
+                    isDarkMode ? 'hover:bg-[rgb(45,52,45)] text-red-400' : 'hover:bg-[rgb(210,220,182)]/30 text-red-600'
+                  }`}
+                >
+                  <Trash2 size={14} />
+                  Delete Team
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* TOP ROW: TEAM MEMBERS & TEAM PROGRESS */}
@@ -456,6 +790,23 @@ export default function TeamPage() {
         </div>
 
       </div>
+
+      {/* MODALS */}
+      <EditTeamModal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        team={team}
+        onSubmit={(updates) => updateTeamMutation.mutate(updates)}
+        darkMode={isDarkMode}
+      />
+
+      <DeleteTeamModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        team={team}
+        onConfirm={() => deleteTeamMutation.mutate()}
+        darkMode={isDarkMode}
+      />
     </div>
   );
 }

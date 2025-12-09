@@ -15,3 +15,43 @@ export const teamIdParamSchema = z.object({
     .transform(Number)
     .refine((val) => val > 0, 'Team ID must be greater than 0'),
 });
+
+/**
+ * Validate team creation data
+ * SECURITY: Sanitize inputs, enforce length limits, prevent XSS
+ */
+export const createTeamSchema = z.object({
+  name: z
+    .string()
+    .min(1, 'Team name is required')
+    .max(100, 'Team name must be 100 characters or less')
+    .trim()
+    .refine((val) => val.length > 0, 'Team name cannot be empty or whitespace only'),
+  description: z
+    .string()
+    .max(500, 'Description must be 500 characters or less')
+    .trim()
+    .optional()
+    .nullable(),
+});
+
+/**
+ * Validate team update data
+ * SECURITY: Same validations as create, all fields optional for partial updates
+ */
+export const updateTeamSchema = z.object({
+  name: z
+    .string()
+    .min(1, 'Team name cannot be empty')
+    .max(100, 'Team name must be 100 characters or less')
+    .trim()
+    .optional(),
+  description: z
+    .string()
+    .max(500, 'Description must be 500 characters or less')
+    .trim()
+    .optional()
+    .nullable(),
+}).refine((data) => Object.keys(data).length > 0, {
+  message: 'At least one field must be provided for update',
+});

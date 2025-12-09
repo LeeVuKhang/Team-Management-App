@@ -136,3 +136,111 @@ export const getUserTeams = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Create a new team
+ * @route POST /api/v1/teams
+ * SECURITY: User becomes owner automatically
+ */
+export const createTeam = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const { name, description } = req.body;
+
+    const newTeam = await TeamModel.createTeam({
+      name,
+      description,
+      createdBy: userId,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Team created successfully',
+      data: newTeam,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Update team details
+ * @route PUT /api/v1/teams/:teamId
+ * SECURITY: Only owner or admin can update team
+ */
+export const updateTeam = async (req, res, next) => {
+  try {
+    const { teamId } = req.params;
+    const userId = req.user.id;
+    const updates = req.body;
+
+    const updatedTeam = await TeamModel.updateTeam(teamId, userId, updates);
+
+    if (!updatedTeam) {
+      return res.status(404).json({
+        success: false,
+        message: 'Team not found or update failed',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Team updated successfully',
+      data: updatedTeam,
+    });
+  } catch (error) {
+    if (error.message.includes('not authorized') || error.message.includes('Owner or Admin')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Only team owner or admin can update team details',
+      });
+    }
+    if (error.message.includes('not a member')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You are not a member of this team',
+      });
+    }
+    next(error);
+  }
+};
+
+/**
+ * Delete a team
+ * @route DELETE /api/v1/teams/:teamId
+ * SECURITY: Only owner can delete team (CASCADE will handle related data)
+ */
+export const deleteTeam = async (req, res, next) => {
+  try {
+    const { teamId } = req.params;
+    const userId = req.user.id;
+
+    const result = await TeamModel.deleteTeam(teamId, userId);
+
+    if (!result) {
+      return res.status(404).json({
+        success: false,
+        message: 'Team not found or deletion failed',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Team deleted successfully',
+    });
+  } catch (error) {
+    if (error.message.includes('Only the team owner')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Only the team owner can delete the team',
+      });
+    }
+    if (error.message.includes('not a member')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You are not a member of this team',
+      });
+    }
+    next(error);
+  }
+};
