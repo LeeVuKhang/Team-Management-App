@@ -66,20 +66,24 @@ const Modal = ({ isOpen, onClose, title, children, darkMode }) => {
         }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className={`flex items-center justify-between p-6 border-b sticky top-0 z-10 ${
-          darkMode ? 'border-[rgb(45,52,45)] bg-[rgb(30,36,30)]' : 'border-[rgb(210,220,182)] bg-white'
+        <div className={`sticky top-0 z-10 ${
+          darkMode ? 'bg-[rgb(30,36,30)]' : 'bg-white'
         }`}>
-          <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
-            {title}
-          </h2>
-          <button
-            onClick={onClose}
-            className={`p-2 rounded-lg transition-colors ${
-              darkMode ? 'hover:bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'hover:bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)]'
-            }`}
-          >
-            <X size={20} />
-          </button>
+          <div className={`flex items-center justify-between p-6 border-b ${
+            darkMode ? 'border-[rgb(45,52,45)]' : 'border-[rgb(210,220,182)]'
+          }`}>
+            <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
+              {title}
+            </h2>
+            <button
+              onClick={onClose}
+              className={`p-2 rounded-lg transition-colors ${
+                darkMode ? 'hover:bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'hover:bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)]'
+              }`}
+            >
+              <X size={20} />
+            </button>
+          </div>
         </div>
         <div className="p-6 max-h-[calc(100vh-200px)] overflow-y-auto">
           {children}
@@ -132,17 +136,6 @@ const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode }) => {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Edit Team" darkMode={darkMode}>
       <form onSubmit={handleSubmit} className="space-y-4">
-        {error && (
-          <div className={`p-3 rounded-lg border ${
-            darkMode ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-red-50 border-red-200 text-red-600'
-          }`}>
-            <div className="flex items-start gap-2">
-              <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
-              <p className="text-sm">{error}</p>
-            </div>
-          </div>
-        )}
-
         <div>
           <label className={labelClass}>Team Name *</label>
           <input
@@ -167,6 +160,17 @@ const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode }) => {
             placeholder="Enter team description"
           />
         </div>
+
+        {error && (
+          <div className={`p-3 rounded-lg border ${
+            darkMode ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-red-50 border-red-200 text-red-600'
+          }`}>
+            <div className="flex items-start gap-2">
+              <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
+              <p className="text-sm">{error}</p>
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-3 pt-4">
           <button
@@ -251,14 +255,6 @@ const DeleteTeamModal = ({ isOpen, onClose, team, onConfirm, darkMode }) => {
           </div>
         </div>
 
-        {error && (
-          <div className={`p-3 rounded-lg border ${
-            darkMode ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-red-50 border-red-200 text-red-600'
-          }`}>
-            <p className="text-sm">{error}</p>
-          </div>
-        )}
-
         <div>
           <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
             Type <span className="font-mono text-red-500">"{team?.name}"</span> to confirm:
@@ -271,6 +267,17 @@ const DeleteTeamModal = ({ isOpen, onClose, team, onConfirm, darkMode }) => {
             placeholder={team?.name}
           />
         </div>
+
+        {error && (
+          <div className={`p-3 rounded-lg border ${
+            darkMode ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-red-50 border-red-200 text-red-600'
+          }`}>
+            <div className="flex items-start gap-2">
+              <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
+              <p className="text-sm">{error}</p>
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-3 pt-4">
           <button
@@ -408,14 +415,6 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Create New Project" darkMode={darkMode}>
       <form onSubmit={handleSubmit} className="space-y-4">
-        {error && (
-          <div className={`p-3 rounded-lg border ${
-            darkMode ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-red-50 border-red-200 text-red-600'
-          }`}>
-            <p className="text-sm">{error}</p>
-          </div>
-        )}
-
         <div>
           <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
             Project Name <span className="text-red-500">*</span>
@@ -560,6 +559,17 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
           </p>
         </div>
 
+        {error && (
+          <div className={`p-3 rounded-lg border ${
+            darkMode ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-red-50 border-red-200 text-red-600'
+          }`}>
+            <div className="flex items-start gap-2">
+              <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
+              <p className="text-sm">{error}</p>
+            </div>
+          </div>
+        )}
+
         <div className="flex gap-3 pt-4">
           <button
             type="button"
@@ -586,8 +596,144 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
   );
 };
 
+// Remove Member Confirmation Modal
+const RemoveMemberConfirmModal = ({ isOpen, onClose, memberInfo, onConfirm, darkMode }) => {
+  const [confirmText, setConfirmText] = useState('');
+  const [error, setError] = useState(null);
+  const [isRemoving, setIsRemoving] = useState(false);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setConfirmText('');
+      setError(null);
+    }
+  }, [isOpen]);
+
+  const handleRemove = async () => {
+    if (confirmText.toLowerCase() !== 'yes') {
+      setError('Please type "Yes" to confirm');
+      return;
+    }
+
+    setError(null);
+    setIsRemoving(true);
+
+    try {
+      await onConfirm();
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to remove member');
+    } finally {
+      setIsRemoving(false);
+    }
+  };
+
+  const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all ${
+    darkMode ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white' : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)]'
+  }`;
+
+  return (
+    <div className={`${isOpen ? 'fixed' : 'hidden'} inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto`}>
+      <div 
+        className={`w-full max-w-lg rounded-xl shadow-2xl my-8 ${
+          darkMode ? 'bg-[rgb(30,36,30)] border border-[rgb(45,52,45)]' : 'bg-white border border-[rgb(210,220,182)]'
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className={`flex items-center justify-between p-6 border-b ${
+          darkMode ? 'border-[rgb(45,52,45)] bg-[rgb(30,36,30)]' : 'border-[rgb(210,220,182)] bg-white'
+        }`}>
+          <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
+            Remove Project Member
+          </h2>
+          <button
+            onClick={onClose}
+            className={`p-2 rounded-lg transition-colors ${
+              darkMode ? 'hover:bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'hover:bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)]'
+            }`}
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <div className="p-6">
+      <div className="space-y-4">
+        <div className={`p-4 rounded-lg border-2 ${
+          darkMode ? 'bg-red-500/10 border-red-500/30' : 'bg-red-50 border-red-200'
+        }`}>
+          <div className="flex items-start gap-3">
+            <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+            <div>
+              <h4 className={`font-bold text-sm mb-1 ${darkMode ? 'text-red-400' : 'text-red-600'}`}>
+                Warning: This action cannot be undone
+              </h4>
+              <p className={`text-sm mb-2 ${darkMode ? 'text-red-300' : 'text-red-500'}`}>
+                This member has <span className="font-bold">{memberInfo?.taskCount || 0} assigned task(s)</span>.
+              </p>
+              <p className={`text-sm ${darkMode ? 'text-red-300' : 'text-red-500'}`}>
+                Removing this member will:
+              </p>
+              <ul className={`text-xs mt-2 space-y-1 list-disc list-inside ${darkMode ? 'text-red-300' : 'text-red-500'}`}>
+                <li>Unassign them from all {memberInfo?.taskCount || 0} task(s)</li>
+                <li>Remove their access to this project</li>
+                <li>Remove them from project channels</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+            Type <span className="font-mono text-red-500">"Yes"</span> to confirm:
+          </label>
+          <input
+            type="text"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            className={inputClass}
+            placeholder="Yes"
+          />
+        </div>
+
+        {error && (
+          <div className={`p-3 rounded-lg border ${
+            darkMode ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-red-50 border-red-200 text-red-600'
+          }`}>
+            <div className="flex items-start gap-2">
+              <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
+              <p className="text-sm">{error}</p>
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-3 pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isRemoving}
+            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+              darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)]/70' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]'
+            } disabled:opacity-50`}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleRemove}
+            disabled={isRemoving || confirmText.toLowerCase() !== 'yes'}
+            className="flex-1 px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isRemoving ? 'Removing...' : 'Remove Member'}
+          </button>
+        </div>
+      </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Edit Project Modal
-const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMembers, teamId }) => {
+const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMembers, teamId, queryClient }) => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -599,6 +745,9 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
   const [error, setError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [initialMembers, setInitialMembers] = useState([]); // Track initial state for comparison
+  const [showRemoveMemberModal, setShowRemoveMemberModal] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState(null); // {userId, taskCount}
+  const [pendingChanges, setPendingChanges] = useState(null); // Store changes to apply after confirmation
 
   // Fetch current project members when modal opens
   React.useEffect(() => {
@@ -711,16 +860,19 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
           // Try to remove without force first
           await removeProjectMember(project.id, member.userId, false);
         } catch (err) {
-          // If member has tasks, ask for confirmation
-          if (err.message.includes('has assigned tasks')) {
-            const confirmRemove = window.confirm(
-              `This member has assigned tasks in the project. Remove them anyway? (Tasks will be unassigned)`
-            );
-            if (confirmRemove) {
-              await removeProjectMember(project.id, member.userId, true);
-            } else {
-              throw new Error('Member removal cancelled');
-            }
+          // If member has tasks, show confirmation modal
+          console.log('Remove member error:', err.message); // Debug log
+          if (err.message.includes('assigned task')) {
+            // Extract task count from error message
+            const taskCountMatch = err.message.match(/(\d+)/);
+            const taskCount = taskCountMatch ? parseInt(taskCountMatch[0]) : 0;
+            
+            // Store pending changes and show modal
+            setPendingChanges({ dataToSubmit, membersToAdd, membersToRemove, membersToUpdate });
+            setMemberToRemove({ userId: member.userId, taskCount });
+            setShowRemoveMemberModal(true);
+            setIsSubmitting(false);
+            return; // Stop execution, wait for user confirmation
           } else {
             throw new Error(`Failed to remove member: ${err.message}`);
           }
@@ -744,6 +896,12 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
         setError('No changes detected');
         setIsSubmitting(false);
         return;
+      }
+
+      // Invalidate queries to refresh data
+      if (queryClient) {
+        queryClient.invalidateQueries(['teamProjects', teamId]);
+        queryClient.invalidateQueries(['teamStats', teamId]);
       }
 
       onClose();
@@ -780,21 +938,84 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
     }));
   };
 
+  // Handle confirmed member removal with force
+  const handleConfirmedRemoval = async () => {
+    if (!memberToRemove || !pendingChanges) return;
+
+    setIsSubmitting(true);
+    setShowRemoveMemberModal(false);
+
+    try {
+      const { dataToSubmit, membersToAdd, membersToRemove, membersToUpdate } = pendingChanges;
+
+      // Execute member additions first
+      for (const member of membersToAdd) {
+        try {
+          await addProjectMember(project.id, member.userId, member.role);
+        } catch (err) {
+          console.error(`Failed to add member ${member.userId}:`, err);
+          throw new Error(`Failed to add member: ${err.message}`);
+        }
+      }
+
+      // Execute member removals (including the one with tasks using force)
+      for (const member of membersToRemove) {
+        try {
+          const forceRemove = member.userId === memberToRemove.userId;
+          await removeProjectMember(project.id, member.userId, forceRemove);
+        } catch (err) {
+          throw new Error(`Failed to remove member: ${err.message}`);
+        }
+      }
+
+      // Execute role updates
+      for (const member of membersToUpdate) {
+        try {
+          await updateProjectMemberRole(project.id, member.userId, member.role);
+        } catch (err) {
+          console.error(`Failed to update member ${member.userId}:`, err);
+          throw new Error(`Failed to update member role: ${err.message}`);
+        }
+      }
+
+      // Invalidate queries to refresh data
+      if (queryClient) {
+        queryClient.invalidateQueries(['teamProjects', teamId]);
+        queryClient.invalidateQueries(['teamStats', teamId]);
+      }
+
+      // Clear pending changes and close
+      setPendingChanges(null);
+      setMemberToRemove(null);
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to update project');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${
     darkMode ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white placeholder-[rgb(119,136,115)]' : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)] placeholder-[rgb(119,136,115)]'
   }`;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Edit Project" darkMode={darkMode}>
+    <>
+      <RemoveMemberConfirmModal
+        isOpen={showRemoveMemberModal}
+        onClose={() => {
+          setShowRemoveMemberModal(false);
+          setMemberToRemove(null);
+          setPendingChanges(null);
+          setIsSubmitting(false);
+        }}
+        memberInfo={memberToRemove}
+        onConfirm={handleConfirmedRemoval}
+        darkMode={darkMode}
+      />
+      
+      <Modal isOpen={isOpen} onClose={onClose} title="Edit Project" darkMode={darkMode}>
       <form onSubmit={handleSubmit} className="space-y-4">
-        {error && (
-          <div className={`p-3 rounded-lg border ${
-            darkMode ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-red-50 border-red-200 text-red-600'
-          }`}>
-            <p className="text-sm">{error}</p>
-          </div>
-        )}
-
         <div>
           <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
             Project Name <span className="text-red-500">*</span>
@@ -939,6 +1160,17 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
           </p>
         </div>
 
+        {error && (
+          <div className={`p-3 rounded-lg border ${
+            darkMode ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-red-50 border-red-200 text-red-600'
+          }`}>
+            <div className="flex items-start gap-2">
+              <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
+              <p className="text-sm">{error}</p>
+            </div>
+          </div>
+        )}
+
         <div className="flex gap-3 pt-4">
           <button
             type="button"
@@ -962,6 +1194,7 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
         </div>
       </form>
     </Modal>
+    </>
   );
 };
 
@@ -1026,14 +1259,6 @@ const DeleteProjectModal = ({ isOpen, onClose, project, onConfirm, darkMode }) =
           </div>
         </div>
 
-        {error && (
-          <div className={`p-3 rounded-lg border ${
-            darkMode ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-red-50 border-red-200 text-red-600'
-          }`}>
-            <p className="text-sm">{error}</p>
-          </div>
-        )}
-
         <div>
           <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
             Type <span className="font-mono text-red-500">"{project?.name}"</span> to confirm:
@@ -1046,6 +1271,17 @@ const DeleteProjectModal = ({ isOpen, onClose, project, onConfirm, darkMode }) =
             placeholder={project?.name}
           />
         </div>
+
+        {error && (
+          <div className={`p-3 rounded-lg border ${
+            darkMode ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-red-50 border-red-200 text-red-600'
+          }`}>
+            <div className="flex items-start gap-2">
+              <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
+              <p className="text-sm">{error}</p>
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-3 pt-4">
           <button
@@ -1746,6 +1982,7 @@ export default function TeamPage() {
         darkMode={isDarkMode}
         teamMembers={membersData?.data}
         teamId={teamData?.data?.id}
+        queryClient={queryClient}
       />
 
       <DeleteProjectModal
