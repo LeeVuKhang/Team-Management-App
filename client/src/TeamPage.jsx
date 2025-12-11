@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useOutletContext, useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { z } from 'zod';
 import { 
   getTeam, 
   getTeamProjects, 
@@ -32,6 +33,77 @@ import {
   Settings,
   Calendar
 } from 'lucide-react';
+
+/**
+ * VALIDATION SCHEMAS (Client-Side with Zod)
+ */
+
+// Team validation
+const teamSchema = z.object({
+  name: z.string()
+    .min(1, 'Team name is required')
+    .max(100, 'Team name must be 100 characters or less')
+    .trim(),
+  description: z.string()
+    .max(500, 'Description must be 500 characters or less')
+    .optional()
+    .or(z.literal(''))
+});
+
+// Project validation - STRICT with Security & Type Safety
+const projectSchema = z.object({
+  name: z.string()
+    .trim() // Sanitization: remove whitespace
+    .min(1, 'Project name is required')
+    .max(100, 'Project name must be 100 characters or less'),
+  description: z.string()
+    .trim() // Sanitization
+    .max(500, 'Description must be 500 characters or less')
+    .optional()
+    .or(z.literal('')),
+  status: z.enum(['active', 'archived', 'completed'], {
+    errorMap: () => ({ message: 'Invalid status' })
+  }),
+  start_date: z.string()
+    .optional()
+    .or(z.literal(''))
+    .refine(
+      (val) => {
+        if (!val || val === '') return true;
+        const date = new Date(val);
+        return !isNaN(date.getTime()) && date.getFullYear() > 1900 && date.getFullYear() < 2100;
+      },
+      { message: 'Invalid start date' }
+    ),
+  end_date: z.string()
+    .optional()
+    .or(z.literal(''))
+    .refine(
+      (val) => {
+        if (!val || val === '') return true;
+        const date = new Date(val);
+        return !isNaN(date.getTime()) && date.getFullYear() > 1900 && date.getFullYear() < 2100;
+      },
+      { message: 'Invalid end date' }
+    )
+}).refine(
+  (data) => {
+    // CRITICAL: Date comparison validation
+    if (data.start_date && data.end_date && data.start_date !== '' && data.end_date !== '') {
+      const start = new Date(data.start_date);
+      const end = new Date(data.end_date);
+      // Type safety check
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) return true;
+      // end_date must be >= start_date
+      return end >= start;
+    }
+    return true;
+  },
+  {
+    message: 'End date must be after or equal to start date',
+    path: ['end_date'] // Associate error with end_date field
+  }
+);
 
 /**
  * COMPONENTS
@@ -100,6 +172,7 @@ const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode }) => {
     description: ''
   });
   const [error, setError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   React.useEffect(() => {
@@ -110,18 +183,42 @@ const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode }) => {
       });
     }
     setError(null);
+    setFieldErrors({});
   }, [team, isOpen]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    setFieldErrors({});
     setIsSubmitting(true);
+
+    // CLIENT-SIDE VALIDATION with Zod
+    try {
+      teamSchema.parse(formData);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        const errors = {};
+        err.errors.forEach((error) => {
+          errors[error.path[0]] = error.message;
+        });
+        setFieldErrors(errors);
+        setError('Please fix the errors below');
+        setIsSubmitting(false);
+        return;
+      }
+    }
 
     try {
       await onSubmit(formData);
+      
+      // SUCCESS: Only close modal if no error thrown
       onClose();
     } catch (err) {
-      setError(err.message || 'Failed to update team');
+      // Extract server error message from response
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to update team';
+      console.error('❌ Server error:', errorMessage);
+      setError(errorMessage);
+      // Modal stays open, user can see the error and retry
     } finally {
       setIsSubmitting(false);
     }
@@ -130,6 +227,17 @@ const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode }) => {
   const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${
     darkMode ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white' : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)]'
   }`;
+  
+  const getInputClass = (fieldName) => {
+    const hasError = fieldErrors[fieldName];
+    return `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 transition-all ${
+      hasError 
+        ? 'border-2 border-red-500 focus:ring-red-500/50 bg-red-50 dark:bg-red-500/10' 
+        : darkMode 
+          ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white focus:ring-[rgb(119,136,115)]/50' 
+          : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)] focus:ring-[rgb(119,136,115)]/50'
+    }`;
+  };
 
   const labelClass = `block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`;
 
@@ -140,13 +248,23 @@ const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode }) => {
           <label className={labelClass}>Team Name *</label>
           <input
             type="text"
-            required
             maxLength={100}
             value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className={inputClass}
+            onChange={(e) => {
+              setFormData({ ...formData, name: e.target.value });
+              if (fieldErrors.name) {
+                setFieldErrors({ ...fieldErrors, name: null });
+              }
+            }}
+            className={getInputClass('name')}
             placeholder="Enter team name"
           />
+          {fieldErrors.name && (
+            <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+              <AlertCircle size={12} />
+              {fieldErrors.name}
+            </p>
+          )}
         </div>
 
         <div>
@@ -155,10 +273,21 @@ const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode }) => {
             rows={4}
             maxLength={500}
             value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            className={inputClass}
+            onChange={(e) => {
+              setFormData({ ...formData, description: e.target.value });
+              if (fieldErrors.description) {
+                setFieldErrors({ ...fieldErrors, description: null });
+              }
+            }}
+            className={getInputClass('description')}
             placeholder="Enter team description"
           />
+          {fieldErrors.description && (
+            <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+              <AlertCircle size={12} />
+              {fieldErrors.description}
+            </p>
+          )}
         </div>
 
         {error && (
@@ -315,6 +444,7 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
     selectedMembers: [] // Array of {userId, role}
   });
   const [error, setError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   React.useEffect(() => {
@@ -328,28 +458,50 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
         selectedMembers: [] // Creator will be auto-added as lead on backend
       });
       setError(null);
+      setFieldErrors({});
     }
   }, [isOpen]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Reset all error states
     setError(null);
+    setFieldErrors({});
 
-    if (!formData.name.trim()) {
-      setError('Project name is required');
-      return;
+    // SECURITY: STRICT CLIENT-SIDE VALIDATION - BLOCK REQUEST IF INVALID
+    try {
+      const validatedData = projectSchema.parse({
+        name: formData.name,
+        description: formData.description,
+        status: formData.status,
+        start_date: formData.start_date,
+        end_date: formData.end_date
+      });
+      
+      // If validation passes, validatedData is now sanitized (trimmed strings, etc.)
+      console.log('✅ Validation passed:', validatedData);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        // Build field-specific error map
+        const errors = {};
+        err.errors.forEach((error) => {
+          const fieldName = error.path[0];
+          errors[fieldName] = error.message;
+        });
+        
+        console.log('❌ Validation failed:', errors);
+        
+        // Set errors to trigger visual feedback
+        setFieldErrors(errors);
+        setError('Please fix the errors below');
+        
+        // CRITICAL: DO NOT PROCEED - Block API call
+        return; // Exit immediately without calling mutation
+      }
     }
 
-    if (formData.name.length > 100) {
-      setError('Project name must be 100 characters or less');
-      return;
-    }
-
-    if (formData.description && formData.description.length > 500) {
-      setError('Description must be 500 characters or less');
-      return;
-    }
-
+    // Validation passed - proceed with API call
     setIsSubmitting(true);
 
     try {
@@ -374,9 +526,15 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
       dataToSubmit.members = formData.selectedMembers;
 
       await onSubmit(dataToSubmit);
+      
+      // SUCCESS: Only close modal if no error thrown
       onClose();
     } catch (err) {
-      setError(err.message || 'Failed to create project');
+      // Extract server error message from response
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to create project';
+      console.error('❌ Server error:', errorMessage);
+      setError(errorMessage);
+      // Modal stays open, user can see the error and retry
     } finally {
       setIsSubmitting(false);
     }
@@ -408,9 +566,16 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
     }));
   };
 
-  const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${
-    darkMode ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white placeholder-[rgb(119,136,115)]' : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)] placeholder-[rgb(119,136,115)]'
-  }`;
+  const getInputClass = (fieldName) => {
+    const hasError = fieldErrors[fieldName];
+    return `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 transition-all ${
+      hasError 
+        ? 'border-2 border-red-500 focus:ring-red-500/50 bg-red-50 dark:bg-red-500/10' 
+        : darkMode 
+          ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white placeholder-[rgb(119,136,115)] focus:ring-[rgb(119,136,115)]/50' 
+          : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)] placeholder-[rgb(119,136,115)] focus:ring-[rgb(119,136,115)]/50'
+    }`;
+  };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Create New Project" darkMode={darkMode}>
@@ -422,14 +587,24 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
           <input
             type="text"
             value={formData.name}
-            onChange={(e) => setFormData({...formData, name: e.target.value})}
-            className={inputClass}
+            onChange={(e) => {
+              setFormData({...formData, name: e.target.value});
+              if (fieldErrors.name) setFieldErrors({...fieldErrors, name: null});
+            }}
+            className={getInputClass('name')}
             placeholder="Enter project name"
             maxLength={100}
           />
-          <p className={`text-xs mt-1 ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
-            {formData.name.length}/100 characters
-          </p>
+          {fieldErrors.name ? (
+            <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+              <AlertCircle size={12} />
+              {fieldErrors.name}
+            </p>
+          ) : (
+            <p className={`text-xs mt-1 ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
+              {formData.name.length}/100 characters
+            </p>
+          )}
         </div>
 
         <div>
@@ -438,15 +613,25 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
           </label>
           <textarea
             value={formData.description}
-            onChange={(e) => setFormData({...formData, description: e.target.value})}
-            className={inputClass}
+            onChange={(e) => {
+              setFormData({...formData, description: e.target.value});
+              if (fieldErrors.description) setFieldErrors({...fieldErrors, description: null});
+            }}
+            className={getInputClass('description')}
             placeholder="Project description (optional)"
             rows={3}
             maxLength={500}
           />
-          <p className={`text-xs mt-1 ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
-            {formData.description.length}/500 characters
-          </p>
+          {fieldErrors.description ? (
+            <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+              <AlertCircle size={12} />
+              {fieldErrors.description}
+            </p>
+          ) : (
+            <p className={`text-xs mt-1 ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
+              {formData.description.length}/500 characters
+            </p>
+          )}
         </div>
 
         <div>
@@ -455,13 +640,22 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
           </label>
           <select
             value={formData.status}
-            onChange={(e) => setFormData({...formData, status: e.target.value})}
-            className={inputClass}
+            onChange={(e) => {
+              setFormData({...formData, status: e.target.value});
+              if (fieldErrors.status) setFieldErrors({...fieldErrors, status: null});
+            }}
+            className={getInputClass('status')}
           >
             <option value="active">Active</option>
             <option value="archived">Archived</option>
             <option value="completed">Completed</option>
           </select>
+          {fieldErrors.status && (
+            <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+              <AlertCircle size={12} />
+              {fieldErrors.status}
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -472,9 +666,18 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
             <input
               type="date"
               value={formData.start_date}
-              onChange={(e) => setFormData({...formData, start_date: e.target.value})}
-              className={inputClass}
+              onChange={(e) => {
+                setFormData({...formData, start_date: e.target.value});
+                if (fieldErrors.start_date) setFieldErrors({...fieldErrors, start_date: null});
+              }}
+              className={getInputClass('start_date')}
             />
+            {fieldErrors.start_date && (
+              <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                <AlertCircle size={12} />
+                {fieldErrors.start_date}
+              </p>
+            )}
           </div>
           <div>
             <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
@@ -483,9 +686,28 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
             <input
               type="date"
               value={formData.end_date}
-              onChange={(e) => setFormData({...formData, end_date: e.target.value})}
-              className={inputClass}
+              onChange={(e) => {
+                setFormData({...formData, end_date: e.target.value});
+                if (fieldErrors.end_date) setFieldErrors({...fieldErrors, end_date: null});
+              }}
+              onBlur={() => {
+                // Validate date comparison on blur for CreateProjectModal
+                if (formData.start_date && formData.end_date) {
+                  const start = new Date(formData.start_date);
+                  const end = new Date(formData.end_date);
+                  if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && start > end) {
+                    setFieldErrors(prev => ({...prev, end_date: 'End date must be after start date'}));
+                  }
+                }
+              }}
+              className={getInputClass('end_date')}
             />
+            {fieldErrors.end_date && (
+              <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                <AlertCircle size={12} />
+                {fieldErrors.end_date}
+              </p>
+            )}
           </div>
         </div>
 
@@ -743,6 +965,7 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
     selectedMembers: [] // {userId, role}
   });
   const [error, setError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [initialMembers, setInitialMembers] = useState([]); // Track initial state for comparison
   const [showRemoveMemberModal, setShowRemoveMemberModal] = useState(false);
@@ -779,23 +1002,43 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Reset all error states
     setError(null);
+    setFieldErrors({});
 
-    if (!formData.name.trim()) {
-      setError('Project name is required');
-      return;
+    // SECURITY: STRICT CLIENT-SIDE VALIDATION - BLOCK REQUEST IF INVALID
+    try {
+      const validatedData = projectSchema.parse({
+        name: formData.name,
+        description: formData.description,
+        status: formData.status,
+        start_date: formData.start_date,
+        end_date: formData.end_date
+      });
+      
+      console.log('✅ EditProject validation passed:', validatedData);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        // Build field-specific error map
+        const errors = {};
+        err.errors.forEach((error) => {
+          const fieldName = error.path[0];
+          errors[fieldName] = error.message;
+        });
+        
+        console.log('❌ EditProject validation failed:', errors);
+        
+        // Set errors to trigger visual feedback
+        setFieldErrors(errors);
+        setError('Please fix the errors below');
+        
+        // CRITICAL: DO NOT PROCEED - Block API call
+        return; // Exit immediately without calling mutation
+      }
     }
 
-    if (formData.name.length > 100) {
-      setError('Project name must be 100 characters or less');
-      return;
-    }
-
-    if (formData.description && formData.description.length > 500) {
-      setError('Description must be 500 characters or less');
-      return;
-    }
-
+    // Validation passed - proceed with updates
     setIsSubmitting(true);
 
     try {
@@ -826,7 +1069,16 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
 
       // Update project if there are changes
       if (Object.keys(dataToSubmit).length > 0) {
-        await onSubmit(dataToSubmit);
+        try {
+          await onSubmit(dataToSubmit);
+        } catch (err) {
+          // Extract server error message from response
+          const errorMessage = err.response?.data?.message || err.message || 'Failed to update project';
+          console.error('❌ Server error:', errorMessage);
+          setError(errorMessage);
+          setIsSubmitting(false);
+          return; // Exit early, modal stays open
+        }
       }
 
       // Handle member changes
@@ -850,8 +1102,11 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
         try {
           await addProjectMember(project.id, member.userId, member.role);
         } catch (err) {
-          console.error(`Failed to add member ${member.userId}:`, err);
-          throw new Error(`Failed to add member: ${err.message}`);
+          const errorMessage = err.response?.data?.message || err.message || 'Failed to add member';
+          console.error(`Failed to add member ${member.userId}:`, errorMessage);
+          setError(`Failed to add member: ${errorMessage}`);
+          setIsSubmitting(false);
+          return; // Exit early, modal stays open
         }
       }
 
@@ -860,11 +1115,14 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
           // Try to remove without force first
           await removeProjectMember(project.id, member.userId, false);
         } catch (err) {
+          // Extract error message properly
+          const errorMessage = err.response?.data?.message || err.message || 'Failed to remove member';
+          
           // If member has tasks, show confirmation modal
-          console.log('Remove member error:', err.message); // Debug log
-          if (err.message.includes('assigned task')) {
+          console.log('Remove member error:', errorMessage); // Debug log
+          if (errorMessage.includes('assigned task')) {
             // Extract task count from error message
-            const taskCountMatch = err.message.match(/(\d+)/);
+            const taskCountMatch = errorMessage.match(/(\d+)/);
             const taskCount = taskCountMatch ? parseInt(taskCountMatch[0]) : 0;
             
             // Store pending changes and show modal
@@ -874,7 +1132,10 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
             setIsSubmitting(false);
             return; // Stop execution, wait for user confirmation
           } else {
-            throw new Error(`Failed to remove member: ${err.message}`);
+            // Other errors - display and stop
+            setError(`Failed to remove member: ${errorMessage}`);
+            setIsSubmitting(false);
+            return; // Exit early, modal stays open
           }
         }
       }
@@ -904,9 +1165,8 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
         queryClient.invalidateQueries(['teamStats', teamId]);
       }
 
+      // SUCCESS: Only close modal if all operations succeeded
       onClose();
-    } catch (err) {
-      setError(err.message || 'Failed to update project');
     } finally {
       setIsSubmitting(false);
     }
@@ -995,9 +1255,16 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
     }
   };
 
-  const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${
-    darkMode ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white placeholder-[rgb(119,136,115)]' : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)] placeholder-[rgb(119,136,115)]'
-  }`;
+  const getInputClass = (fieldName) => {
+    const hasError = fieldErrors[fieldName];
+    return `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 transition-all ${
+      hasError 
+        ? 'border-2 border-red-500 focus:ring-red-500/50 bg-red-50 dark:bg-red-500/10' 
+        : darkMode 
+          ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white placeholder-[rgb(119,136,115)] focus:ring-[rgb(119,136,115)]/50' 
+          : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)] placeholder-[rgb(119,136,115)] focus:ring-[rgb(119,136,115)]/50'
+    }`;
+  };
 
   return (
     <>
@@ -1023,14 +1290,24 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
           <input
             type="text"
             value={formData.name}
-            onChange={(e) => setFormData({...formData, name: e.target.value})}
-            className={inputClass}
+            onChange={(e) => {
+              setFormData({...formData, name: e.target.value});
+              if (fieldErrors.name) setFieldErrors({...fieldErrors, name: null});
+            }}
+            className={getInputClass('name')}
             placeholder="Enter project name"
             maxLength={100}
           />
-          <p className={`text-xs mt-1 ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
-            {formData.name.length}/100 characters
-          </p>
+          {fieldErrors.name ? (
+            <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+              <AlertCircle size={12} />
+              {fieldErrors.name}
+            </p>
+          ) : (
+            <p className={`text-xs mt-1 ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
+              {formData.name.length}/100 characters
+            </p>
+          )}
         </div>
 
         <div>
@@ -1039,15 +1316,25 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
           </label>
           <textarea
             value={formData.description}
-            onChange={(e) => setFormData({...formData, description: e.target.value})}
-            className={inputClass}
+            onChange={(e) => {
+              setFormData({...formData, description: e.target.value});
+              if (fieldErrors.description) setFieldErrors({...fieldErrors, description: null});
+            }}
+            className={getInputClass('description')}
             placeholder="Project description (optional)"
             rows={3}
             maxLength={500}
           />
-          <p className={`text-xs mt-1 ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
-            {formData.description.length}/500 characters
-          </p>
+          {fieldErrors.description ? (
+            <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+              <AlertCircle size={12} />
+              {fieldErrors.description}
+            </p>
+          ) : (
+            <p className={`text-xs mt-1 ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
+              {formData.description.length}/500 characters
+            </p>
+          )}
         </div>
 
         <div>
@@ -1056,13 +1343,22 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
           </label>
           <select
             value={formData.status}
-            onChange={(e) => setFormData({...formData, status: e.target.value})}
-            className={inputClass}
+            onChange={(e) => {
+              setFormData({...formData, status: e.target.value});
+              if (fieldErrors.status) setFieldErrors({...fieldErrors, status: null});
+            }}
+            className={getInputClass('status')}
           >
             <option value="active">Active</option>
             <option value="archived">Archived</option>
             <option value="completed">Completed</option>
           </select>
+          {fieldErrors.status && (
+            <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+              <AlertCircle size={12} />
+              {fieldErrors.status}
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -1073,9 +1369,18 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
             <input
               type="date"
               value={formData.start_date}
-              onChange={(e) => setFormData({...formData, start_date: e.target.value})}
-              className={inputClass}
+              onChange={(e) => {
+                setFormData({...formData, start_date: e.target.value});
+                if (fieldErrors.start_date) setFieldErrors({...fieldErrors, start_date: null});
+              }}
+              className={getInputClass('start_date')}
             />
+            {fieldErrors.start_date && (
+              <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                <AlertCircle size={12} />
+                {fieldErrors.start_date}
+              </p>
+            )}
           </div>
           <div>
             <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
@@ -1084,9 +1389,28 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
             <input
               type="date"
               value={formData.end_date}
-              onChange={(e) => setFormData({...formData, end_date: e.target.value})}
-              className={inputClass}
+              onChange={(e) => {
+                setFormData({...formData, end_date: e.target.value});
+                if (fieldErrors.end_date) setFieldErrors({...fieldErrors, end_date: null});
+              }}
+              onBlur={() => {
+                // Validate date comparison on blur for EditProjectModal
+                if (formData.start_date && formData.end_date) {
+                  const start = new Date(formData.start_date);
+                  const end = new Date(formData.end_date);
+                  if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && start > end) {
+                    setFieldErrors(prev => ({...prev, end_date: 'End date must be after start date'}));
+                  }
+                }
+              }}
+              className={getInputClass('end_date')}
             />
+            {fieldErrors.end_date && (
+              <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                <AlertCircle size={12} />
+                {fieldErrors.end_date}
+              </p>
+            )}
           </div>
         </div>
 
@@ -1950,7 +2274,7 @@ export default function TeamPage() {
         isOpen={showEditModal}
         onClose={() => setShowEditModal(false)}
         team={team}
-        onSubmit={(updates) => updateTeamMutation.mutate(updates)}
+        onSubmit={(updates) => updateTeamMutation.mutateAsync(updates)}
         darkMode={isDarkMode}
       />
 
@@ -1967,7 +2291,7 @@ export default function TeamPage() {
         onClose={() => setShowCreateProjectModal(false)}
         teamId={teamId}
         teamMembers={members}
-        onSubmit={(projectData) => createProjectMutation.mutate(projectData)}
+        onSubmit={(projectData) => createProjectMutation.mutateAsync(projectData)}
         darkMode={isDarkMode}
       />
 
@@ -1978,7 +2302,7 @@ export default function TeamPage() {
           setSelectedProject(null);
         }}
         project={selectedProject}
-        onSubmit={(updates) => updateProjectMutation.mutate({ projectId: selectedProject.id, updates })}
+        onSubmit={(updates) => updateProjectMutation.mutateAsync({ projectId: selectedProject.id, updates })}
         darkMode={isDarkMode}
         teamMembers={membersData?.data}
         teamId={teamData?.data?.id}
