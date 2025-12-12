@@ -2002,76 +2002,57 @@ const TeamMembersModal = ({ isOpen, onClose, teamId, darkMode }) => {
             </p>
           </div>
         ) : (
-          <div className={`border rounded-lg max-h-96 overflow-y-auto ${
-            darkMode ? 'border-[#171717]' : 'border-gray-200'
+          <div className={`divide-y ${
+            darkMode ? 'divide-[#171717]' : 'divide-gray-200'
           }`}>
-            <div className={`divide-y ${
-              darkMode ? 'divide-[#171717]' : 'divide-gray-200'
-            }`}>
-              {filteredMembers.map((member) => (
-                <div
-                  key={member.id}
-                  className={`p-4 transition-colors ${
-                    darkMode ? 'hover:bg-[#171717]/50' : 'hover:bg-gray-50'
-                  }`}
-                >
-                  <div className="flex items-center gap-4">
-                    {/* Avatar */}
-                    {getUserAvatar(member)}
+            {filteredMembers.map((member) => (
+              <div
+                key={member.id}
+                className={`p-4 transition-colors ${
+                  darkMode ? 'hover:bg-[#171717]/50' : 'hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  {/* Avatar */}
+                  {getUserAvatar(member)}
 
-                    {/* Member Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className={`text-sm font-medium truncate ${
-                          darkMode ? 'text-white' : 'text-black'
-                        }`}>
-                          {member.username}
-                        </p>
-                      </div>
-                      <p className={`text-xs truncate ${
-                        darkMode ? 'text-gray-400' : 'text-gray-500'
+                  {/* Member Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className={`text-sm font-medium truncate ${
+                        darkMode ? 'text-white' : 'text-black'
                       }`}>
-                        {member.email}
+                        {member.username}
                       </p>
                     </div>
-
-                    {/* Role Badge (Read-Only) */}
-                    <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium border ${
-                      getRoleBadgeColor(member.role)
+                    <p className={`text-xs truncate ${
+                      darkMode ? 'text-gray-400' : 'text-gray-500'
                     }`}>
-                      {member.role}
-                    </span>
+                      {member.email}
+                    </p>
                   </div>
+
+                  {/* Role Badge (Read-Only) */}
+                  <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium border ${
+                    getRoleBadgeColor(member.role)
+                  }`}>
+                    {member.role}
+                  </span>
                 </div>
-              ))}
+              </div>
+            ))}
+            
+            {/* Footer Info */}
+            <div className={`text-xs text-center py-3 border-t ${
+              darkMode ? 'text-gray-400 border-[#171717]' : 'text-gray-500 border-gray-200'
+            }`}>
+              {searchQuery 
+                ? `Showing ${filteredMembers.length} of ${members.length} members` 
+                : `Total ${members.length} team member${members.length !== 1 ? 's' : ''}`
+              }
             </div>
           </div>
         )}
-
-        {/* Footer Info */}
-        {!isLoading && filteredMembers.length > 0 && (
-          <div className={`text-xs text-center pt-2 border-t ${
-            darkMode ? 'text-gray-400 border-[#171717]' : 'text-gray-500 border-gray-200'
-          }`}>
-            {searchQuery 
-              ? `Showing ${filteredMembers.length} of ${members.length} members` 
-              : `Total ${members.length} team member${members.length !== 1 ? 's' : ''}`
-            }
-          </div>
-        )}
-
-        {/* Close Button */}
-        <div className="flex justify-end pt-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className={`px-6 py-3 rounded-lg font-semibold transition-all ${
-              darkMode ? 'bg-[#171717] text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Close
-          </button>
-        </div>
       </div>
     </Modal>
   );
