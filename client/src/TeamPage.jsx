@@ -432,7 +432,7 @@ const DeleteTeamModal = ({ isOpen, onClose, team, onConfirm, darkMode }) => {
             onClick={onClose}
             disabled={isDeleting}
             className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
-              darkMode ? 'bg-[rgb(45,52,45)] text-gray-300 hover:bg-[#171717]/70' : 'bg-gray-200/50 text-gray-400 hover:bg-gray-200'
+              darkMode ? 'bg-[#171717] text-gray-300 hover:bg-[#171717]/70' : 'bg-gray-200/50 text-gray-400 hover:bg-gray-200'
             } disabled:opacity-50`}
           >
             Cancel
@@ -525,7 +525,7 @@ const InviteMemberModal = ({ isOpen, onClose, teamId, darkMode }) => {
     
     return (
       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-        darkMode ? 'bg-[#006239] text-[rgb(24,28,24)]' : 'bg-[#006239] text-white'
+        darkMode ? 'bg-[#006239] text-black' : 'bg-[#006239] text-white'
       }`}>
         {initials}
       </div>
@@ -1120,7 +1120,7 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
                           type="checkbox"
                           checked={!!isSelected}
                           onChange={() => toggleMember(member)}
-                          className="w-4 h-4 rounded border-[rgb(119,136,115)] text-gray-400 focus:ring-[rgb(119,136,115)]"
+                          className="w-4 h-4 rounded border-gray-400 text-gray-400 focus:ring-blue-500/20"
                         />
                         <div className="flex items-center gap-2">
                           {member.avatar_url ? (
@@ -1132,11 +1132,11 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
                               {member.username[0].toUpperCase()}
                             </div>
                           )}
-                          <span className={`text-sm ${darkMode ? 'text-[rgb(241,243,224)]' : 'text-black'}`}>
+                          <span className={`text-sm ${darkMode ? 'text-white' : 'text-black'}`}>
                             {member.username}
                           </span>
                           <span className={`text-xs px-2 py-0.5 rounded-full ${
-                            darkMode ? 'bg-[rgb(45,52,45)] text-gray-300' : 'bg-gray-200/50 text-gray-400'
+                            darkMode ? 'bg-[#171717] text-gray-300' : 'bg-gray-200/50 text-gray-400'
                           }`}>
                             {member.role}
                           </span>
@@ -1146,7 +1146,7 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
                         <select
                           value={isSelected.role}
                           onChange={(e) => updateMemberRole(member.user_id, e.target.value)}
-                          className={`text-xs px-2 py-1 rounded border focus:outline-none focus:ring-1 focus:ring-[rgb(119,136,115)] ${
+                          className={`text-xs px-2 py-1 rounded border focus:outline-none focus:ring-1 focus:ring-blue-500/20 ${
                             darkMode ? 'bg-dark-secondary border-[#171717] text-gray-300' : 'bg-white border-gray-200 text-gray-400'
                           }`}
                           onClick={(e) => e.stopPropagation()}
@@ -1188,7 +1188,7 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
             onClick={onClose}
             disabled={isSubmitting}
             className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
-              darkMode ? 'bg-[rgb(45,52,45)] text-gray-300 hover:bg-[#171717]/70' : 'bg-gray-200/50 text-gray-400 hover:bg-gray-200'
+              darkMode ? 'bg-[#171717] text-gray-300 hover:bg-[#171717]/70' : 'bg-gray-200/50 text-gray-400 hover:bg-gray-200'
             } disabled:opacity-50`}
           >
             Cancel
@@ -1323,7 +1323,7 @@ const RemoveMemberConfirmModal = ({ isOpen, onClose, memberInfo, onConfirm, dark
             onClick={onClose}
             disabled={isRemoving}
             className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
-              darkMode ? 'bg-[rgb(45,52,45)] text-gray-300 hover:bg-[#171717]/70' : 'bg-gray-200/50 text-gray-400 hover:bg-gray-200'
+              darkMode ? 'bg-[#171717] text-gray-300 hover:bg-[#171717]/70' : 'bg-gray-200/50 text-gray-400 hover:bg-gray-200'
             } disabled:opacity-50`}
           >
             Cancel
@@ -1823,7 +1823,7 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
                           type="checkbox"
                           checked={!!isSelected}
                           onChange={() => toggleMember(member)}
-                          className="w-4 h-4 rounded border-[rgb(119,136,115)] text-gray-400 focus:ring-[rgb(119,136,115)]"
+                          className="w-4 h-4 rounded border-gray-400 text-gray-400 focus:ring-blue-500/20"
                         />
                         <div className="flex items-center gap-2">
                           {member.avatar_url ? (
@@ -1835,11 +1835,11 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
                               {member.username[0].toUpperCase()}
                             </div>
                           )}
-                          <span className={`text-sm ${darkMode ? 'text-[rgb(241,243,224)]' : 'text-black'}`}>
+                          <span className={`text-sm ${darkMode ? 'text-white' : 'text-black'}`}>
                             {member.username}
                           </span>
                           <span className={`text-xs px-2 py-0.5 rounded-full ${
-                            darkMode ? 'bg-[rgb(45,52,45)] text-gray-300' : 'bg-gray-200/50 text-gray-400'
+                            darkMode ? 'bg-[#171717] text-gray-300' : 'bg-gray-200/50 text-gray-400'
                           }`}>
                             {member.role}
                           </span>
@@ -1849,7 +1849,7 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
                         <select
                           value={isSelected.role}
                           onChange={(e) => updateMemberRole(member.user_id, e.target.value)}
-                          className={`text-xs px-2 py-1 rounded border focus:outline-none focus:ring-1 focus:ring-[rgb(119,136,115)] ${
+                          className={`text-xs px-2 py-1 rounded border focus:outline-none focus:ring-1 focus:ring-blue-500/20 ${
                             darkMode ? 'bg-dark-secondary border-[#171717] text-gray-300' : 'bg-white border-gray-200 text-gray-400'
                           }`}
                           onClick={(e) => e.stopPropagation()}
@@ -1891,7 +1891,7 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
             onClick={onClose}
             disabled={isSubmitting}
             className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
-              darkMode ? 'bg-[rgb(45,52,45)] text-gray-300 hover:bg-[#171717]/70' : 'bg-gray-200/50 text-gray-400 hover:bg-gray-200'
+              darkMode ? 'bg-[#171717] text-gray-300 hover:bg-[#171717]/70' : 'bg-gray-200/50 text-gray-400 hover:bg-gray-200'
             } disabled:opacity-50`}
           >
             Cancel
@@ -2003,7 +2003,7 @@ const DeleteProjectModal = ({ isOpen, onClose, project, onConfirm, darkMode }) =
             onClick={onClose}
             disabled={isDeleting}
             className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
-              darkMode ? 'bg-[rgb(45,52,45)] text-gray-300 hover:bg-[#171717]/70' : 'bg-gray-200/50 text-gray-400 hover:bg-gray-200'
+              darkMode ? 'bg-[#171717] text-gray-300 hover:bg-[#171717]/70' : 'bg-gray-200/50 text-gray-400 hover:bg-gray-200'
             } disabled:opacity-50`}
           >
             Cancel
@@ -2072,13 +2072,13 @@ const ProjectCard = ({ project, darkMode, onClick, onEdit, onDelete }) => {
 
   return (
     <div 
-      className={`${darkMode ? 'bg-dark-secondary/50 border-[#171717]/50' : 'bg-white border-gray-200 shadow-sm'} border rounded-xl p-5 hover:border-[rgb(161,188,152)] transition-all flex flex-col h-full relative group`}
+      className={`${darkMode ? 'bg-dark-secondary/50 border-[#171717]/50' : 'bg-white border-gray-200 shadow-sm'} border rounded-xl p-5 hover:border-blue-500 transition-all flex flex-col h-full relative group`}
     >
       {/* Project card header with menu */}
       <div className="flex justify-between items-start mb-3">
         <h3 
           onClick={onClick}
-          className={`font-semibold text-lg cursor-pointer hover:text-gray-400 transition-colors ${darkMode ? 'text-[rgb(241,243,224)]' : 'text-black'}`}
+          className={`font-semibold text-lg cursor-pointer hover:text-gray-400 transition-colors ${darkMode ? 'text-white' : 'text-black'}`}
         >
           {project.name}
         </h3>
@@ -2160,7 +2160,7 @@ const ProjectCard = ({ project, darkMode, onClick, onEdit, onDelete }) => {
             <span>Progress</span>
             <span className={`font-medium ${darkMode ? 'text-gray-300' : 'text-black'}`}>{progress}%</span>
           </div>
-          <div className={`w-full rounded-full h-1.5 ${darkMode ? 'bg-[rgb(45,52,45)]' : 'bg-gray-200'}`}>
+          <div className={`w-full rounded-full h-1.5 ${darkMode ? 'bg-[#171717]' : 'bg-gray-200'}`}>
             <div 
               className="bg-[#006239] h-1.5 rounded-full transition-all duration-500" 
               style={{ width: `${progress}%` }}
@@ -2339,7 +2339,7 @@ export default function TeamPage() {
       <div className="p-6 md:p-8">
         <div className="max-w-7xl mx-auto">
           <div className={`${cardBg} border rounded-xl p-8 text-center`}>
-            <div className={`inline-block animate-spin rounded-full h-8 w-8 border-b-2 ${isDarkMode ? 'border-[rgb(119,136,115)]' : 'border-[rgb(119,136,115)]'}`}></div>
+            <div className={`inline-block animate-spin rounded-full h-8 w-8 border-b-2 ${isDarkMode ? 'border-gray-400' : 'border-gray-400'}`}></div>
             <p className={`mt-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>Loading team data...</p>
           </div>
         </div>
@@ -2414,7 +2414,7 @@ export default function TeamPage() {
         <div className="mb-8 flex items-start justify-between gap-4">
           <div className="flex-1">
             <h1 className={`text-2xl md:text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-black'}`}>
-              {team?.name || 'Team Dashboard'} 👋
+              {team?.name || 'Team Dashboard'}
             </h1>
             <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>
               {team?.description || "Here's what's happening with team projects today."}
@@ -2490,7 +2490,7 @@ export default function TeamPage() {
             
             {membersLoading ? (
               <div className="text-center py-4">
-                <div className={`inline-block animate-spin rounded-full h-5 w-5 border-b-2 ${isDarkMode ? 'border-[rgb(119,136,115)]' : 'border-[rgb(119,136,115)]'}`}></div>
+                <div className={`inline-block animate-spin rounded-full h-5 w-5 border-b-2 ${isDarkMode ? 'border-gray-400' : 'border-gray-400'}`}></div>
               </div>
             ) : members.length === 0 ? (
               <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>No members found</p>
@@ -2528,7 +2528,7 @@ export default function TeamPage() {
             
             {/* Stats Grid */}
             <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className={`${isDarkMode ? 'bg-[rgb(45,52,45)]/50' : 'bg-gray-200/30'} rounded-lg p-4 text-center`}>
+              <div className={`${isDarkMode ? 'bg-[#171717]/50' : 'bg-gray-200/30'} rounded-lg p-4 text-center`}>
                 <div className={`text-3xl font-bold mb-1 ${isDarkMode ? 'text-white' : 'text-black'}`}>
                   {stats.total_projects || 0}
                 </div>
@@ -2536,7 +2536,7 @@ export default function TeamPage() {
                   Total Projects
                 </div>
               </div>
-              <div className={`${isDarkMode ? 'bg-[rgb(45,52,45)]/50' : 'bg-gray-200/30'} rounded-lg p-4 text-center`}>
+              <div className={`${isDarkMode ? 'bg-[#171717]/50' : 'bg-gray-200/30'} rounded-lg p-4 text-center`}>
                 <div className={`text-3xl font-bold mb-1 ${isDarkMode ? 'text-white' : 'text-black'}`}>
                   {stats.total_members || 0}
                 </div>
@@ -2555,7 +2555,7 @@ export default function TeamPage() {
                     {stats.completed_tasks || 0}/{stats.total_tasks || 0}
                   </span>
                 </div>
-                <div className={`w-full rounded-full h-2 ${isDarkMode ? 'bg-[rgb(45,52,45)]' : 'bg-gray-200'}`}>
+                <div className={`w-full rounded-full h-2 ${isDarkMode ? 'bg-[#171717]' : 'bg-gray-200'}`}>
                   <div 
                     className="bg-green-500 h-2 rounded-full transition-all duration-500" 
                     style={{ width: `${stats.total_tasks > 0 ? (stats.completed_tasks / stats.total_tasks * 100) : 0}%` }}
@@ -2570,7 +2570,7 @@ export default function TeamPage() {
                     {stats.in_progress_tasks || 0}
                   </span>
                 </div>
-                <div className={`w-full rounded-full h-2 ${isDarkMode ? 'bg-[rgb(45,52,45)]' : 'bg-gray-200'}`}>
+                <div className={`w-full rounded-full h-2 ${isDarkMode ? 'bg-[#171717]' : 'bg-gray-200'}`}>
                   <div 
                     className="bg-amber-500 h-2 rounded-full transition-all duration-500" 
                     style={{ width: `${stats.total_tasks > 0 ? (stats.in_progress_tasks / stats.total_tasks * 100) : 0}%` }}
@@ -2669,7 +2669,7 @@ export default function TeamPage() {
           {/* Projects Grid */}
           {projectsLoading ? (
             <div className={`${cardBg} border rounded-xl p-8 text-center`}>
-              <div className={`inline-block animate-spin rounded-full h-6 w-6 border-b-2 ${isDarkMode ? 'border-[rgb(119,136,115)]' : 'border-[rgb(119,136,115)]'}`}></div>
+              <div className={`inline-block animate-spin rounded-full h-6 w-6 border-b-2 ${isDarkMode ? 'border-gray-400' : 'border-gray-400'}`}></div>
               <p className={`mt-3 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>Loading projects...</p>
             </div>
           ) : filteredProjects.length === 0 ? (
@@ -2773,3 +2773,5 @@ export default function TeamPage() {
     </div>
   );
 }
+
+
