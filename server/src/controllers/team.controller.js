@@ -244,3 +244,37 @@ export const deleteTeam = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Search users for team invitation
+ * @route GET /api/v1/teams/:teamId/search-users?q=query
+ */
+export const searchUsers = async (req, res, next) => {
+  try {
+    const { teamId } = req.params;
+    const { q } = req.query;
+    const userId = req.user.id;
+
+    if (!q || q.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Search query is required',
+      });
+    }
+
+    const users = await TeamModel.searchUsersForInvite(teamId, q.trim(), userId);
+
+    res.status(200).json({
+      success: true,
+      data: users,
+    });
+  } catch (error) {
+    if (error.message.includes('not a member')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You are not a member of this team',
+      });
+    }
+    next(error);
+  }
+};

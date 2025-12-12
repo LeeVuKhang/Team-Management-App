@@ -5,7 +5,8 @@ import { mockAuth } from '../middlewares/auth.js'; // Temporary mock auth
 import { 
   teamIdParamSchema, 
   createTeamSchema, 
-  updateTeamSchema 
+  updateTeamSchema,
+  searchUsersSchema
 } from '../validations/team.validation.js';
 
 const router = express.Router();
@@ -68,6 +69,19 @@ router.get(
   '/:teamId/stats',
   validate(teamIdParamSchema, 'params'),
   TeamController.getTeamStats
+);
+
+/**
+ * @route   GET /api/v1/teams/:teamId/search-users
+ * @desc    Search users for team invitation (with status indicators)
+ * @access  Private (Team Member)
+ * @query   q - Search query (username or email)
+ */
+router.get(
+  '/:teamId/search-users',
+  validate(teamIdParamSchema, 'params'),
+  validate(searchUsersSchema, 'query'),
+  TeamController.searchUsers
 );
 
 /**

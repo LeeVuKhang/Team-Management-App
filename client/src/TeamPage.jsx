@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useOutletContext, useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
+import toast from 'react-hot-toast';
 import { 
   getTeam, 
   getTeamProjects, 
@@ -15,8 +16,11 @@ import {
   getProjectMembers,
   addProjectMember,
   removeProjectMember,
-  updateProjectMemberRole
+  updateProjectMemberRole,
+  searchUsers,
+  createInvitation
 } from './services/projectApi';
+import { useDebounce } from './hooks/useDebounce';
 import { 
   LayoutDashboard, 
   FolderKanban, 
@@ -31,7 +35,10 @@ import {
   Edit3,
   Trash2,
   Settings,
-  Calendar
+  Calendar,
+  Loader2,
+  UserCheck,
+  Mail
 } from 'lucide-react';
 
 /**
@@ -444,151 +451,249 @@ const DeleteTeamModal = ({ isOpen, onClose, team, onConfirm, darkMode }) => {
   );
 };
 
-// Invite Member Modal
-const InviteMemberModal = ({ isOpen, onClose, onSubmit, darkMode }) => {
-  const [formData, setFormData] = useState({
-    email: '',
-    role: 'member'
-  });
-  const [error, setError] = useState(null);
-  const [fieldErrors, setFieldErrors] = useState({});
+// Invite Member Modal (GitHub-Style Search & Select)
+const InviteMemberModal = ({ isOpen, onClose, teamId, darkMode }) => {
+  const queryClient = useQueryClient();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedRole, setSelectedRole] = useState('member');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Debounce search query to avoid spamming API
+  const debouncedQuery = useDebounce(searchQuery, 300);
 
+  // Reset state when modal opens/closes
   React.useEffect(() => {
     if (isOpen) {
-      setFormData({ email: '', role: 'member' });
-      setError(null);
-      setFieldErrors({});
+      setSearchQuery('');
+      setSelectedUser(null);
+      setSelectedRole('member');
     }
   }, [isOpen]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Reset all error states
-    setError(null);
-    setFieldErrors({});
+  // Search users query (only when debounced query has value)
+  const { data: searchResults, isLoading: isSearching } = useQuery({
+    queryKey: ['searchUsers', teamId, debouncedQuery],
+    queryFn: () => searchUsers(teamId, debouncedQuery),
+    enabled: debouncedQuery.length > 0 && isOpen,
+    select: (response) => response.data,
+  });
 
-    // SECURITY: STRICT CLIENT-SIDE VALIDATION - BLOCK REQUEST IF INVALID
-    try {
-      const validatedData = inviteMemberSchema.parse(formData);
-      console.log('✅ Invite validation passed:', validatedData);
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        const errors = {};
-        err.errors.forEach((error) => {
-          const fieldName = error.path[0];
-          errors[fieldName] = error.message;
-        });
-        
-        console.log('❌ Invite validation failed:', errors);
-        setFieldErrors(errors);
-        setError('Please fix the errors below');
-        return;
-      }
-    }
-
-    // Validation passed - mock API call
-    setIsSubmitting(true);
-
-    try {
-      // MOCK: Just log to console for now
-      console.log('🚀 [MOCK] Sending invite:', {
-        email: formData.email.trim(),
-        role: formData.role
-      });
-      
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // SUCCESS: Close modal
+  // Create invitation mutation
+  const inviteMutation = useMutation({
+    mutationFn: ({ email, role }) => createInvitation(teamId, email, role),
+    onSuccess: (data) => {
+      toast.success(data.message || 'Invitation sent successfully!');
+      queryClient.invalidateQueries(['teamMembers', teamId]);
       onClose();
-      
-      // TODO: Show success toast notification
-      alert(`Invitation sent to ${formData.email.trim()}`);
-    } catch (err) {
-      const errorMessage = err.response?.data?.message || err.message || 'Failed to send invitation';
-      console.error('❌ Invite error:', errorMessage);
-      setError(errorMessage);
-    } finally {
-      setIsSubmitting(false);
-    }
+    },
+    onError: (error) => {
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to send invitation';
+      toast.error(errorMessage);
+    },
+  });
+
+  const handleInvite = () => {
+    if (!selectedUser) return;
+    
+    setIsSubmitting(true);
+    inviteMutation.mutate(
+      { email: selectedUser.email, role: selectedRole },
+      { onSettled: () => setIsSubmitting(false) }
+    );
   };
 
-  const getInputClass = (fieldName) => {
-    const hasError = fieldErrors[fieldName];
-    return `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 transition-all ${
-      hasError 
-        ? 'border-2 border-red-500 focus:ring-red-500/50 bg-red-50 dark:bg-red-500/10' 
-        : darkMode 
-          ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white focus:ring-[rgb(119,136,115)]/50' 
-          : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)] focus:ring-[rgb(119,136,115)]/50'
-    }`;
+  // Get user avatar (initials fallback)
+  const getUserAvatar = (user) => {
+    if (user.avatar_url) {
+      return (
+        <img 
+          src={user.avatar_url} 
+          alt={user.username}
+          className="w-8 h-8 rounded-full object-cover"
+        />
+      );
+    }
+    
+    // Fallback to initials
+    const initials = user.username
+      .split(' ')
+      .map(word => word[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+    
+    return (
+      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+        darkMode ? 'bg-[rgb(119,136,115)] text-[rgb(24,28,24)]' : 'bg-[rgb(119,136,115)] text-white'
+      }`}>
+        {initials}
+      </div>
+    );
+  };
+
+  // Get status badge
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'member':
+        return (
+          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+            <UserCheck size={12} />
+            Already a member
+          </span>
+        );
+      case 'pending':
+        return (
+          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+            <Clock size={12} />
+            Invitation pending
+          </span>
+        );
+      default:
+        return null;
+    }
   };
 
   const labelClass = `block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Invite Team Member" darkMode={darkMode}>
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-4">
+        {/* Search Input */}
         <div>
           <label className={labelClass}>
-            Email Address <span className="text-red-500">*</span>
+            Search by username or email <span className="text-red-500">*</span>
           </label>
-          <input
-            type="email"
-            value={formData.email}
-            onChange={(e) => {
-              setFormData({ ...formData, email: e.target.value });
-              setFieldErrors(prev => ({ ...prev, email: null }));
-            }}
-            className={getInputClass('email')}
-            placeholder="member@example.com"
-            autoComplete="email"
-          />
-          {fieldErrors.email && (
-            <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-              <AlertCircle size={12} />
-              {fieldErrors.email}
-            </p>
-          )}
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Type to search users..."
+              className={`w-full rounded-lg px-4 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 transition-all ${
+                darkMode 
+                  ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white focus:ring-[rgb(119,136,115)]/50' 
+                  : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)] focus:ring-[rgb(119,136,115)]/50'
+              }`}
+            />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+              {isSearching ? (
+                <Loader2 size={16} className="animate-spin text-[rgb(119,136,115)]" />
+              ) : (
+                <Search size={16} className="text-[rgb(119,136,115)]" />
+              )}
+            </div>
+          </div>
         </div>
 
-        <div>
-          <label className={labelClass}>Role</label>
-          <select
-            value={formData.role}
-            onChange={(e) => {
-              setFormData({ ...formData, role: e.target.value });
-              setFieldErrors(prev => ({ ...prev, role: null }));
-            }}
-            className={getInputClass('role')}
-          >
-            <option value="member">Member</option>
-            <option value="admin">Admin</option>
-          </select>
-          {fieldErrors.role && (
-            <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-              <AlertCircle size={12} />
-              {fieldErrors.role}
-            </p>
-          )}
-          <p className={`text-xs mt-1 ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
-            {formData.role === 'admin' ? 'Can manage team settings and members' : 'Can view and work on projects'}
-          </p>
-        </div>
-
-        {error && (
-          <div className={`p-3 rounded-lg border ${
-            darkMode ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-red-50 border-red-200 text-red-600'
+        {/* Search Results */}
+        {debouncedQuery.length > 0 && (
+          <div className={`border rounded-lg max-h-60 overflow-y-auto ${
+            darkMode ? 'border-[rgb(45,52,45)]' : 'border-[rgb(210,220,182)]'
           }`}>
-            <div className="flex items-start gap-2">
-              <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
-              <p className="text-sm">{error}</p>
+            {isSearching ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 size={24} className="animate-spin text-[rgb(119,136,115)]" />
+              </div>
+            ) : searchResults?.length > 0 ? (
+              <div className="divide-y divide-[rgb(45,52,45)]">
+                {searchResults.map((user) => {
+                  const isDisabled = user.status !== 'none';
+                  const isSelected = selectedUser?.id === user.id;
+                  
+                  return (
+                    <button
+                      key={user.id}
+                      type="button"
+                      onClick={() => !isDisabled && setSelectedUser(user)}
+                      disabled={isDisabled}
+                      className={`w-full p-3 flex items-center gap-3 transition-all text-left ${
+                        isDisabled 
+                          ? 'opacity-50 cursor-not-allowed' 
+                          : isSelected
+                            ? darkMode 
+                              ? 'bg-[rgb(119,136,115)]/20' 
+                              : 'bg-[rgb(161,188,152)]/20'
+                            : darkMode
+                              ? 'hover:bg-[rgb(45,52,45)]'
+                              : 'hover:bg-[rgb(210,220,182)]/30'
+                      }`}
+                    >
+                      {getUserAvatar(user)}
+                      <div className="flex-1 min-w-0">
+                        <p className={`font-medium text-sm ${darkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
+                          {user.username}
+                        </p>
+                        <p className={`text-xs truncate ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
+                          {user.email}
+                        </p>
+                      </div>
+                      {getStatusBadge(user.status)}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-8 text-center">
+                <p className={`text-sm ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
+                  No users found matching "{debouncedQuery}"
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Selected User Display */}
+        {selectedUser && (
+          <div className={`p-3 rounded-lg border ${
+            darkMode 
+              ? 'bg-[rgb(119,136,115)]/10 border-[rgb(119,136,115)]/30' 
+              : 'bg-[rgb(161,188,152)]/10 border-[rgb(161,188,152)]/30'
+          }`}>
+            <div className="flex items-center gap-3">
+              <Mail size={16} className="text-[rgb(119,136,115)]" />
+              <div className="flex-1">
+                <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
+                  {selectedUser.username}
+                </p>
+                <p className={`text-xs ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
+                  {selectedUser.email}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedUser(null)}
+                className="p-1 rounded hover:bg-red-500/20 text-red-500 transition-colors"
+              >
+                <X size={16} />
+              </button>
             </div>
           </div>
         )}
 
+        {/* Role Selection */}
+        {selectedUser && (
+          <div>
+            <label className={labelClass}>Role</label>
+            <select
+              value={selectedRole}
+              onChange={(e) => setSelectedRole(e.target.value)}
+              className={`w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 transition-all ${
+                darkMode 
+                  ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white focus:ring-[rgb(119,136,115)]/50' 
+                  : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)] focus:ring-[rgb(119,136,115)]/50'
+              }`}
+            >
+              <option value="member">Member</option>
+              <option value="admin">Admin</option>
+            </select>
+            <p className={`text-xs mt-1 ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
+              {selectedRole === 'admin' ? 'Can manage team settings and members' : 'Can view and work on projects'}
+            </p>
+          </div>
+        )}
+
+        {/* Action Buttons */}
         <div className="flex gap-3 pt-4">
           <button
             type="button"
@@ -601,14 +706,22 @@ const InviteMemberModal = ({ isOpen, onClose, onSubmit, darkMode }) => {
             Cancel
           </button>
           <button
-            type="submit"
-            disabled={isSubmitting}
-            className="flex-1 px-6 py-3 bg-[rgb(119,136,115)] hover:bg-[rgb(161,188,152)] text-white rounded-lg font-semibold transition-all disabled:opacity-50"
+            type="button"
+            onClick={handleInvite}
+            disabled={!selectedUser || isSubmitting}
+            className="flex-1 px-6 py-3 bg-[rgb(119,136,115)] hover:bg-[rgb(119,136,115)]/90 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {isSubmitting ? 'Sending...' : 'Send Invitation'}
+            {isSubmitting ? (
+              <>
+                <Loader2 size={16} className="animate-spin" />
+                Sending...
+              </>
+            ) : (
+              'Send Invitation'
+            )}
           </button>
         </div>
-      </form>
+      </div>
     </Modal>
   );
 };
@@ -2125,7 +2238,7 @@ export default function TeamPage() {
   const handleRevokeInvite = (invite) => {
     console.log('🗑️ [MOCK] Revoking invitation:', invite);
     // TODO: Implement actual API call
-    alert(`Invitation to ${invite.email} would be revoked`);
+    toast.success(`Invitation to ${invite.email} would be revoked`);
   };
 
   // Fetch team data
@@ -2612,10 +2725,7 @@ export default function TeamPage() {
       <InviteMemberModal
         isOpen={showInviteMemberModal}
         onClose={() => setShowInviteMemberModal(false)}
-        onSubmit={(inviteData) => {
-          // MOCK: Just log for now
-          console.log('Invite submitted:', inviteData);
-        }}
+        teamId={team?.id}
         darkMode={isDarkMode}
       />
 

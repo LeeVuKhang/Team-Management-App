@@ -273,3 +273,61 @@ export async function updateProjectMemberRole(projectId, userId, role) {
     body: JSON.stringify({ role }),
   });
 }
+
+// ==================== INVITATION API ====================
+
+/**
+ * Get all pending invitations for the current user
+ * @returns {Promise<{success: boolean, data: Array}>}
+ */
+export async function getUserInvitations() {
+  return apiFetch('/user/invitations');
+}
+
+/**
+ * Accept a team invitation
+ * @param {string} token - Invitation token
+ * @returns {Promise<{success: boolean, message: string, data: {teamId: number, teamName: string}}>}
+ */
+export async function acceptInvitation(token) {
+  return apiFetch('/invitations/accept', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  });
+}
+
+/**
+ * Decline a team invitation
+ * @param {string} token - Invitation token
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export async function declineInvitation(token) {
+  return apiFetch('/invitations/decline', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  });
+}
+
+/**
+ * Search users for team invitation (with status indicators)
+ * @param {number} teamId - Team ID
+ * @param {string} query - Search query (username or email)
+ * @returns {Promise<{success: boolean, data: Array<{id, username, email, avatar_url, status}>}>}
+ */
+export async function searchUsers(teamId, query) {
+  return apiFetch(`/teams/${teamId}/search-users?q=${encodeURIComponent(query)}`);
+}
+
+/**
+ * Create a team invitation
+ * @param {number} teamId - Team ID
+ * @param {string} email - Email to invite
+ * @param {string} role - Role ('member' or 'admin')
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export async function createInvitation(teamId, email, role = 'member') {
+  return apiFetch(`/teams/${teamId}/invitations`, {
+    method: 'POST',
+    body: JSON.stringify({ email, role }),
+  });
+}

@@ -306,3 +306,56 @@ export const deleteTeam = async (teamId, userId) => {
 
   return result.count > 0;
 };
+
+/**
+ * Search users with their team membership status
+ * @param {number} teamId - Team ID to check membership against
+ * @param {string} searchQuery - Username or email to search
+ * @param {number} requestingUserId - User ID making the request (for RBAC)
+ * @returns {Promise<Array>} List of users with status indicators
+ * @throws {Error} If requesting user is not a team member
+ * SECURITY: Only team members can search for users to invite
+ */
+export const searchUsersForInvite = async (teamId, searchQuery, requestingUserId) => {
+  // SECURITY: Verify requesting user is a team member
+  const membershipCheck = await db`
+    SELECT 1 FROM team_members WHERE team_id = ${teamId} AND user_id = ${requestingUserId}
+  `;
+
+  if (membershipCheck.length === 0) {
+    throw new Error('Access denied: User is not a member of this team');
+  }
+
+  // Search for users matching username or email (case-insensitive partial match)
+  const searchPattern = `%${searchQuery}%`;
+  
+  const users = await db`
+    SELECT 
+      u.id,
+      u.username,
+      u.email,
+      u.avatar_url,
+      CASE 
+        WHEN tm.user_id IS NOT NULL THEN 'member'
+        WHEN ti.email IS NOT NULL AND ti.status = 'pending' THEN 'pending'
+        ELSE 'none'
+      END AS status
+    FROM users u
+    LEFT JOIN team_members tm ON u.id = tm.user_id AND tm.team_id = ${teamId}
+    LEFT JOIN team_invitations ti ON u.email = ti.email AND ti.team_id = ${teamId}
+    WHERE 
+      (LOWER(u.username) LIKE LOWER(${searchPattern})
+       OR LOWER(u.email) LIKE LOWER(${searchPattern}))
+      AND u.id != ${requestingUserId}
+    ORDER BY 
+      CASE 
+        WHEN tm.user_id IS NOT NULL THEN 3
+        WHEN ti.email IS NOT NULL THEN 2
+        ELSE 1
+      END,
+      u.username ASC
+    LIMIT 10
+  `;
+
+  return users;
+};

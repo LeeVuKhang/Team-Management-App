@@ -55,3 +55,16 @@ export const updateTeamSchema = z.object({
 }).refine((data) => Object.keys(data).length > 0, {
   message: 'At least one field must be provided for update',
 });
+
+/**
+ * Validate user search query
+ * SECURITY: Sanitize search input, prevent SQL injection
+ */
+export const searchUsersSchema = z.object({
+  q: z
+    .string()
+    .min(1, 'Search query is required')
+    .max(100, 'Search query must be 100 characters or less')
+    .trim()
+    .refine((val) => val.length > 0, 'Search query cannot be empty'),
+});
