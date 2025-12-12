@@ -10,7 +10,10 @@ const app = express();
 // Security Middleware
 app.use(helmet()); // Secure HTTP headers
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: [
+    process.env.CLIENT_URL || 'http://localhost:5173',
+    'http://localhost:5174' // Vite alternative port
+  ],
   credentials: true, // Allow cookies
 }));
 

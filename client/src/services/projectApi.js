@@ -157,3 +157,205 @@ export async function getTeamProjects(teamId) {
 export async function getTeamStats(teamId) {
   return apiFetch(`/teams/${teamId}/stats`);
 }
+
+/**
+ * Create a new team
+ * @param {object} teamData - {name, description?}
+ * @returns {Promise<{success: boolean, message: string, data: object}>}
+ */
+export async function createTeam(teamData) {
+  return apiFetch('/teams', {
+    method: 'POST',
+    body: JSON.stringify(teamData),
+  });
+}
+
+/**
+ * Update team details
+ * @param {number} teamId 
+ * @param {object} updates - {name?, description?}
+ * @returns {Promise<{success: boolean, message: string, data: object}>}
+ */
+export async function updateTeam(teamId, updates) {
+  return apiFetch(`/teams/${teamId}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+}
+
+/**
+ * Delete a team
+ * @param {number} teamId 
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export async function deleteTeam(teamId) {
+  return apiFetch(`/teams/${teamId}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Create a new project
+ * @param {number} teamId 
+ * @param {object} projectData - {name, description?, status?, start_date?, end_date?}
+ * @returns {Promise<{success: boolean, message: string, data: object}>}
+ */
+export async function createProject(teamId, projectData) {
+  return apiFetch(`/teams/${teamId}/projects`, {
+    method: 'POST',
+    body: JSON.stringify(projectData),
+  });
+}
+
+/**
+ * Update a project
+ * @param {number} teamId 
+ * @param {number} projectId 
+ * @param {object} updates - {name?, description?, status?, start_date?, end_date?}
+ * @returns {Promise<{success: boolean, message: string, data: object}>}
+ */
+export async function updateProject(teamId, projectId, updates) {
+  return apiFetch(`/teams/${teamId}/projects/${projectId}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+}
+
+/**
+ * Delete a project
+ * @param {number} teamId 
+ * @param {number} projectId 
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export async function deleteProject(teamId, projectId) {
+  return apiFetch(`/teams/${teamId}/projects/${projectId}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Add a member to a project
+ * @param {number} projectId 
+ * @param {number} userId 
+ * @param {string} role - 'lead', 'editor', or 'viewer'
+ * @returns {Promise<{success: boolean, message: string, data: object}>}
+ */
+export async function addProjectMember(projectId, userId, role = 'viewer') {
+  return apiFetch(`/projects/${projectId}/members`, {
+    method: 'POST',
+    body: JSON.stringify({ userId, role }),
+  });
+}
+
+/**
+ * Remove a member from a project
+ * @param {number} projectId 
+ * @param {number} userId 
+ * @param {boolean} forceRemove - If true, unassign tasks before removing
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export async function removeProjectMember(projectId, userId, forceRemove = false) {
+  return apiFetch(`/projects/${projectId}/members/${userId}?forceRemove=${forceRemove}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Update a project member's role
+ * @param {number} projectId 
+ * @param {number} userId 
+ * @param {string} role - 'lead', 'editor', or 'viewer'
+ * @returns {Promise<{success: boolean, message: string, data: object}>}
+ */
+export async function updateProjectMemberRole(projectId, userId, role) {
+  return apiFetch(`/projects/${projectId}/members/${userId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role }),
+  });
+}
+
+// ==================== INVITATION API ====================
+
+/**
+ * Get all pending invitations for the current user
+ * @returns {Promise<{success: boolean, data: Array}>}
+ */
+export async function getUserInvitations() {
+  return apiFetch('/user/invitations');
+}
+
+/**
+ * Accept a team invitation
+ * @param {string} token - Invitation token
+ * @returns {Promise<{success: boolean, message: string, data: {teamId: number, teamName: string}}>}
+ */
+export async function acceptInvitation(token) {
+  return apiFetch('/invitations/accept', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  });
+}
+
+/**
+ * Decline a team invitation
+ * @param {string} token - Invitation token
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export async function declineInvitation(token) {
+  return apiFetch('/invitations/decline', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  });
+}
+
+/**
+ * Search users for team invitation (with status indicators)
+ * @param {number} teamId - Team ID
+ * @param {string} query - Search query (username or email)
+ * @returns {Promise<{success: boolean, data: Array<{id, username, email, avatar_url, status}>}>}
+ */
+export async function searchUsers(teamId, query) {
+  return apiFetch(`/teams/${teamId}/search-users?q=${encodeURIComponent(query)}`);
+}
+
+/**
+ * Create a team invitation
+ * @param {number} teamId - Team ID
+ * @param {string} email - Email to invite
+ * @param {string} role - Role ('member' or 'admin')
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export async function createInvitation(teamId, email, role = 'member') {
+  return apiFetch(`/teams/${teamId}/invitations`, {
+    method: 'POST',
+    body: JSON.stringify({ email, role }),
+  });
+}
+
+// ==================== TEAM MEMBER MANAGEMENT ====================
+
+/**
+ * Remove a member from a team
+ * @param {number} teamId - Team ID
+ * @param {number} userId - User ID to remove
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export async function removeTeamMember(teamId, userId) {
+  return apiFetch(`/teams/${teamId}/members/${userId}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Update a team member's role
+ * @param {number} teamId - Team ID
+ * @param {number} userId - User ID
+ * @param {string} role - Role ('member', 'admin', or 'owner')
+ * @returns {Promise<{success: boolean, message: string, data: object}>}
+ */
+export async function updateTeamMemberRole(teamId, userId, role) {
+  return apiFetch(`/teams/${teamId}/members/${userId}/role`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role }),
+  });
+}

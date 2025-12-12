@@ -268,3 +268,280 @@ export const deleteTask = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Create a new project
+ * @route POST /api/v1/teams/:teamId/projects
+ */
+export const createProject = async (req, res, next) => {
+  try {
+    const { teamId } = req.params;
+    const userId = req.user.id;
+    const projectData = req.body;
+
+    const newProject = await ProjectModel.createProject(teamId, userId, projectData);
+
+    res.status(201).json({
+      success: true,
+      message: 'Project created successfully',
+      data: newProject,
+    });
+  } catch (error) {
+    if (error.message.includes('not a member of this team')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You are not a member of this team',
+      });
+    }
+
+    if (error.message.includes('Only team owner or admin')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Permission denied: Only team owner or admin can create projects',
+      });
+    }
+
+    next(error);
+  }
+};
+
+/**
+ * Update a project
+ * @route PUT /api/v1/teams/:teamId/projects/:projectId
+ */
+export const updateProject = async (req, res, next) => {
+  try {
+    const { teamId, projectId } = req.params;
+    const userId = req.user.id;
+    const updates = req.body;
+
+    const updatedProject = await ProjectModel.updateProject(projectId, teamId, userId, updates);
+
+    res.status(200).json({
+      success: true,
+      message: 'Project updated successfully',
+      data: updatedProject,
+    });
+  } catch (error) {
+    if (error.message.includes('not a member of this project or team')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You are not a member of this project or team',
+      });
+    }
+
+    if (error.message.includes('Only project lead, team owner, or team admin')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Permission denied: Only project lead, team owner, or team admin can update projects',
+      });
+    }
+
+    if (error.message.includes('Project not found')) {
+      return res.status(404).json({
+        success: false,
+        message: 'Project not found in this team',
+      });
+    }
+
+    next(error);
+  }
+};
+
+/**
+ * Delete a project
+ * @route DELETE /api/v1/teams/:teamId/projects/:projectId
+ */
+export const deleteProject = async (req, res, next) => {
+  try {
+    const { teamId, projectId } = req.params;
+    const userId = req.user.id;
+
+    await ProjectModel.deleteProject(projectId, teamId, userId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Project deleted successfully. All related tasks and members were also removed.',
+    });
+  } catch (error) {
+    if (error.message.includes('not a member of this project or team')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You are not a member of this project or team',
+      });
+    }
+
+    if (error.message.includes('Only project lead, team owner, or team admin')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Permission denied: Only project lead, team owner, or team admin can delete projects',
+      });
+    }
+
+    if (error.message.includes('Project not found')) {
+      return res.status(404).json({
+        success: false,
+        message: 'Project not found in this team',
+      });
+    }
+
+    next(error);
+  }
+};
+
+/**
+ * Add a member to a project
+ * @route POST /api/v1/projects/:projectId/members
+ */
+export const addProjectMember = async (req, res, next) => {
+  try {
+    const { projectId } = req.params;
+    const requesterId = req.user.id;
+    const { userId, role } = req.body;
+
+    const newMember = await ProjectModel.addProjectMember(projectId, requesterId, userId, role);
+
+    res.status(201).json({
+      success: true,
+      message: 'Member added to project successfully',
+      data: newMember,
+    });
+  } catch (error) {
+    if (error.message.includes('Access denied')) {
+      return res.status(403).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    if (error.message.includes('must be a team member')) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    if (error.message.includes('already a member')) {
+      return res.status(409).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    if (error.message.includes('not found')) {
+      return res.status(404).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    next(error);
+  }
+};
+
+/**
+ * Remove a member from a project
+ * @route DELETE /api/v1/projects/:projectId/members/:userId
+ */
+export const removeProjectMember = async (req, res, next) => {
+  try {
+    const { projectId, userId } = req.params;
+    const requesterId = req.user.id;
+    const { forceRemove } = req.query;
+
+    const result = await ProjectModel.removeProjectMember(
+      projectId, 
+      requesterId, 
+      parseInt(userId), 
+      forceRemove === 'true'
+    );
+
+    // If member has tasks and forceRemove is not set
+    if (!result.canRemove) {
+      return res.status(409).json({
+        success: false,
+        message: result.message,
+        data: {
+          assignedTaskCount: result.assignedTaskCount,
+          assignedTasks: result.assignedTasks,
+        },
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  } catch (error) {
+    if (error.message.includes('Access denied')) {
+      return res.status(403).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    if (error.message.includes('only project lead')) {
+      return res.status(403).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    if (error.message.includes('not found')) {
+      return res.status(404).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    next(error);
+  }
+};
+
+/**
+ * Update project member role
+ * @route PATCH /api/v1/projects/:projectId/members/:userId
+ */
+export const updateProjectMemberRole = async (req, res, next) => {
+  try {
+    const { projectId, userId } = req.params;
+    const requesterId = req.user.id;
+    const { role } = req.body;
+
+    const updatedMember = await ProjectModel.updateProjectMemberRole(
+      projectId,
+      requesterId,
+      parseInt(userId),
+      role
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Member role updated successfully',
+      data: updatedMember,
+    });
+  } catch (error) {
+    if (error.message.includes('Access denied')) {
+      return res.status(403).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    if (error.message.includes('only project lead')) {
+      return res.status(403).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    if (error.message.includes('not found')) {
+      return res.status(404).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    next(error);
+  }
+};

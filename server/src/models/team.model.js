@@ -192,3 +192,170 @@ export const getUserTeams = async (userId) => {
 
   return teams;
 };
+
+/**
+ * Create a new team
+ * @param {Object} teamData - Team data { name, description, createdBy }
+ * @returns {Promise<Object>} Created team with ID
+ * SECURITY: User who creates team becomes owner automatically
+ */
+export const createTeam = async ({ name, description, createdBy }) => {
+  // Start transaction
+  const [newTeam] = await db`
+    INSERT INTO teams (name, description, owner_id)
+    VALUES (${name}, ${description || null}, ${createdBy})
+    RETURNING id, name, description, owner_id, created_at, updated_at
+  `;
+
+  // Automatically add creator as owner in team_members
+  await db`
+    INSERT INTO team_members (team_id, user_id, role)
+    VALUES (${newTeam.id}, ${createdBy}, 'owner')
+  `;
+
+  return newTeam;
+};
+
+/**
+ * Update team details
+ * @param {number} teamId - Team ID to update
+ * @param {number} userId - User ID making the request
+ * @param {Object} updates - Fields to update { name?, description? }
+ * @returns {Promise<Object>} Updated team
+ * @throws {Error} If user is not owner/admin or team doesn't exist
+ * SECURITY: Only owner or admin can update team
+ */
+export const updateTeam = async (teamId, userId, updates) => {
+  // SECURITY: Verify membership and role
+  const membershipCheck = await db`
+    SELECT role FROM team_members WHERE team_id = ${teamId} AND user_id = ${userId}
+  `;
+
+  if (membershipCheck.length === 0) {
+    throw new Error('Access denied: User is not a member of this team');
+  }
+
+  const userRole = membershipCheck[0].role;
+  if (userRole !== 'owner' && userRole !== 'admin') {
+    throw new Error('Access denied: Only Owner or Admin can update team details');
+  }
+
+  // Build dynamic update query (only update provided fields)
+  const updateFields = [];
+  const values = [];
+  
+  if (updates.name !== undefined) {
+    updateFields.push('name');
+    values.push(updates.name);
+  }
+  if (updates.description !== undefined) {
+    updateFields.push('description');
+    values.push(updates.description);
+  }
+
+  if (updateFields.length === 0) {
+    throw new Error('No fields to update');
+  }
+
+  // Always update updated_at
+  updateFields.push('updated_at');
+  values.push(new Date());
+
+  // Construct SET clause
+  const setClause = updateFields.map((field, idx) => `${field} = $${idx + 1}`).join(', ');
+  
+  // Execute update
+  const [updatedTeam] = await db.unsafe(
+    `UPDATE teams 
+     SET ${setClause}
+     WHERE id = $${values.length + 1}
+     RETURNING id, name, description, owner_id, created_at, updated_at`,
+    [...values, teamId]
+  );
+
+  return updatedTeam || null;
+};
+
+/**
+ * Delete a team (CASCADE will delete all related data)
+ * @param {number} teamId - Team ID to delete
+ * @param {number} userId - User ID making the request
+ * @returns {Promise<boolean>} True if deleted successfully
+ * @throws {Error} If user is not owner
+ * SECURITY: Only owner can delete team. Database CASCADE will handle cleanup.
+ */
+export const deleteTeam = async (teamId, userId) => {
+  // SECURITY: Verify user is the team owner
+  const membershipCheck = await db`
+    SELECT role FROM team_members WHERE team_id = ${teamId} AND user_id = ${userId}
+  `;
+
+  if (membershipCheck.length === 0) {
+    throw new Error('Access denied: User is not a member of this team');
+  }
+
+  const userRole = membershipCheck[0].role;
+  if (userRole !== 'owner') {
+    throw new Error('Access denied: Only the team owner can delete the team');
+  }
+
+  // Delete team (CASCADE will handle team_members, projects, etc.)
+  const result = await db`
+    DELETE FROM teams WHERE id = ${teamId}
+  `;
+
+  return result.count > 0;
+};
+
+/**
+ * Search users with their team membership status
+ * @param {number} teamId - Team ID to check membership against
+ * @param {string} searchQuery - Username or email to search
+ * @param {number} requestingUserId - User ID making the request (for RBAC)
+ * @returns {Promise<Array>} List of users with status indicators
+ * @throws {Error} If requesting user is not a team member
+ * SECURITY: Only team members can search for users to invite
+ */
+export const searchUsersForInvite = async (teamId, searchQuery, requestingUserId) => {
+  // SECURITY: Verify requesting user is a team member
+  const membershipCheck = await db`
+    SELECT 1 FROM team_members WHERE team_id = ${teamId} AND user_id = ${requestingUserId}
+  `;
+
+  if (membershipCheck.length === 0) {
+    throw new Error('Access denied: User is not a member of this team');
+  }
+
+  // Search for users matching username or email (case-insensitive partial match)
+  const searchPattern = `%${searchQuery}%`;
+  
+  const users = await db`
+    SELECT 
+      u.id,
+      u.username,
+      u.email,
+      u.avatar_url,
+      CASE 
+        WHEN tm.user_id IS NOT NULL THEN 'member'
+        WHEN ti.email IS NOT NULL AND ti.status = 'pending' THEN 'pending'
+        ELSE 'none'
+      END AS status
+    FROM users u
+    LEFT JOIN team_members tm ON u.id = tm.user_id AND tm.team_id = ${teamId}
+    LEFT JOIN team_invitations ti ON u.email = ti.email AND ti.team_id = ${teamId}
+    WHERE 
+      (LOWER(u.username) LIKE LOWER(${searchPattern})
+       OR LOWER(u.email) LIKE LOWER(${searchPattern}))
+      AND u.id != ${requestingUserId}
+    ORDER BY 
+      CASE 
+        WHEN tm.user_id IS NOT NULL THEN 3
+        WHEN ti.email IS NOT NULL THEN 2
+        ELSE 1
+      END,
+      u.username ASC
+    LIMIT 10
+  `;
+
+  return users;
+};

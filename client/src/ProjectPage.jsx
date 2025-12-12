@@ -108,11 +108,11 @@ const TaskCard = ({ task, darkMode, userRole, onEdit, onDelete }) => {
   const canEdit = canEditTasks(userRole);
 
   return (
-    <div className={`${darkMode ? 'bg-[rgb(30,36,30)]/50 border-[rgb(45,52,45)]/50 hover:border-[rgb(119,136,115)]/50' : 'bg-white border-[rgb(210,220,182)] shadow-sm hover:border-[rgb(161,188,152)]'} border rounded-xl p-5 transition-all group`}>
+    <div className={`${darkMode ? 'bg-dark-secondary/50 border-[#171717]/50 hover:border-blue-500/50' : 'bg-white border-gray-200 shadow-sm hover:border-blue-500'} border rounded-xl p-5 transition-all group`}>
       
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex-1 min-w-0">
-          <h3 className={`font-semibold text-lg mb-2 ${darkMode ? 'text-[rgb(241,243,224)]' : 'text-[rgb(60,68,58)]'}`}>
+          <h3 className={`font-semibold text-lg mb-2 ${darkMode ? 'text-white' : 'text-black'}`}>
             {sanitizeText(task.title)}
           </h3>
           <div className="flex flex-wrap items-center gap-2">
@@ -125,23 +125,23 @@ const TaskCard = ({ task, darkMode, userRole, onEdit, onDelete }) => {
           <div className="relative">
             <button
               onClick={() => setShowActions(!showActions)}
-              className={`p-2 rounded-lg transition-colors ${darkMode ? 'hover:bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'hover:bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)]'}`}
+              className={`p-2 rounded-lg transition-colors ${darkMode ? 'hover:bg-[#171717] text-gray-300' : 'hover:bg-gray-100 text-gray-700'}`}
             >
               <MoreVertical size={18} />
             </button>
 
             {showActions && (
-              <div className={`absolute right-0 mt-2 w-48 rounded-lg shadow-lg border overflow-hidden z-10 ${darkMode ? 'bg-[rgb(30,36,30)] border-[rgb(45,52,45)]' : 'bg-white border-[rgb(210,220,182)]'}`}>
+              <div className={`absolute right-0 mt-2 w-48 rounded-lg shadow-lg border overflow-hidden z-10 ${darkMode ? 'bg-dark-secondary border-[#171717]' : 'bg-white border-gray-200'}`}>
                 <button
                   onClick={() => { onEdit(task); setShowActions(false); }}
-                  className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${darkMode ? 'hover:bg-[rgb(45,52,45)] text-[rgb(210,220,182)]' : 'hover:bg-[rgb(210,220,182)]/30 text-[rgb(60,68,58)]'}`}
+                  className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${darkMode ? 'hover:bg-[#171717] text-gray-300' : 'hover:bg-gray-200/30 text-black'}`}
                 >
                   <Edit3 size={14} />
                   Edit Task
                 </button>
                 <button
                   onClick={() => { onDelete(task); setShowActions(false); }}
-                  className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${darkMode ? 'hover:bg-[rgb(45,52,45)] text-red-400' : 'hover:bg-[rgb(210,220,182)]/30 text-red-600'}`}
+                  className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${darkMode ? 'hover:bg-[#171717] text-red-400' : 'hover:bg-gray-200/30 text-red-600'}`}
                 >
                   <Trash2 size={14} />
                   Delete Task
@@ -153,7 +153,7 @@ const TaskCard = ({ task, darkMode, userRole, onEdit, onDelete }) => {
       </div>
 
       {task.description && (
-        <p className={`${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'} text-sm mb-4 ${isExpanded ? '' : 'line-clamp-2'}`}>
+        <p className={`${darkMode ? 'text-gray-300' : 'text-gray-400'} text-sm mb-4 ${isExpanded ? '' : 'line-clamp-2'}`}>
           {sanitizeText(task.description)}
         </p>
       )}
@@ -161,16 +161,16 @@ const TaskCard = ({ task, darkMode, userRole, onEdit, onDelete }) => {
       {task.description && task.description.length > 100 && (
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className={`text-xs font-medium mb-3 ${darkMode ? 'text-[rgb(119,136,115)] hover:text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)] hover:text-[rgb(60,68,58)]'}`}
+          className={`text-xs font-medium mb-3 ${darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-400 hover:text-black'}`}
         >
           {isExpanded ? 'Show less' : 'Show more'}
         </button>
       )}
 
-      <div className={`space-y-3 pt-3 border-t ${darkMode ? 'border-[rgb(45,52,45)]/50' : 'border-[rgb(210,220,182)]'}`}>
+      <div className={`space-y-3 pt-3 border-t ${darkMode ? 'border-[#171717]/50' : 'border-gray-200'}`}>
         
         <div className="flex items-center justify-between">
-          <span className={`text-xs font-medium ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+          <span className={`text-xs font-medium ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
             Assigned to:
           </span>
           <div className="flex items-center gap-2">
@@ -189,8 +189,8 @@ const TaskCard = ({ task, darkMode, userRole, onEdit, onDelete }) => {
                           key={assignee.user_id || idx}
                           className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-medium border-2 ${
                             darkMode 
-                              ? 'bg-[rgb(119,136,115)] text-white border-[rgb(30,36,30)]' 
-                              : 'bg-[rgb(210,220,182)] text-[rgb(60,68,58)] border-white'
+                              ? 'bg-[#006239] text-white border-[rgb(30,36,30)]' 
+                              : 'bg-gray-200 text-black border-white'
                           }`}
                           title={assignee.username}
                         >
@@ -201,15 +201,15 @@ const TaskCard = ({ task, darkMode, userRole, onEdit, onDelete }) => {
                         <div
                           className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-medium border-2 ${
                             darkMode 
-                              ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] border-[rgb(30,36,30)]' 
-                              : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] border-white'
+                              ? 'bg-[#171717] text-gray-300 border-[rgb(30,36,30)]' 
+                              : 'bg-gray-100 text-gray-700 border-white'
                           }`}
                         >
                           +{validAssignees.length - 3}
                         </div>
                       )}
                     </div>
-                    <span className={`text-sm font-medium ${darkMode ? 'text-[rgb(210,220,182)]' : 'text-[rgb(60,68,58)]'}`}>
+                    <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-black'}`}>
                       {validAssignees.length} {validAssignees.length === 1 ? 'person' : 'people'}
                     </span>
                   </>
@@ -218,11 +218,11 @@ const TaskCard = ({ task, darkMode, userRole, onEdit, onDelete }) => {
                 return (
                   <>
                     <div className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-medium ${
-                      darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)]'
+                      darkMode ? 'bg-[#171717] text-gray-300' : 'bg-gray-100 text-gray-700'
                     }`}>
                       ?
                     </div>
-                    <span className={`text-sm font-medium ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+                    <span className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
                       Unassigned
                     </span>
                   </>
@@ -233,12 +233,12 @@ const TaskCard = ({ task, darkMode, userRole, onEdit, onDelete }) => {
         </div>
 
         <div className="flex items-center justify-between">
-          <span className={`text-xs font-medium ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+          <span className={`text-xs font-medium ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
             Due date:
           </span>
           <div className="flex items-center gap-1.5">
-            <Clock size={14} className={isOverdue ? 'text-red-500' : isDueSoon ? 'text-amber-500' : (darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]')} />
-            <span className={`text-sm font-medium ${isOverdue ? 'text-red-500' : isDueSoon ? 'text-amber-500' : (darkMode ? 'text-[rgb(210,220,182)]' : 'text-[rgb(60,68,58)]')}`}>
+            <Clock size={14} className={isOverdue ? 'text-red-500' : isDueSoon ? 'text-amber-500' : (darkMode ? 'text-gray-300' : 'text-gray-400')} />
+            <span className={`text-sm font-medium ${isOverdue ? 'text-red-500' : isDueSoon ? 'text-amber-500' : (darkMode ? 'text-gray-300' : 'text-black')}`}>
               {formatDate(task.due_date)}
               {isOverdue && ' (Overdue)'}
               {isDueSoon && !isOverdue && ` (${daysUntilDue}d left)`}
@@ -246,16 +246,16 @@ const TaskCard = ({ task, darkMode, userRole, onEdit, onDelete }) => {
           </div>
         </div>
 
-        <div className={`flex items-center gap-4 pt-2 border-t ${darkMode ? 'border-[rgb(45,52,45)]/50' : 'border-[rgb(210,220,182)]'}`}>
-          <div className={`flex items-center gap-1.5 text-xs ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+        <div className={`flex items-center gap-4 pt-2 border-t ${darkMode ? 'border-[#171717]/50' : 'border-gray-200'}`}>
+          <div className={`flex items-center gap-1.5 text-xs ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
             <MessageSquare size={14} />
             <span>{task.comments_count}</span>
           </div>
-          <div className={`flex items-center gap-1.5 text-xs ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+          <div className={`flex items-center gap-1.5 text-xs ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
             <Paperclip size={14} />
             <span>{task.attachments_count}</span>
           </div>
-          <div className={`flex items-center gap-1 text-xs ml-auto ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+          <div className={`flex items-center gap-1 text-xs ml-auto ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
             Updated {formatDate(task.updated_at)}
           </div>
         </div>
@@ -269,10 +269,10 @@ const FilterButton = ({ active, children, onClick, darkMode }) => (
     onClick={onClick}
     className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
       active
-        ? 'bg-[rgb(119,136,115)] text-white shadow-md'
+        ? 'bg-[#006239] text-white shadow-md'
         : darkMode
-        ? 'bg-[rgb(30,36,30)]/50 text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)] hover:text-[rgb(210,220,182)]'
-        : 'bg-white text-[rgb(119,136,115)] border border-[rgb(210,220,182)] hover:bg-[rgb(210,220,182)]/30 hover:text-[rgb(60,68,58)]'
+        ? 'bg-dark-secondary/50 text-gray-300 hover:bg-[#171717] hover:text-gray-300'
+        : 'bg-white text-gray-400 border border-gray-200 hover:bg-gray-200/30 hover:text-black'
     }`}
   >
     {children}
@@ -313,27 +313,27 @@ const Modal = ({ isOpen, onClose, title, children, darkMode }) => {
       onTouchMove={(e) => e.preventDefault()}
     >
       <div 
-        className={`w-full max-w-2xl rounded-xl shadow-2xl max-h-[90vh] overflow-y-auto ${
-          darkMode ? 'bg-[rgb(30,36,30)] border border-[rgb(45,52,45)]' : 'bg-white border border-[rgb(210,220,182)]'
+        className={`w-full max-w-2xl rounded-xl shadow-2xl max-h-[90vh] overflow-hidden ${
+          darkMode ? 'bg-dark-secondary border border-[#171717]' : 'bg-white border border-gray-200'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className={`flex items-center justify-between p-6 border-b ${
-          darkMode ? 'border-[rgb(45,52,45)]' : 'border-[rgb(210,220,182)]'
+          darkMode ? 'border-[#171717]' : 'border-gray-200'
         }`}>
           <h2 className={`text-2xl font-bold ${
-            darkMode ? 'text-white' : 'text-[rgb(60,68,58)]'
+            darkMode ? 'text-white' : 'text-black'
           }`}>{title}</h2>
           <button
             onClick={onClose}
             className={`p-2 rounded-lg transition-colors ${
-              darkMode ? 'hover:bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'hover:bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)]'
+              darkMode ? 'hover:bg-[#171717] text-gray-300' : 'hover:bg-gray-100 text-gray-700'
             }`}
           >
             ✕
           </button>
         </div>
-        <div className="p-6">
+        <div className="p-6 max-h-[calc(90vh-100px)] overflow-y-auto">
           {children}
         </div>
       </div>
@@ -379,12 +379,12 @@ const CreateTaskModal = ({ isOpen, onClose, onSubmit, projectMembers, darkMode }
     }
   };
 
-  const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${
-    darkMode ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-[rgb(210,220,182)]' : 'bg-[rgb(210,220,182)]/30 border border-[rgb(161,188,152)] text-[rgb(60,68,58)]'
+  const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
+    darkMode ? 'bg-dark-secondary border border-[#171717] text-gray-300' : 'bg-gray-200/30 border border-[rgb(161,188,152)] text-black'
   }`;
 
   const labelClass = `block text-sm font-bold mb-2 ${
-    darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'
+    darkMode ? 'text-gray-300' : 'text-gray-400'
   }`;
 
   return (
@@ -479,7 +479,7 @@ const CreateTaskModal = ({ isOpen, onClose, onSubmit, projectMembers, darkMode }
                         setFormData({ ...formData, assignee_ids: formData.assignee_ids.filter(id => id !== member.user_id) });
                       }
                     }}
-                    className="rounded border-2 border-[rgb(119,136,115)]"
+                    className="rounded border-2 border-gray-400"
                   />
                   <span>{member.username}</span>
                 </label>
@@ -506,7 +506,7 @@ const CreateTaskModal = ({ isOpen, onClose, onSubmit, projectMembers, darkMode }
             type="button"
             onClick={onClose}
             className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
-              darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)]/70' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]'
+              darkMode ? 'bg-[#171717] text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
             Cancel
@@ -514,7 +514,7 @@ const CreateTaskModal = ({ isOpen, onClose, onSubmit, projectMembers, darkMode }
           <button
             type="submit"
             disabled={isSubmitting}
-            className="flex-1 px-6 py-3 bg-[rgb(119,136,115)] hover:bg-[rgb(161,188,152)] text-white rounded-lg font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-6 py-3 bg-[#006239] hover:bg-[#005230] text-white rounded-lg font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? 'Creating...' : 'Create Task'}
           </button>
@@ -580,12 +580,12 @@ const EditTaskModal = ({ isOpen, onClose, onSubmit, task, projectMembers, darkMo
     }
   };
 
-  const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${
-    darkMode ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-[rgb(210,220,182)]' : 'bg-[rgb(210,220,182)]/30 border border-[rgb(161,188,152)] text-[rgb(60,68,58)]'
+  const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
+    darkMode ? 'bg-dark-secondary border border-[#171717] text-gray-300' : 'bg-gray-200/30 border border-[rgb(161,188,152)] text-black'
   }`;
 
   const labelClass = `block text-sm font-bold mb-2 ${
-    darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'
+    darkMode ? 'text-gray-300' : 'text-gray-400'
   }`;
 
   if (!task) return null;
@@ -680,7 +680,7 @@ const EditTaskModal = ({ isOpen, onClose, onSubmit, task, projectMembers, darkMo
                         setFormData({ ...formData, assignee_ids: formData.assignee_ids.filter(id => id !== member.user_id) });
                       }
                     }}
-                    className="rounded border-2 border-[rgb(119,136,115)]"
+                    className="rounded border-2 border-gray-400"
                   />
                   <span>{member.username}</span>
                 </label>
@@ -707,7 +707,7 @@ const EditTaskModal = ({ isOpen, onClose, onSubmit, task, projectMembers, darkMo
             type="button"
             onClick={onClose}
             className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
-              darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)]/70' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]'
+              darkMode ? 'bg-[#171717] text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
             Cancel
@@ -715,7 +715,7 @@ const EditTaskModal = ({ isOpen, onClose, onSubmit, task, projectMembers, darkMo
           <button
             type="submit"
             disabled={isSubmitting}
-            className="flex-1 px-6 py-3 bg-[rgb(119,136,115)] hover:bg-[rgb(161,188,152)] text-white rounded-lg font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-6 py-3 bg-[#006239] hover:bg-[#005230] text-white rounded-lg font-semibold shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? 'Saving...' : 'Save Changes'}
           </button>
@@ -793,17 +793,17 @@ const DeleteTaskModal = ({ isOpen, onClose, onConfirm, task, darkMode }) => {
         </div>
 
         <div className={`p-4 rounded-lg ${
-          darkMode ? 'bg-[rgb(24,28,24)]' : 'bg-[rgb(210,220,182)]/20'
+          darkMode ? 'bg-dark-secondary' : 'bg-gray-200/20'
         }`}>
           <p className={`text-sm font-medium mb-2 ${
-            darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'
+            darkMode ? 'text-gray-300' : 'text-gray-400'
           }`}>Task Details:</p>
           <h4 className={`font-bold text-lg ${
-            darkMode ? 'text-white' : 'text-[rgb(60,68,58)]'
+            darkMode ? 'text-white' : 'text-black'
           }`}>{sanitizeText(task.title)}</h4>
           {task.description && (
             <p className={`text-sm mt-2 ${
-              darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'
+              darkMode ? 'text-gray-300' : 'text-gray-400'
             }`}>{sanitizeText(task.description).substring(0, 100)}...</p>
           )}
         </div>
@@ -812,7 +812,7 @@ const DeleteTaskModal = ({ isOpen, onClose, onConfirm, task, darkMode }) => {
           <button
             onClick={onClose}
             className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
-              darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)]/70' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]'
+              darkMode ? 'bg-[#171717] text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
             Cancel
@@ -905,8 +905,8 @@ export default function ProjectPage() {
   };
 
   // Theme classes (only page-specific)
-  const cardBg = isDarkMode ? 'bg-[rgb(30,36,30)]/50 border-[rgb(45,52,45)]/50' : 'bg-white border-[rgb(210,220,182)] shadow-sm';
-  const inputBg = isDarkMode ? 'bg-[rgb(30,36,30)] border-[rgb(45,52,45)] text-[rgb(210,220,182)] placeholder:text-[rgb(119,136,115)]' : 'bg-[rgb(210,220,182)]/30 border-[rgb(161,188,152)] text-[rgb(60,68,58)] placeholder:text-[rgb(119,136,115)]';
+  const cardBg = isDarkMode ? 'bg-dark-secondary/50 border-[#171717]/50' : 'bg-white border-gray-200 shadow-sm';
+  const inputBg = isDarkMode ? 'bg-dark-secondary border-[#171717] text-gray-300 placeholder:text-gray-400' : 'bg-gray-200/30 border-[rgb(161,188,152)] text-black placeholder:text-gray-400';
 
   // Filter and sort tasks
   const filteredTasks = tasks.filter(task => {
@@ -1013,7 +1013,7 @@ export default function ProjectPage() {
           {/* Back Button */}
           <button 
             onClick={() => navigate(`/teams/${teamId}`)}
-            className={`flex items-center gap-2 mb-6 ${isDarkMode ? 'text-[rgb(161,188,152)] hover:text-[rgb(210,220,182)]' : 'text-[rgb(119,136,115)] hover:text-[rgb(60,68,58)]'} transition-colors`}
+            className={`flex items-center gap-2 mb-6 ${isDarkMode ? 'text-gray-300 hover:text-gray-300' : 'text-gray-400 hover:text-black'} transition-colors`}
           >
             <ArrowLeft size={20} />
             <span className="font-medium">Back to Teams</span>
@@ -1022,8 +1022,8 @@ export default function ProjectPage() {
           {/* Loading State */}
           {loading && (
             <div className={`${cardBg} border rounded-xl p-12 text-center`}>
-              <div className="animate-spin w-12 h-12 border-4 border-[rgb(119,136,115)] border-t-transparent rounded-full mx-auto mb-4"></div>
-              <p className={`text-lg ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>Loading project data...</p>
+              <div className="animate-spin w-12 h-12 border-4 border-gray-400 border-t-transparent rounded-full mx-auto mb-4"></div>
+              <p className={`text-lg ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>Loading project data...</p>
             </div>
           )}
 
@@ -1049,10 +1049,10 @@ export default function ProjectPage() {
               <div className={`${cardBg} border rounded-xl p-6 mb-8`}>
                 <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-4">
                   <div className="flex-1">
-                    <h1 className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
+                    <h1 className={`text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-black'}`}>
                       {sanitizeText(projectData.name)}
                     </h1>
-                    <p className={`${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'} mb-4`}>
+                    <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-400'} mb-4`}>
                       {sanitizeText(projectData.description)}
                     </p>
                     <div className="flex flex-wrap items-center gap-3">
@@ -1060,7 +1060,7 @@ export default function ProjectPage() {
                         <CheckCircle2 size={12} />
                         {projectData.status}
                       </span>
-                      <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full ${isDarkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'bg-[rgb(210,220,182)] text-[rgb(119,136,115)]'}`}>
+                      <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full ${isDarkMode ? 'bg-[#171717] text-gray-300' : 'bg-gray-200 text-gray-400'}`}>
                         <Calendar size={12} />
                         {formatDate(projectData.start_date)} - {formatDate(projectData.end_date)}
                       </span>
@@ -1079,25 +1079,25 @@ export default function ProjectPage() {
                     <div className="flex -space-x-2">
                       {projectMembers.map((member) => (
                         <div key={member.id} className="relative group">
-                          <div className={`h-10 w-10 rounded-full border-2 flex items-center justify-center text-sm font-medium transition-all cursor-pointer group-hover:scale-110 group-hover:z-10 ${isDarkMode ? 'border-[rgb(30,36,30)] bg-[rgb(119,136,115)] text-white' : 'border-white bg-[rgb(210,220,182)] text-[rgb(60,68,58)]'}`}>
+                          <div className={`h-10 w-10 rounded-full border-2 flex items-center justify-center text-sm font-medium transition-all cursor-pointer group-hover:scale-110 group-hover:z-10 ${isDarkMode ? 'border-[rgb(30,36,30)] bg-[#006239] text-white' : 'border-white bg-gray-200 text-black'}`}>
                             {member.username.charAt(0).toUpperCase()}
                           </div>
-                          <div className={`absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none ${isDarkMode ? 'bg-[rgb(45,52,45)] text-white' : 'bg-[rgb(60,68,58)] text-white'}`}>
+                          <div className={`absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none ${isDarkMode ? 'bg-[#171717] text-white' : 'bg-[rgb(60,68,58)] text-white'}`}>
                             {member.username} ({member.role})
                           </div>
                         </div>
                       ))}
                     </div>
-                    <span className={`text-xs ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+                    <span className={`text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>
                       {projectMembers.length} team members
                     </span>
                   </div>
                 </div>
 
-                <div className={`pt-4 border-t ${isDarkMode ? 'border-[rgb(45,52,45)]/50' : 'border-[rgb(210,220,182)]'}`}>
-                  <span className={`inline-flex items-center gap-2 text-xs font-medium ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+                <div className={`pt-4 border-t ${isDarkMode ? 'border-[#171717]/50' : 'border-gray-200'}`}>
+                  <span className={`inline-flex items-center gap-2 text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>
                     <User size={14} />
-                    Your role: <span className={`font-bold uppercase ${isDarkMode ? 'text-[rgb(210,220,182)]' : 'text-[rgb(60,68,58)]'}`}>{userRole}</span>
+                    Your role: <span className={`font-bold uppercase ${isDarkMode ? 'text-gray-300' : 'text-black'}`}>{userRole}</span>
                     {canEditTasks(userRole) && <span className="text-green-500">(Can edit tasks)</span>}
                   </span>
                 </div>
@@ -1117,8 +1117,8 @@ export default function ProjectPage() {
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-3 ${stat.color}`}>
                       <stat.icon size={16} />
                     </div>
-                    <h3 className={`text-2xl font-bold mb-1 ${isDarkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>{stat.value}</h3>
-                    <p className={`text-xs font-medium ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>{stat.label}</p>
+                    <h3 className={`text-2xl font-bold mb-1 ${isDarkMode ? 'text-white' : 'text-black'}`}>{stat.value}</h3>
+                    <p className={`text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>{stat.label}</p>
                   </div>
                 ))}
               </div>
@@ -1127,20 +1127,20 @@ export default function ProjectPage() {
               <div className={`${cardBg} border rounded-xl p-6 mb-6`}>
                 <div className="flex flex-col md:flex-row gap-4 mb-6">
                   <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[rgb(119,136,115)]" size={18} />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                     <input
                       type="text"
                       placeholder="Search tasks..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className={`w-full rounded-lg py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${inputBg}`}
+                      className={`w-full rounded-lg py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${inputBg}`}
                     />
                   </div>
 
                   {canEditTasks(userRole) && (
                     <button
                       onClick={handleCreateTask}
-                      className="flex items-center justify-center gap-2 bg-[rgb(119,136,115)] hover:bg-[rgb(161,188,152)] text-white px-6 py-2.5 rounded-lg font-semibold shadow-lg shadow-[rgb(119,136,115)]/20 transition-all active:scale-95 whitespace-nowrap"
+                      className="flex items-center justify-center gap-2 bg-[#006239] hover:bg-[#005230] text-white px-6 py-2.5 rounded-lg font-semibold shadow-lg shadow-green-500/20 transition-all active:scale-95 whitespace-nowrap"
                     >
                       <Plus size={18} />
                       Create Task
@@ -1150,7 +1150,7 @@ export default function ProjectPage() {
 
                 <div className="space-y-4">
                   <div>
-                    <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+                    <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>
                       Status
                     </label>
                     <div className="flex flex-wrap gap-2">
@@ -1163,7 +1163,7 @@ export default function ProjectPage() {
                   </div>
 
                   <div>
-                    <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+                    <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>
                       Priority
                     </label>
                     <div className="flex flex-wrap gap-2">
@@ -1177,8 +1177,8 @@ export default function ProjectPage() {
 
                   <div className="flex flex-col sm:flex-row gap-4">
                     <div className="flex-1">
-                      <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>Sort By</label>
-                      <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={`w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${inputBg}`}>
+                      <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>Sort By</label>
+                      <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={`w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${inputBg}`}>
                         <option value="due_date">Due Date</option>
                         <option value="priority">Priority</option>
                         <option value="status">Status</option>
@@ -1187,8 +1187,8 @@ export default function ProjectPage() {
                     </div>
 
                     <div className="flex-1">
-                      <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>Assignee</label>
-                      <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)} className={`w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${inputBg}`}>
+                      <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>Assignee</label>
+                      <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)} className={`w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${inputBg}`}>
                         <option value="all">All Members</option>
                         {projectMembers.map(member => (
                           <option key={member.user_id} value={member.user_id}>{member.username}</option>
@@ -1203,7 +1203,7 @@ export default function ProjectPage() {
               {/* Tasks List */}
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
+                  <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-black'}`}>
                     Tasks ({filteredTasks.length})
                   </h2>
                   {filteredTasks.length !== tasks.length && (
@@ -1214,7 +1214,7 @@ export default function ProjectPage() {
                         setPriorityFilter('all');
                         setAssigneeFilter('all');
                       }}
-                      className={`text-sm font-medium ${isDarkMode ? 'text-[rgb(119,136,115)] hover:text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)] hover:text-[rgb(60,68,58)]'}`}
+                      className={`text-sm font-medium ${isDarkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-400 hover:text-black'}`}
                     >
                       Clear Filters
                     </button>
@@ -1223,11 +1223,11 @@ export default function ProjectPage() {
 
                 {filteredTasks.length === 0 ? (
                   <div className={`${cardBg} border rounded-xl p-12 text-center`}>
-                    <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${isDarkMode ? 'bg-[rgb(45,52,45)]' : 'bg-[rgb(210,220,182)]'}`}>
-                      <Search size={32} className={isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'} />
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${isDarkMode ? 'bg-[#171717]' : 'bg-gray-200'}`}>
+                      <Search size={32} className={isDarkMode ? 'text-gray-300' : 'text-gray-400'} />
                     </div>
-                    <h3 className={`text-lg font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>No tasks found</h3>
-                    <p className={`${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>Try adjusting your filters or search query</p>
+                    <h3 className={`text-lg font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-black'}`}>No tasks found</h3>
+                    <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>Try adjusting your filters or search query</p>
                   </div>
                 ) : (
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -1283,3 +1283,7 @@ export default function ProjectPage() {
     </>
   );
 }
+
+
+
+

@@ -5,6 +5,9 @@ import { z } from 'zod';
  * Security: Validates and sanitizes all inputs to prevent injection attacks
  */
 
+// Project status enum from schema.sql
+const projectStatusEnum = z.enum(['active', 'archived', 'completed']);
+
 // Task status enum from schema.sql
 const taskStatusEnum = z.enum(['todo', 'in_progress', 'review', 'done']);
 
@@ -80,6 +83,79 @@ export const updateTaskSchema = z.object({
 );
 
 /**
+ * Schema for creating a new project
+ * SECURITY: Sanitize inputs, enforce length limits, prevent XSS
+ */
+export const createProjectSchema = z.object({
+  name: z.string()
+    .min(1, 'Project name is required')
+    .max(100, 'Project name must be 100 characters or less')
+    .trim()
+    .refine((val) => val.length > 0, 'Project name cannot be empty or whitespace only'),
+  
+  description: z.string()
+    .max(500, 'Description must be 500 characters or less')
+    .trim()
+    .optional()
+    .nullable(),
+  
+  status: projectStatusEnum.default('active'),
+  
+  start_date: z.string()
+    .datetime('Invalid datetime format for start date')
+    .optional()
+    .nullable(),
+  
+  end_date: z.string()
+    .datetime('Invalid datetime format for end date')
+    .optional()
+    .nullable(),
+});
+
+/**
+ * Schema for updating a project
+ * SECURITY: Same validations as create, all fields optional for partial updates
+ */
+export const updateProjectSchema = z.object({
+  name: z.string()
+    .min(1, 'Project name cannot be empty')
+    .max(100, 'Project name must be 100 characters or less')
+    .trim()
+    .optional(),
+  
+  description: z.string()
+    .max(500, 'Description must be 500 characters or less')
+    .trim()
+    .optional()
+    .nullable(),
+  
+  status: projectStatusEnum.optional(),
+  
+  start_date: z.string()
+    .datetime('Invalid datetime format for start date')
+    .optional()
+    .nullable(),
+  
+  end_date: z.string()
+    .datetime('Invalid datetime format for end date')
+    .optional()
+    .nullable(),
+}).refine(
+  (data) => Object.keys(data).length > 0,
+  { message: 'At least one field must be provided for update' }
+);
+
+/**
+ * Schema for teamId parameter
+ */
+export const teamIdParamSchema = z.object({
+  teamId: z.string()
+    .regex(/^\d+$/, 'Team ID must be a number')
+    .transform(Number)
+    .refine(val => val > 0, 'Team ID must be positive'),
+});
+
+/**
  * Schema for project ID parameter
  */
 export const projectIdSchema = z.object({
@@ -97,6 +173,33 @@ export const taskIdSchema = z.object({
     .regex(/^\d+$/, 'Task ID must be a number')
     .transform(Number)
     .refine(val => val > 0, 'Task ID must be positive'),
+});
+
+/**
+ * Schema for adding a project member
+ */
+export const addProjectMemberSchema = z.object({
+  userId: z.number()
+    .int('User ID must be an integer')
+    .positive('User ID must be positive'),
+  role: z.enum(['lead', 'editor', 'viewer']).default('viewer'),
+});
+
+/**
+ * Schema for updating a project member role
+ */
+export const updateProjectMemberRoleSchema = z.object({
+  role: z.enum(['lead', 'editor', 'viewer']),
+});
+
+/**
+ * Schema for user ID parameter
+ */
+export const userIdParamSchema = z.object({
+  userId: z.string()
+    .regex(/^\d+$/, 'User ID must be a number')
+    .transform(Number)
+    .refine(val => val > 0, 'User ID must be positive'),
 });
 
 /**

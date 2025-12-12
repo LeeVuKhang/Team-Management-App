@@ -1,12 +1,19 @@
 import express from 'express';
+import { z } from 'zod';
 import * as projectController from '../controllers/project.controller.js';
 import { validate } from '../middlewares/validate.js';
 import { mockAuth } from '../middlewares/auth.js'; // Temporary mock auth
 import {
   projectIdSchema,
+  teamIdParamSchema,
+  createProjectSchema,
+  updateProjectSchema,
   createTaskSchema,
   updateTaskSchema,
   projectTaskParamsSchema,
+  addProjectMemberSchema,
+  updateProjectMemberRoleSchema,
+  userIdParamSchema,
 } from '../validations/project.validation.js';
 
 const router = express.Router();
@@ -98,5 +105,111 @@ router.delete(
   validate({ params: projectTaskParamsSchema }),
   projectController.deleteTask
 );
+
+/**
+ * TEAM-LEVEL PROJECT CRUD ROUTES
+ * Mounted on /api/v1/teams/:teamId/projects
+ */
+
+/**
+ * @route   POST /api/v1/teams/:teamId/projects
+ * @desc    Create a new project in a team
+ * @access  Private (Team Owner/Admin only)
+ * @body    {name, description?, status?, start_date?, end_date?}
+ */
+export const teamProjectRouter = express.Router({ mergeParams: true });
+teamProjectRouter.use(mockAuth);
+
+teamProjectRouter.post(
+  '/',
+  validate({ params: teamIdParamSchema, body: createProjectSchema }),
+  projectController.createProject
+);
+
+/**
+ * @route   PUT /api/v1/teams/:teamId/projects/:projectId
+ * @desc    Update a project
+ * @access  Private (Project Lead/Team Owner/Team Admin)
+ * @body    {name?, description?, status?, start_date?, end_date?}
+ */
+teamProjectRouter.put(
+  '/:projectId',
+  validate({
+    params: z.object({
+      teamId: teamIdParamSchema.shape.teamId,
+      projectId: projectIdSchema.shape.projectId,
+    }),
+    body: updateProjectSchema,
+  }),
+  projectController.updateProject
+);
+
+/**
+ * @route   DELETE /api/v1/teams/:teamId/projects/:projectId
+ * @desc    Delete a project
+ * @access  Private (Project Lead/Team Owner/Team Admin)
+ */
+teamProjectRouter.delete(
+  '/:projectId',
+  validate({
+    params: z.object({
+      teamId: teamIdParamSchema.shape.teamId,
+      projectId: projectIdSchema.shape.projectId,
+    }),
+  }),
+  projectController.deleteProject
+);
+
+/**
+ * PROJECT MEMBER MANAGEMENT ROUTES
+ */
+
+/**
+ * @route   POST /api/v1/projects/:projectId/members
+ * @desc    Add a member to a project
+ * @access  Private (Project Lead/Team Owner/Team Admin)
+ * @body    {userId, role?}
+ */
+router.post(
+  '/:projectId/members',
+  validate({ params: projectIdSchema, body: addProjectMemberSchema }),
+  projectController.addProjectMember
+);
+
+/**
+ * @route   DELETE /api/v1/projects/:projectId/members/:userId
+ * @desc    Remove a member from a project
+ * @access  Private (Project Lead/Team Owner/Team Admin)
+ * @query   {forceRemove?} - If true, unassign tasks before removing
+ */
+router.delete(
+  '/:projectId/members/:userId',
+  validate({
+    params: z.object({
+      projectId: projectIdSchema.shape.projectId,
+      userId: userIdParamSchema.shape.userId,
+    }),
+  }),
+  projectController.removeProjectMember
+);
+
+/**
+ * @route   PATCH /api/v1/projects/:projectId/members/:userId
+ * @desc    Update a project member's role
+ * @access  Private (Project Lead/Team Owner/Team Admin)
+ * @body    {role}
+ */
+router.patch(
+  '/:projectId/members/:userId',
+  validate({
+    params: z.object({
+      projectId: projectIdSchema.shape.projectId,
+      userId: userIdParamSchema.shape.userId,
+    }),
+    body: updateProjectMemberRoleSchema,
+  }),
+  projectController.updateProjectMemberRole
+);
+
 
 export default router;
