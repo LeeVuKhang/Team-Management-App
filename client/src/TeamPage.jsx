@@ -153,7 +153,7 @@ const Modal = ({ isOpen, onClose, title, children, darkMode }) => {
       onClick={onClose}
     >
       <div 
-        className={`w-full max-w-lg rounded-xl shadow-2xl my-8 ${
+        className={`w-full max-w-lg rounded-xl shadow-2xl my-8 overflow-hidden ${
           darkMode ? 'bg-dark-secondary border border-[#171717]' : 'bg-white border border-gray-200'
         }`}
         onClick={(e) => e.stopPropagation()}
