@@ -1,24 +1,33 @@
 /**
  * Reusable Sidebar Item Component
  */
-export default function SidebarItem({ icon: Icon, label, active = false, hasNotification = false, badgeCount = 0, darkMode }) {
+export default function SidebarItem({ icon: Icon, label, active = false, hasNotification = false, badgeCount = 0, darkMode, onClick }) {
+  const className = `w-full flex items-center px-3 py-3 rounded-lg transition-all duration-200 group/item relative ${
+    active 
+      ? darkMode
+        ? 'bg-[#171717] text-white' 
+        : 'bg-gray-200 text-gray-900'
+      : `${darkMode ? 'text-gray-400 hover:bg-[#1F1F1F] hover:text-gray-200' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`
+  }`;
+
   return (
     <button 
-      className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 group ${
-        active 
-          ? 'bg-[rgb(119,136,115)]/10 text-[rgb(119,136,115)] border-r-2 border-[rgb(119,136,115)]' 
-          : `${darkMode ? 'text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)] hover:text-[rgb(210,220,182)]' : 'text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]/50 hover:text-[rgb(60,68,58)]'}`
-      }`}
+      className={className}
+      title={label}
+      onClick={onClick}
     >
-      <Icon size={20} className={active ? 'text-[rgb(119,136,115)]' : `${darkMode ? 'text-[rgb(119,136,115)] group-hover:text-[rgb(161,188,152)]' : 'text-[rgb(161,188,152)] group-hover:text-[rgb(119,136,115)]'}`} />
-      <span className="font-medium text-sm">{label}</span>
+      <Icon size={20} className={`flex-shrink-0 ${active ? '' : `${darkMode ? 'text-gray-500' : 'text-gray-500'}`}`} />
+      <span className="ml-3 font-medium text-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap overflow-hidden">{label}</span>
       {hasNotification && (
-        <span className="ml-auto w-2 h-2 rounded-full bg-red-500"></span>
+        <span className="w-2 h-2 rounded-full bg-red-500 absolute top-2 left-2 opacity-100 group-hover:opacity-0"></span>
       )}
       {badgeCount > 0 && (
-        <span className="ml-auto bg-[rgb(119,136,115)] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-          {badgeCount}
-        </span>
+        <>
+          <span className="w-2 h-2 rounded-full bg-red-500 absolute top-2 left-2 opacity-100 group-hover:opacity-0"></span>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ml-auto opacity-0 group-hover:opacity-100 transition-opacity ${darkMode ? 'bg-[#171717] text-white' : 'bg-gray-800 text-white'}`}>
+            {badgeCount}
+          </span>
+        </>
       )}
     </button>
   );
