@@ -111,3 +111,23 @@ CREATE TABLE messages (
     attachment_url TEXT, -- Link ảnh/file nếu có
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 9. Bảng TEAM_INVITATIONS
+-- Lưu trữ các lời mời đang chờ xử lý
+CREATE TABLE team_invitations (
+    id SERIAL PRIMARY KEY,
+    team_id INTEGER REFERENCES teams(id) ON DELETE CASCADE,
+    inviter_id INTEGER REFERENCES users(id) ON DELETE SET NULL, -- Ai là người mời
+    email VARCHAR(255) NOT NULL, -- Email được mời
+    role VARCHAR(20) DEFAULT 'member' CHECK (role IN ('owner', 'admin', 'member')),
+    token VARCHAR(64) UNIQUE NOT NULL, -- Token bảo mật cho link invite
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'expired')),
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Đảm bảo không spam invite cùng 1 email trong 1 team
+    UNIQUE(team_id, email) 
+);
+
+-- Index để tìm kiếm token nhanh khi user click link
+CREATE INDEX idx_invitations_token ON team_invitations(token);

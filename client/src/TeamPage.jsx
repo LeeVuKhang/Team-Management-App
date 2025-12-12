@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useOutletContext, useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
@@ -104,6 +104,17 @@ const projectSchema = z.object({
     path: ['end_date'] // Associate error with end_date field
   }
 );
+
+// Invite member validation
+const inviteMemberSchema = z.object({
+  email: z.string()
+    .trim()
+    .min(1, 'Email is required')
+    .email('Invalid email format'),
+  role: z.enum(['member', 'admin'], {
+    errorMap: () => ({ message: 'Invalid role' })
+  })
+});
 
 /**
  * COMPONENTS
@@ -430,6 +441,272 @@ const DeleteTeamModal = ({ isOpen, onClose, team, onConfirm, darkMode }) => {
         </div>
       </div>
     </Modal>
+  );
+};
+
+// Invite Member Modal
+const InviteMemberModal = ({ isOpen, onClose, onSubmit, darkMode }) => {
+  const [formData, setFormData] = useState({
+    email: '',
+    role: 'member'
+  });
+  const [error, setError] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setFormData({ email: '', role: 'member' });
+      setError(null);
+      setFieldErrors({});
+    }
+  }, [isOpen]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Reset all error states
+    setError(null);
+    setFieldErrors({});
+
+    // SECURITY: STRICT CLIENT-SIDE VALIDATION - BLOCK REQUEST IF INVALID
+    try {
+      const validatedData = inviteMemberSchema.parse(formData);
+      console.log('✅ Invite validation passed:', validatedData);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        const errors = {};
+        err.errors.forEach((error) => {
+          const fieldName = error.path[0];
+          errors[fieldName] = error.message;
+        });
+        
+        console.log('❌ Invite validation failed:', errors);
+        setFieldErrors(errors);
+        setError('Please fix the errors below');
+        return;
+      }
+    }
+
+    // Validation passed - mock API call
+    setIsSubmitting(true);
+
+    try {
+      // MOCK: Just log to console for now
+      console.log('🚀 [MOCK] Sending invite:', {
+        email: formData.email.trim(),
+        role: formData.role
+      });
+      
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // SUCCESS: Close modal
+      onClose();
+      
+      // TODO: Show success toast notification
+      alert(`Invitation sent to ${formData.email.trim()}`);
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to send invitation';
+      console.error('❌ Invite error:', errorMessage);
+      setError(errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const getInputClass = (fieldName) => {
+    const hasError = fieldErrors[fieldName];
+    return `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 transition-all ${
+      hasError 
+        ? 'border-2 border-red-500 focus:ring-red-500/50 bg-red-50 dark:bg-red-500/10' 
+        : darkMode 
+          ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white focus:ring-[rgb(119,136,115)]/50' 
+          : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)] focus:ring-[rgb(119,136,115)]/50'
+    }`;
+  };
+
+  const labelClass = `block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`;
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Invite Team Member" darkMode={darkMode}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className={labelClass}>
+            Email Address <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="email"
+            value={formData.email}
+            onChange={(e) => {
+              setFormData({ ...formData, email: e.target.value });
+              setFieldErrors(prev => ({ ...prev, email: null }));
+            }}
+            className={getInputClass('email')}
+            placeholder="member@example.com"
+            autoComplete="email"
+          />
+          {fieldErrors.email && (
+            <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+              <AlertCircle size={12} />
+              {fieldErrors.email}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label className={labelClass}>Role</label>
+          <select
+            value={formData.role}
+            onChange={(e) => {
+              setFormData({ ...formData, role: e.target.value });
+              setFieldErrors(prev => ({ ...prev, role: null }));
+            }}
+            className={getInputClass('role')}
+          >
+            <option value="member">Member</option>
+            <option value="admin">Admin</option>
+          </select>
+          {fieldErrors.role && (
+            <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+              <AlertCircle size={12} />
+              {fieldErrors.role}
+            </p>
+          )}
+          <p className={`text-xs mt-1 ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
+            {formData.role === 'admin' ? 'Can manage team settings and members' : 'Can view and work on projects'}
+          </p>
+        </div>
+
+        {error && (
+          <div className={`p-3 rounded-lg border ${
+            darkMode ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-red-50 border-red-200 text-red-600'
+          }`}>
+            <div className="flex items-start gap-2">
+              <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
+              <p className="text-sm">{error}</p>
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-3 pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+              darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)]/70' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]'
+            } disabled:opacity-50`}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="flex-1 px-6 py-3 bg-[rgb(119,136,115)] hover:bg-[rgb(161,188,152)] text-white rounded-lg font-semibold transition-all disabled:opacity-50"
+          >
+            {isSubmitting ? 'Sending...' : 'Send Invitation'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+};
+
+// Pending Invitations List Component
+const PendingInvitationsList = ({ invitations, onRevoke, darkMode }) => {
+  if (!invitations || invitations.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className={`${
+      darkMode ? 'bg-[rgb(30,36,30)]/50 border-[rgb(45,52,45)]/50' : 'bg-white border-[rgb(210,220,182)] shadow-sm'
+    } border rounded-xl p-5 transition-all mb-6`}>
+      <h3 className={`font-bold mb-4 ${darkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
+        Pending Invitations ({invitations.length})
+      </h3>
+      
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead>
+            <tr className={`border-b ${
+              darkMode ? 'border-[rgb(45,52,45)]' : 'border-[rgb(210,220,182)]'
+            }`}>
+              <th className={`text-left py-2 px-3 text-xs font-semibold uppercase tracking-wider ${
+                darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'
+              }`}>Email</th>
+              <th className={`text-left py-2 px-3 text-xs font-semibold uppercase tracking-wider ${
+                darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'
+              }`}>Role</th>
+              <th className={`text-left py-2 px-3 text-xs font-semibold uppercase tracking-wider ${
+                darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'
+              }`}>Sent Date</th>
+              <th className={`text-left py-2 px-3 text-xs font-semibold uppercase tracking-wider ${
+                darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'
+              }`}>Status</th>
+              <th className={`text-right py-2 px-3 text-xs font-semibold uppercase tracking-wider ${
+                darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'
+              }`}>Action</th>
+            </tr>
+          </thead>
+          <tbody className={`divide-y ${
+            darkMode ? 'divide-[rgb(45,52,45)]' : 'divide-[rgb(210,220,182)]'
+          }`}>
+            {invitations.map((invite) => (
+              <tr key={invite.id} className={`transition-colors ${
+                darkMode ? 'hover:bg-[rgb(45,52,45)]/30' : 'hover:bg-[rgb(210,220,182)]/20'
+              }`}>
+                <td className={`py-3 px-3 text-sm ${
+                  darkMode ? 'text-[rgb(210,220,182)]' : 'text-[rgb(60,68,58)]'
+                }`}>
+                  {invite.email}
+                </td>
+                <td className="py-3 px-3">
+                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                    invite.role === 'admin'
+                      ? 'bg-purple-500/10 text-purple-500'
+                      : 'bg-blue-500/10 text-blue-500'
+                  }`}>
+                    {invite.role}
+                  </span>
+                </td>
+                <td className={`py-3 px-3 text-sm ${
+                  darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'
+                }`}>
+                  {new Date(invite.sentDate).toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric', 
+                    year: 'numeric' 
+                  })}
+                </td>
+                <td className="py-3 px-3">
+                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                    invite.status === 'pending'
+                      ? 'bg-amber-500/10 text-amber-500'
+                      : 'bg-gray-500/10 text-gray-500'
+                  }`}>
+                    {invite.status}
+                  </span>
+                </td>
+                <td className="py-3 px-3 text-right">
+                  <button
+                    onClick={() => onRevoke(invite)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      darkMode 
+                        ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20' 
+                        : 'bg-red-50 text-red-600 hover:bg-red-100'
+                    }`}
+                  >
+                    Revoke
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 };
 
@@ -1637,10 +1914,10 @@ const FilterButton = ({ active, onClick, children, darkMode }) => (
     onClick={onClick}
     className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
       active
-        ? 'bg-white text-black shadow-md'
+        ? 'bg-[rgb(119,136,115)] text-white shadow-md'
         : darkMode
-        ? 'bg-[#1F1F1F] text-gray-400 hover:bg-[#171717]'
-        : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+        ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)]/70'
+        : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]'
     }`}
   >
     {children}
@@ -1675,7 +1952,7 @@ const ProjectCard = ({ project, darkMode, onClick, onEdit, onDelete }) => {
     switch (status) {
       case 'active': return 'text-green-500 bg-green-500/10';
       case 'completed': return 'text-blue-500 bg-blue-500/10';
-      case 'archived': return 'text-gray-400 bg-gray-400/10';
+      case 'archived': return 'text-gray-500 bg-gray-500/10';
       default: return 'text-purple-500 bg-purple-500/10';
     }
   };
@@ -1759,32 +2036,32 @@ const ProjectCard = ({ project, darkMode, onClick, onEdit, onDelete }) => {
 
       <div onClick={onClick} className="mt-auto space-y-4 cursor-pointer">
         <div className="flex items-center gap-2">
-          <Users size={14} className={darkMode ? 'text-gray-400' : 'text-gray-600'} />
-          <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+          <Users size={14} className={darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'} />
+          <span className={`text-xs ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
             {project.member_count} {project.member_count === 1 ? 'member' : 'members'}
           </span>
         </div>
 
         <div>
-          <div className={`flex justify-between text-xs mb-1.5 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+          <div className={`flex justify-between text-xs mb-1.5 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
             <span>Progress</span>
-            <span className={`font-medium ${darkMode ? 'text-white' : 'text-gray-900'}`}>{progress}%</span>
+            <span className={`font-medium ${darkMode ? 'text-[rgb(210,220,182)]' : 'text-[rgb(60,68,58)]'}`}>{progress}%</span>
           </div>
-          <div className={`w-full rounded-full h-1.5 ${darkMode ? 'bg-[#171717]' : 'bg-gray-200'}`}>
+          <div className={`w-full rounded-full h-1.5 ${darkMode ? 'bg-[rgb(45,52,45)]' : 'bg-[rgb(210,220,182)]'}`}>
             <div 
-              className="bg-green-500 h-1.5 rounded-full transition-all duration-500" 
+              className="bg-[rgb(119,136,115)] h-1.5 rounded-full transition-all duration-500" 
               style={{ width: `${progress}%` }}
             ></div>
           </div>
         </div>
 
-        <div className={`pt-3 border-t flex items-center justify-between text-xs ${darkMode ? 'border-[#171717] text-gray-400' : 'border-gray-200 text-gray-600'}`}>
+        <div className={`pt-3 border-t flex items-center justify-between text-xs ${darkMode ? 'border-[rgb(45,52,45)]/50 text-[rgb(161,188,152)]' : 'border-[rgb(210,220,182)] text-[rgb(119,136,115)]'}`}>
           <div className="flex items-center">
             <Clock size={14} className="mr-1.5" />
             <span>{project.completed_tasks}/{project.total_tasks} tasks</span>
           </div>
           {project.end_date && (
-            <span className={`${darkMode ? 'text-white' : 'text-gray-900'}`}>
+            <span className={`${darkMode ? 'text-[rgb(210,220,182)]' : 'text-[rgb(60,68,58)]'}`}>
               {new Date(project.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </span>
           )}
@@ -1815,8 +2092,41 @@ export default function TeamPage() {
   const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
   const [showEditProjectModal, setShowEditProjectModal] = useState(false);
   const [showDeleteProjectModal, setShowDeleteProjectModal] = useState(false);
+  const [showInviteMemberModal, setShowInviteMemberModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
   const [projectMenuOpen, setProjectMenuOpen] = useState(null);
+
+  // MOCK DATA: Pending invitations (replace with real API call later)
+  const [mockPendingInvites] = useState([
+    {
+      id: 1,
+      email: 'john.doe@example.com',
+      role: 'member',
+      sentDate: '2024-12-10T10:30:00Z',
+      status: 'pending'
+    },
+    {
+      id: 2,
+      email: 'jane.smith@example.com',
+      role: 'admin',
+      sentDate: '2024-12-11T14:20:00Z',
+      status: 'pending'
+    },
+    {
+      id: 3,
+      email: 'bob.wilson@example.com',
+      role: 'member',
+      sentDate: '2024-12-12T09:15:00Z',
+      status: 'pending'
+    }
+  ]);
+
+  // Handler for revoking invitations (mock for now)
+  const handleRevokeInvite = (invite) => {
+    console.log('🗑️ [MOCK] Revoking invitation:', invite);
+    // TODO: Implement actual API call
+    alert(`Invitation to ${invite.email} would be revoked`);
+  };
 
   // Fetch team data
   const { data: teamData, isLoading: teamLoading, error: teamError } = useQuery({
@@ -1916,8 +2226,8 @@ export default function TeamPage() {
       <div className="p-6 md:p-8">
         <div className="max-w-7xl mx-auto">
           <div className={`${cardBg} border rounded-xl p-8 text-center`}>
-            <div className={`inline-block animate-spin rounded-full h-8 w-8 border-b-2 ${isDarkMode ? 'border-white' : 'border-gray-900'}`}></div>
-            <p className={`mt-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Loading team data...</p>
+            <div className={`inline-block animate-spin rounded-full h-8 w-8 border-b-2 ${isDarkMode ? 'border-[rgb(119,136,115)]' : 'border-[rgb(119,136,115)]'}`}></div>
+            <p className={`mt-4 ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>Loading team data...</p>
           </div>
         </div>
       </div>
@@ -2037,32 +2347,53 @@ export default function TeamPage() {
           </div>
         </div>
 
+        {/* PENDING INVITATIONS */}
+        <PendingInvitationsList
+          invitations={mockPendingInvites}
+          onRevoke={handleRevokeInvite}
+          darkMode={isDarkMode}
+        />
+
         {/* TOP ROW: TEAM MEMBERS & TEAM PROGRESS */}
         <div className="grid md:grid-cols-2 gap-6 mb-8">
           
           {/* TEAM MEMBERS WIDGET */}
           <div className={`${cardBg} border rounded-xl p-5 transition-all`}>
-            <h3 className={`font-bold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Team Members</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={`font-bold ${isDarkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>Team Members</h3>
+              <button
+                onClick={() => setShowInviteMemberModal(true)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  isDarkMode 
+                    ? 'bg-[rgb(119,136,115)] hover:bg-[rgb(119,136,115)]/80 text-white' 
+                    : 'bg-[rgb(119,136,115)] hover:bg-[rgb(119,136,115)]/90 text-white'
+                }`}
+                title="Invite a new member"
+              >
+                <Plus size={14} />
+                Invite
+              </button>
+            </div>
             
             {membersLoading ? (
               <div className="text-center py-4">
-                <div className={`inline-block animate-spin rounded-full h-5 w-5 border-b-2 ${isDarkMode ? 'border-white' : 'border-gray-900'}`}></div>
+                <div className={`inline-block animate-spin rounded-full h-5 w-5 border-b-2 ${isDarkMode ? 'border-[rgb(119,136,115)]' : 'border-[rgb(119,136,115)]'}`}></div>
               </div>
             ) : members.length === 0 ? (
-              <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>No members found</p>
+              <p className={`text-sm ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>No members found</p>
             ) : (
               <>
                 <div className="space-y-3">
                   {members.slice(0, 4).map((member) => (
-                    <div key={member.id} className={`flex items-center gap-4 p-2 rounded-lg transition-all ${isDarkMode ? 'hover:bg-[#1F1F1F]' : 'hover:bg-gray-100'}`}>
-                      <div className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-medium ${isDarkMode ? 'bg-white text-black' : 'bg-gray-200 text-gray-900'}`}>
+                    <div key={member.id} className={`flex items-center gap-4 p-2 rounded-lg transition-all ${isDarkMode ? 'hover:bg-[rgb(45,52,45)]/50' : 'hover:bg-[rgb(210,220,182)]/20'}`}>
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-medium ${isDarkMode ? 'bg-[rgb(119,136,115)] text-white' : 'bg-[rgb(210,220,182)] text-[rgb(60,68,58)]'}`}>
                         {member.username?.substring(0, 2).toUpperCase() || 'U'}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium truncate ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                        <p className={`text-sm font-medium truncate ${isDarkMode ? 'text-[rgb(210,220,182)]' : 'text-[rgb(60,68,58)]'}`}>
                           {member.username}
                         </p>
-                        <p className={`text-xs truncate ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        <p className={`text-xs truncate ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
                           {member.role}
                         </p>
                       </div>
@@ -2070,7 +2401,7 @@ export default function TeamPage() {
                   ))}
                 </div>
                 {members.length > 4 && (
-                  <button className={`w-full mt-3 py-2 text-sm font-medium border-t transition-colors ${isDarkMode ? 'text-gray-400 hover:text-white border-[#171717]' : 'text-gray-600 hover:text-gray-900 border-gray-200'}`}>
+                  <button className={`w-full mt-3 py-2 text-sm font-medium border-t transition-colors ${isDarkMode ? 'text-[rgb(161,188,152)] hover:text-white border-[rgb(45,52,45)]/50' : 'text-[rgb(119,136,115)] hover:text-[rgb(60,68,58)] border-[rgb(210,220,182)]'}`}>
                     View All {members.length} Members
                   </button>
                 )}
@@ -2080,23 +2411,23 @@ export default function TeamPage() {
 
           {/* TEAM PROGRESS WIDGET */}
           <div className={`${cardBg} border rounded-xl p-5 transition-all`}>
-            <h3 className={`font-bold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Team Progress</h3>
+            <h3 className={`font-bold mb-4 ${isDarkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>Team Progress</h3>
             
             {/* Stats Grid */}
             <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className={`${isDarkMode ? 'bg-[#171717]' : 'bg-gray-100'} rounded-lg p-4 text-center`}>
-                <div className={`text-3xl font-bold mb-1 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+              <div className={`${isDarkMode ? 'bg-[rgb(45,52,45)]/50' : 'bg-[rgb(210,220,182)]/30'} rounded-lg p-4 text-center`}>
+                <div className={`text-3xl font-bold mb-1 ${isDarkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
                   {stats.total_projects || 0}
                 </div>
-                <div className={`text-xs font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                <div className={`text-xs font-medium ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
                   Total Projects
                 </div>
               </div>
-              <div className={`${isDarkMode ? 'bg-[#171717]' : 'bg-gray-100'} rounded-lg p-4 text-center`}>
-                <div className={`text-3xl font-bold mb-1 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+              <div className={`${isDarkMode ? 'bg-[rgb(45,52,45)]/50' : 'bg-[rgb(210,220,182)]/30'} rounded-lg p-4 text-center`}>
+                <div className={`text-3xl font-bold mb-1 ${isDarkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
                   {stats.total_members || 0}
                 </div>
-                <div className={`text-xs font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                <div className={`text-xs font-medium ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
                   Team Members
                 </div>
               </div>
@@ -2105,13 +2436,13 @@ export default function TeamPage() {
             {/* Progress Bars */}
             <div className="space-y-3">
               <div>
-                <div className={`flex justify-between items-center mb-1.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                <div className={`flex justify-between items-center mb-1.5 ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
                   <span className="text-xs">Tasks Completed</span>
-                  <span className={`text-sm font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  <span className={`text-sm font-bold ${isDarkMode ? 'text-[rgb(210,220,182)]' : 'text-[rgb(60,68,58)]'}`}>
                     {stats.completed_tasks || 0}/{stats.total_tasks || 0}
                   </span>
                 </div>
-                <div className={`w-full rounded-full h-2 ${isDarkMode ? 'bg-[#171717]' : 'bg-gray-200'}`}>
+                <div className={`w-full rounded-full h-2 ${isDarkMode ? 'bg-[rgb(45,52,45)]' : 'bg-[rgb(210,220,182)]'}`}>
                   <div 
                     className="bg-green-500 h-2 rounded-full transition-all duration-500" 
                     style={{ width: `${stats.total_tasks > 0 ? (stats.completed_tasks / stats.total_tasks * 100) : 0}%` }}
@@ -2120,13 +2451,13 @@ export default function TeamPage() {
               </div>
               
               <div>
-                <div className={`flex justify-between items-center mb-1.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                <div className={`flex justify-between items-center mb-1.5 ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
                   <span className="text-xs">In Progress</span>
-                  <span className={`text-sm font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  <span className={`text-sm font-bold ${isDarkMode ? 'text-[rgb(210,220,182)]' : 'text-[rgb(60,68,58)]'}`}>
                     {stats.in_progress_tasks || 0}
                   </span>
                 </div>
-                <div className={`w-full rounded-full h-2 ${isDarkMode ? 'bg-[#171717]' : 'bg-gray-200'}`}>
+                <div className={`w-full rounded-full h-2 ${isDarkMode ? 'bg-[rgb(45,52,45)]' : 'bg-[rgb(210,220,182)]'}`}>
                   <div 
                     className="bg-amber-500 h-2 rounded-full transition-all duration-500" 
                     style={{ width: `${stats.total_tasks > 0 ? (stats.in_progress_tasks / stats.total_tasks * 100) : 0}%` }}
@@ -2145,22 +2476,22 @@ export default function TeamPage() {
           <div className={`${cardBg} border rounded-xl p-6`}>
             <div className="flex flex-col md:flex-row gap-4 mb-6">
               <div className="relative flex-1">
-                <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`} size={18} />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[rgb(119,136,115)]" size={18} />
                 <input
                   type="text"
                   placeholder="Search projects..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className={`w-full rounded-lg py-2.5 pl-10 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-white/20 transition-all placeholder:opacity-60 ${
+                  className={`w-full rounded-lg py-2.5 pl-10 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all placeholder:opacity-60 ${
                     isDarkMode 
-                      ? 'bg-[#171717] text-white border border-[#1F1F1F] placeholder:text-gray-500' 
-                      : 'bg-white text-gray-900 border border-gray-200 placeholder:text-gray-400'
+                      ? 'bg-[rgb(24,28,24)] text-white border border-[rgb(45,52,45)] placeholder:text-[rgb(161,188,152)]' 
+                      : 'bg-white text-[rgb(60,68,58)] border border-[rgb(210,220,182)] placeholder:text-[rgb(119,136,115)]'
                   }`}
                 />
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery('')}
-                    className={`absolute right-3 top-1/2 -translate-y-1/2 ${isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[rgb(119,136,115)] hover:text-[rgb(161,188,152)]"
                   >
                     <X size={18} />
                   </button>
@@ -2171,14 +2502,14 @@ export default function TeamPage() {
                 onClick={() => setShowCreateProjectModal(true)}
                 className="flex items-center justify-center gap-2 bg-[rgb(119,136,115)] hover:bg-[rgb(161,188,152)] text-white px-6 py-2.5 rounded-lg font-semibold shadow-lg shadow-[rgb(119,136,115)]/20 transition-all active:scale-95 whitespace-nowrap"
               >
-                <Plus size={18} className="text-[#308f68]" />
+                <Plus size={18} />
                 Create Project
               </button>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
                   Status
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -2190,29 +2521,32 @@ export default function TeamPage() {
               </div>
 
               <div>
-                <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
                   Sort By
                 </label>
-                <CustomDropdown
-                  value={sortBy}
-                  onChange={setSortBy}
-                  options={[
-                    { value: 'created_at', label: 'Recently Created' },
-                    { value: 'name', label: 'Project Name' },
-                    { value: 'progress', label: 'Progress' }
-                  ]}
-                  darkMode={isDarkMode}
-                />
+                <select 
+                  value={sortBy} 
+                  onChange={(e) => setSortBy(e.target.value)} 
+                  className={`w-full md:w-auto rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${
+                    isDarkMode 
+                      ? 'bg-[rgb(24,28,24)] text-white border border-[rgb(45,52,45)]' 
+                      : 'bg-white text-[rgb(60,68,58)] border border-[rgb(210,220,182)]'
+                  }`}
+                >
+                  <option value="created_at">Recently Created</option>
+                  <option value="name">Project Name</option>
+                  <option value="progress">Progress</option>
+                </select>
               </div>
             </div>
           </div>
 
           {/* Projects Header */}
           <div className="flex items-center justify-between">
-            <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+            <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
               Projects
               {!projectsLoading && filteredProjects.length > 0 && (
-                <span className={`ml-2 text-sm font-normal ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                <span className={`ml-2 text-sm font-normal ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
                   ({filteredProjects.length} {filteredProjects.length !== projects.length ? `of ${projects.length}` : ''})
                 </span>
               )}
@@ -2222,13 +2556,13 @@ export default function TeamPage() {
           {/* Projects Grid */}
           {projectsLoading ? (
             <div className={`${cardBg} border rounded-xl p-8 text-center`}>
-              <div className={`inline-block animate-spin rounded-full h-6 w-6 border-b-2 ${isDarkMode ? 'border-white' : 'border-gray-900'}`}></div>
-              <p className={`mt-3 text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Loading projects...</p>
+              <div className={`inline-block animate-spin rounded-full h-6 w-6 border-b-2 ${isDarkMode ? 'border-[rgb(119,136,115)]' : 'border-[rgb(119,136,115)]'}`}></div>
+              <p className={`mt-3 text-sm ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>Loading projects...</p>
             </div>
           ) : filteredProjects.length === 0 ? (
             <div className={`${cardBg} border rounded-xl p-8 text-center`}>
-              <FolderKanban size={48} className={`mx-auto mb-4 ${isDarkMode ? 'text-gray-600' : 'text-gray-400'}`} />
-              <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              <FolderKanban size={48} className={`mx-auto mb-4 ${isDarkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(161,188,152)]'}`} />
+              <p className={`${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
                 {searchQuery || statusFilter !== 'all' 
                   ? 'No projects match your filters' 
                   : 'No projects yet in this team'}
@@ -2236,7 +2570,7 @@ export default function TeamPage() {
               {(searchQuery || statusFilter !== 'all') && (
                 <button
                   onClick={() => { setSearchQuery(''); setStatusFilter('all'); }}
-                  className={`mt-4 text-sm font-medium ${isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
+                  className={`mt-4 text-sm font-medium ${isDarkMode ? 'text-[rgb(161,188,152)] hover:text-white' : 'text-[rgb(119,136,115)] hover:text-[rgb(60,68,58)]'}`}
                 >
                   Clear filters
                 </button>
@@ -2272,6 +2606,16 @@ export default function TeamPage() {
         onClose={() => setShowEditModal(false)}
         team={team}
         onSubmit={(updates) => updateTeamMutation.mutateAsync(updates)}
+        darkMode={isDarkMode}
+      />
+
+      <InviteMemberModal
+        isOpen={showInviteMemberModal}
+        onClose={() => setShowInviteMemberModal(false)}
+        onSubmit={(inviteData) => {
+          // MOCK: Just log for now
+          console.log('Invite submitted:', inviteData);
+        }}
         darkMode={isDarkMode}
       />
 
