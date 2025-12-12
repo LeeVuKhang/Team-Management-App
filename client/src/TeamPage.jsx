@@ -546,7 +546,7 @@ const InviteMemberModal = ({ isOpen, onClose, teamId, darkMode }) => {
         );
       case 'pending':
         return (
-          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-900 dark:bg-black-900/30 dark:text-amber-400">
             <Clock size={12} />
             Invitation pending
           </span>
@@ -556,7 +556,7 @@ const InviteMemberModal = ({ isOpen, onClose, teamId, darkMode }) => {
     }
   };
 
-  const labelClass = `block text-sm font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-400'}`;
+  const labelClass = `block text-sm font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Invite Team Member" darkMode={darkMode}>
@@ -574,8 +574,8 @@ const InviteMemberModal = ({ isOpen, onClose, teamId, darkMode }) => {
               placeholder="Type to search users..."
               className={`w-full rounded-lg px-4 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 transition-all ${
                 darkMode 
-                  ? 'bg-dark-secondary border border-[#171717] text-white focus:ring-blue-500/20' 
-                  : 'bg-white border border-gray-200 text-black focus:ring-blue-500/20'
+                  ? 'bg-dark-secondary border border-[#171717] text-white focus:ring-blue-500/20 placeholder:text-gray-400' 
+                  : 'bg-white border border-gray-200 text-black focus:ring-blue-500/20 placeholder:text-gray-600'
               }`}
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -611,7 +611,7 @@ const InviteMemberModal = ({ isOpen, onClose, teamId, darkMode }) => {
                       disabled={isDisabled}
                       className={`w-full p-3 flex items-center gap-3 transition-all text-left ${
                         isDisabled 
-                          ? 'opacity-50 cursor-not-allowed' 
+                          ? 'cursor-not-allowed' 
                           : isSelected
                             ? darkMode 
                               ? 'bg-blue-500/20' 
@@ -621,14 +621,16 @@ const InviteMemberModal = ({ isOpen, onClose, teamId, darkMode }) => {
                               : 'hover:bg-gray-50'
                       }`}
                     >
-                      {getUserAvatar(user)}
-                      <div className="flex-1 min-w-0">
-                        <p className={`font-medium text-sm ${darkMode ? 'text-white' : 'text-black'}`}>
-                          {user.username}
-                        </p>
-                        <p className={`text-xs truncate ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                          {user.email}
-                        </p>
+                      <div className={`flex items-center gap-3 flex-1 min-w-0 ${isDisabled ? 'opacity-50' : ''}`}>
+                        {getUserAvatar(user)}
+                        <div className="flex-1 min-w-0">
+                          <p className={`font-medium text-sm ${darkMode ? 'text-white' : 'text-black'}`}>
+                            {user.username}
+                          </p>
+                          <p className={`text-xs truncate ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                            {user.email}
+                          </p>
+                        </div>
                       </div>
                       {getStatusBadge(user.status)}
                     </button>
@@ -637,7 +639,7 @@ const InviteMemberModal = ({ isOpen, onClose, teamId, darkMode }) => {
               </div>
             ) : (
               <div className="py-8 text-center">
-                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                   No users found matching "{debouncedQuery}"
                 </p>
               </div>
@@ -658,7 +660,7 @@ const InviteMemberModal = ({ isOpen, onClose, teamId, darkMode }) => {
                 <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-black'}`}>
                   {selectedUser.username}
                 </p>
-                <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                   {selectedUser.email}
                 </p>
               </div>
@@ -689,7 +691,7 @@ const InviteMemberModal = ({ isOpen, onClose, teamId, darkMode }) => {
               <option value="member">Member</option>
               <option value="admin">Admin</option>
             </select>
-            <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+            <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               {selectedRole === 'admin' ? 'Can manage team settings and members' : 'Can view and work on projects'}
             </p>
           </div>
