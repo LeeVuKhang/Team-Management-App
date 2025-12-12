@@ -546,7 +546,7 @@ const InviteMemberModal = ({ isOpen, onClose, teamId, darkMode }) => {
         );
       case 'pending':
         return (
-          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-900 dark:bg-black-900/30 dark:text-amber-400">
+          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-700 text-amber-900 dark:bg-black-100/10 dark:text-amber-400">
             <Clock size={12} />
             Invitation pending
           </span>
