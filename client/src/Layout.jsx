@@ -4,8 +4,7 @@ import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 
 export default function Layout() {
-  const [isSidebarOpen, setSidebarOpen] = useState(true);
-  const [isDarkMode, setDarkMode] = useState(true);
+  const [isDarkMode, setDarkMode] = useState(false);
   const location = useLocation();
 
   // Determine active page based on route
@@ -16,26 +15,30 @@ export default function Layout() {
   };
 
   // Dynamic classes based on theme
-  const bgMain = isDarkMode ? 'bg-[rgb(24,28,24)]' : 'bg-[rgb(241,243,224)]';
-  const textMain = isDarkMode ? 'text-[rgb(210,220,182)]' : 'text-[rgb(60,68,58)]';
+  const bgMain = isDarkMode ? 'bg-dark-primary' : 'bg-white';
+  const textMain = isDarkMode ? 'text-gray-300' : 'text-gray-900';
 
   return (
     <div className={`min-h-screen font-sans selection:bg-blue-500/30 transition-colors duration-300 ${bgMain} ${textMain}`}>
-      <div className="flex h-screen overflow-hidden">
-        <Sidebar isOpen={isSidebarOpen} darkMode={isDarkMode} activePage={getActivePage()} />
+      <div className="flex flex-col h-screen overflow-hidden">
+        {/* Header - Full Width */}
+        <Header 
+          isDarkMode={isDarkMode} 
+          toggleDarkMode={() => setDarkMode(!isDarkMode)}
+        />
 
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-          <Header 
-            isDarkMode={isDarkMode} 
-            toggleDarkMode={() => setDarkMode(!isDarkMode)}
-            toggleSidebar={() => setSidebarOpen(!isSidebarOpen)}
+        {/* Sidebar + Main Content */}
+        <div className="flex flex-1 overflow-hidden">
+          <Sidebar 
+            darkMode={isDarkMode} 
+            activePage={getActivePage()} 
           />
 
           {/* Page Content */}
-          <div className="flex-1 overflow-auto">
+          <main className="flex-1 overflow-auto">
             <Outlet context={{ isDarkMode }} />
-          </div>
-        </main>
+          </main>
+        </div>
       </div>
     </div>
   );
