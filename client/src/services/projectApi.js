@@ -331,3 +331,31 @@ export async function createInvitation(teamId, email, role = 'member') {
     body: JSON.stringify({ email, role }),
   });
 }
+
+// ==================== TEAM MEMBER MANAGEMENT ====================
+
+/**
+ * Remove a member from a team
+ * @param {number} teamId - Team ID
+ * @param {number} userId - User ID to remove
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export async function removeTeamMember(teamId, userId) {
+  return apiFetch(`/teams/${teamId}/members/${userId}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Update a team member's role
+ * @param {number} teamId - Team ID
+ * @param {number} userId - User ID
+ * @param {string} role - Role ('member', 'admin', or 'owner')
+ * @returns {Promise<{success: boolean, message: string, data: object}>}
+ */
+export async function updateTeamMemberRole(teamId, userId, role) {
+  return apiFetch(`/teams/${teamId}/members/${userId}/role`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role }),
+  });
+}

@@ -18,7 +18,9 @@ import {
   removeProjectMember,
   updateProjectMemberRole,
   searchUsers,
-  createInvitation
+  createInvitation,
+  removeTeamMember,
+  updateTeamMemberRole
 } from './services/projectApi';
 import { useDebounce } from './hooks/useDebounce';
 import { 
@@ -1912,6 +1914,167 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
   );
 };
 
+// Team Members Modal (View Only - Read-Only)
+const TeamMembersModal = ({ isOpen, onClose, teamId, darkMode }) => {
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Fetch team members
+  const { data: membersData, isLoading } = useQuery({
+    queryKey: ['teamMembers', teamId],
+    queryFn: () => getTeamMembers(teamId),
+    enabled: isOpen && !!teamId,
+  });
+
+  const members = membersData?.data || [];
+
+  // Filter members based on search
+  const filteredMembers = members.filter(member => 
+    member.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    member.email?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Get user avatar
+  const getUserAvatar = (member) => {
+    if (member.avatar_url) {
+      return (
+        <img
+          src={member.avatar_url}
+          alt={member.username}
+          className="h-10 w-10 rounded-full object-cover"
+        />
+      );
+    }
+    return (
+      <div className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-medium ${
+        darkMode ? 'bg-[#006239] text-white' : 'bg-gray-200 text-black'
+      }`}>
+        {member.username?.substring(0, 2).toUpperCase() || 'U'}
+      </div>
+    );
+  };
+
+  // Get role badge color
+  const getRoleBadgeColor = (role) => {
+    switch (role) {
+      case 'owner':
+        return 'bg-purple-500/10 text-purple-500 border-purple-500/20';
+      case 'admin':
+        return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+      case 'member':
+        return 'bg-gray-500/10 text-gray-400 border-gray-500/20';
+      default:
+        return 'bg-gray-500/10 text-gray-400 border-gray-500/20';
+    }
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={`Team Members (${members.length})`} darkMode={darkMode}>
+      <div className="space-y-4">
+        {/* Search Bar */}
+        <div className="relative">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by name or email..."
+            className={`w-full rounded-lg px-4 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 transition-all ${
+              darkMode 
+                ? 'bg-dark-secondary border border-[#171717] text-white focus:ring-blue-500/20 placeholder:text-gray-400' 
+                : 'bg-white border border-gray-200 text-black focus:ring-blue-500/20 placeholder:text-gray-400'
+            }`}
+          />
+          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+            <Search size={16} className="text-gray-400" />
+          </div>
+        </div>
+
+        {/* Members List */}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 size={24} className="animate-spin text-gray-400" />
+          </div>
+        ) : filteredMembers.length === 0 ? (
+          <div className="py-8 text-center">
+            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              {searchQuery ? `No members found matching "${searchQuery}"` : 'No members in this team'}
+            </p>
+          </div>
+        ) : (
+          <div className={`border rounded-lg max-h-96 overflow-y-auto ${
+            darkMode ? 'border-[#171717]' : 'border-gray-200'
+          }`}>
+            <div className={`divide-y ${
+              darkMode ? 'divide-[#171717]' : 'divide-gray-200'
+            }`}>
+              {filteredMembers.map((member) => (
+                <div
+                  key={member.id}
+                  className={`p-4 transition-colors ${
+                    darkMode ? 'hover:bg-[#171717]/50' : 'hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    {/* Avatar */}
+                    {getUserAvatar(member)}
+
+                    {/* Member Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className={`text-sm font-medium truncate ${
+                          darkMode ? 'text-white' : 'text-black'
+                        }`}>
+                          {member.username}
+                        </p>
+                      </div>
+                      <p className={`text-xs truncate ${
+                        darkMode ? 'text-gray-400' : 'text-gray-500'
+                      }`}>
+                        {member.email}
+                      </p>
+                    </div>
+
+                    {/* Role Badge (Read-Only) */}
+                    <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium border ${
+                      getRoleBadgeColor(member.role)
+                    }`}>
+                      {member.role}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Footer Info */}
+        {!isLoading && filteredMembers.length > 0 && (
+          <div className={`text-xs text-center pt-2 border-t ${
+            darkMode ? 'text-gray-400 border-[#171717]' : 'text-gray-500 border-gray-200'
+          }`}>
+            {searchQuery 
+              ? `Showing ${filteredMembers.length} of ${members.length} members` 
+              : `Total ${members.length} team member${members.length !== 1 ? 's' : ''}`
+            }
+          </div>
+        )}
+
+        {/* Close Button */}
+        <div className="flex justify-end pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+              darkMode ? 'bg-[#171717] text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 // Delete Project Modal
 const DeleteProjectModal = ({ isOpen, onClose, project, onConfirm, darkMode }) => {
   const [confirmText, setConfirmText] = useState('');
@@ -2206,6 +2369,7 @@ export default function TeamPage() {
   const [showEditProjectModal, setShowEditProjectModal] = useState(false);
   const [showDeleteProjectModal, setShowDeleteProjectModal] = useState(false);
   const [showInviteMemberModal, setShowInviteMemberModal] = useState(false);
+  const [showMembersModal, setShowMembersModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
   const [projectMenuOpen, setProjectMenuOpen] = useState(null);
 
@@ -2514,7 +2678,10 @@ export default function TeamPage() {
                   ))}
                 </div>
                 {members.length > 4 && (
-                  <button className={`w-full mt-3 py-2 text-sm font-medium border-t transition-colors ${isDarkMode ? 'text-gray-300 hover:text-white border-[#171717]/50' : 'text-gray-400 hover:text-black border-gray-200'}`}>
+                  <button 
+                    onClick={() => setShowMembersModal(true)}
+                    className={`w-full mt-3 py-2 text-sm font-medium border-t transition-colors ${isDarkMode ? 'text-gray-300 hover:text-white border-[#171717]/50' : 'text-gray-400 hover:text-black border-gray-200'}`}
+                  >
                     View All {members.length} Members
                   </button>
                 )}
@@ -2726,6 +2893,13 @@ export default function TeamPage() {
         isOpen={showInviteMemberModal}
         onClose={() => setShowInviteMemberModal(false)}
         teamId={team?.id}
+        darkMode={isDarkMode}
+      />
+
+      <TeamMembersModal
+        isOpen={showMembersModal}
+        onClose={() => setShowMembersModal(false)}
+        teamId={teamId}
         darkMode={isDarkMode}
       />
 
