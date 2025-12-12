@@ -313,7 +313,7 @@ const Modal = ({ isOpen, onClose, title, children, darkMode }) => {
       onTouchMove={(e) => e.preventDefault()}
     >
       <div 
-        className={`w-full max-w-2xl rounded-xl shadow-2xl max-h-[90vh] overflow-y-auto ${
+        className={`w-full max-w-2xl rounded-xl shadow-2xl max-h-[90vh] overflow-hidden ${
           darkMode ? 'bg-dark-secondary border border-[#171717]' : 'bg-white border border-gray-200'
         }`}
         onClick={(e) => e.stopPropagation()}
@@ -333,7 +333,7 @@ const Modal = ({ isOpen, onClose, title, children, darkMode }) => {
             ✕
           </button>
         </div>
-        <div className="p-6">
+        <div className="p-6 max-h-[calc(90vh-100px)] overflow-y-auto">
           {children}
         </div>
       </div>
