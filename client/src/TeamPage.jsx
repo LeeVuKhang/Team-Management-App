@@ -152,23 +152,23 @@ const Modal = ({ isOpen, onClose, title, children, darkMode }) => {
     >
       <div 
         className={`w-full max-w-lg rounded-xl shadow-2xl my-8 ${
-          darkMode ? 'bg-[rgb(30,36,30)] border border-[rgb(45,52,45)]' : 'bg-white border border-[rgb(210,220,182)]'
+          darkMode ? 'bg-dark-secondary border border-[#171717]' : 'bg-white border border-gray-200'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className={`sticky top-0 z-10 ${
-          darkMode ? 'bg-[rgb(30,36,30)]' : 'bg-white'
+          darkMode ? 'bg-dark-secondary' : 'bg-white'
         }`}>
           <div className={`flex items-center justify-between p-6 border-b ${
-            darkMode ? 'border-[rgb(45,52,45)]' : 'border-[rgb(210,220,182)]'
+            darkMode ? 'border-[#171717]' : 'border-gray-200'
           }`}>
-            <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
+            <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>
               {title}
             </h2>
             <button
               onClick={onClose}
               className={`p-2 rounded-lg transition-colors ${
-                darkMode ? 'hover:bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'hover:bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)]'
+                darkMode ? 'hover:bg-[#171717] text-gray-400' : 'hover:bg-gray-100 text-gray-600'
               }`}
             >
               <X size={20} />
@@ -242,8 +242,8 @@ const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode }) => {
     }
   };
 
-  const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${
-    darkMode ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white' : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)]'
+  const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
+    darkMode ? 'bg-dark-secondary border border-[#171717] text-white' : 'bg-white border border-gray-200 text-black'
   }`;
   
   const getInputClass = (fieldName) => {
@@ -252,12 +252,12 @@ const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode }) => {
       hasError 
         ? 'border-2 border-red-500 focus:ring-red-500/50 bg-red-50 dark:bg-red-500/10' 
         : darkMode 
-          ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white focus:ring-[rgb(119,136,115)]/50' 
-          : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)] focus:ring-[rgb(119,136,115)]/50'
+          ? 'bg-dark-secondary border border-[#171717] text-white focus:ring-blue-500/20' 
+          : 'bg-white border border-gray-200 text-black focus:ring-blue-500/20'
     }`;
   };
 
-  const labelClass = `block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`;
+  const labelClass = `block text-sm font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-400'}`;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Edit Team" darkMode={darkMode}>
@@ -325,7 +325,7 @@ const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode }) => {
             onClick={onClose}
             disabled={isSubmitting}
             className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
-              darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)]/70' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]'
+              darkMode ? 'bg-[#171717] text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             } disabled:opacity-50`}
           >
             Cancel
@@ -333,7 +333,7 @@ const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode }) => {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="flex-1 px-6 py-3 bg-[rgb(119,136,115)] hover:bg-[rgb(161,188,152)] text-white rounded-lg font-semibold transition-all disabled:opacity-50"
+            className="flex-1 px-6 py-3 bg-[#006239] hover:bg-[#005230] text-white rounded-lg font-semibold transition-all disabled:opacity-50"
           >
             {isSubmitting ? 'Saving...' : 'Save Changes'}
           </button>
@@ -374,7 +374,7 @@ const DeleteTeamModal = ({ isOpen, onClose, team, onConfirm, darkMode }) => {
   };
 
   const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all ${
-    darkMode ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white' : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)]'
+    darkMode ? 'bg-dark-secondary border border-[#171717] text-white' : 'bg-white border border-gray-200 text-black'
   }`;
 
   return (
@@ -403,7 +403,7 @@ const DeleteTeamModal = ({ isOpen, onClose, team, onConfirm, darkMode }) => {
         </div>
 
         <div>
-          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
             Type <span className="font-mono text-red-500">"{team?.name}"</span> to confirm:
           </label>
           <input
@@ -432,7 +432,7 @@ const DeleteTeamModal = ({ isOpen, onClose, team, onConfirm, darkMode }) => {
             onClick={onClose}
             disabled={isDeleting}
             className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
-              darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)]/70' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]'
+              darkMode ? 'bg-[rgb(45,52,45)] text-gray-300 hover:bg-[#171717]/70' : 'bg-gray-200/50 text-gray-400 hover:bg-gray-200'
             } disabled:opacity-50`}
           >
             Cancel
@@ -525,7 +525,7 @@ const InviteMemberModal = ({ isOpen, onClose, teamId, darkMode }) => {
     
     return (
       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-        darkMode ? 'bg-[rgb(119,136,115)] text-[rgb(24,28,24)]' : 'bg-[rgb(119,136,115)] text-white'
+        darkMode ? 'bg-[#006239] text-[rgb(24,28,24)]' : 'bg-[#006239] text-white'
       }`}>
         {initials}
       </div>
@@ -554,7 +554,7 @@ const InviteMemberModal = ({ isOpen, onClose, teamId, darkMode }) => {
     }
   };
 
-  const labelClass = `block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`;
+  const labelClass = `block text-sm font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-400'}`;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Invite Team Member" darkMode={darkMode}>
@@ -572,15 +572,15 @@ const InviteMemberModal = ({ isOpen, onClose, teamId, darkMode }) => {
               placeholder="Type to search users..."
               className={`w-full rounded-lg px-4 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 transition-all ${
                 darkMode 
-                  ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white focus:ring-[rgb(119,136,115)]/50' 
-                  : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)] focus:ring-[rgb(119,136,115)]/50'
+                  ? 'bg-dark-secondary border border-[#171717] text-white focus:ring-blue-500/20' 
+                  : 'bg-white border border-gray-200 text-black focus:ring-blue-500/20'
               }`}
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2">
               {isSearching ? (
-                <Loader2 size={16} className="animate-spin text-[rgb(119,136,115)]" />
+                <Loader2 size={16} className="animate-spin text-gray-400" />
               ) : (
-                <Search size={16} className="text-[rgb(119,136,115)]" />
+                <Search size={16} className="text-gray-400" />
               )}
             </div>
           </div>
@@ -589,14 +589,14 @@ const InviteMemberModal = ({ isOpen, onClose, teamId, darkMode }) => {
         {/* Search Results */}
         {debouncedQuery.length > 0 && (
           <div className={`border rounded-lg max-h-60 overflow-y-auto ${
-            darkMode ? 'border-[rgb(45,52,45)]' : 'border-[rgb(210,220,182)]'
+            darkMode ? 'border-[#171717]' : 'border-gray-200'
           }`}>
             {isSearching ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 size={24} className="animate-spin text-[rgb(119,136,115)]" />
+                <Loader2 size={24} className="animate-spin text-gray-400" />
               </div>
             ) : searchResults?.length > 0 ? (
-              <div className="divide-y divide-[rgb(45,52,45)]">
+              <div className="divide-y divide-[#171717]">
                 {searchResults.map((user) => {
                   const isDisabled = user.status !== 'none';
                   const isSelected = selectedUser?.id === user.id;
@@ -612,19 +612,19 @@ const InviteMemberModal = ({ isOpen, onClose, teamId, darkMode }) => {
                           ? 'opacity-50 cursor-not-allowed' 
                           : isSelected
                             ? darkMode 
-                              ? 'bg-[rgb(119,136,115)]/20' 
-                              : 'bg-[rgb(161,188,152)]/20'
+                              ? 'bg-blue-500/20' 
+                              : 'bg-blue-100'
                             : darkMode
-                              ? 'hover:bg-[rgb(45,52,45)]'
-                              : 'hover:bg-[rgb(210,220,182)]/30'
+                              ? 'hover:bg-[#171717]'
+                              : 'hover:bg-gray-50'
                       }`}
                     >
                       {getUserAvatar(user)}
                       <div className="flex-1 min-w-0">
-                        <p className={`font-medium text-sm ${darkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
+                        <p className={`font-medium text-sm ${darkMode ? 'text-white' : 'text-black'}`}>
                           {user.username}
                         </p>
-                        <p className={`text-xs truncate ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
+                        <p className={`text-xs truncate ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                           {user.email}
                         </p>
                       </div>
@@ -635,7 +635,7 @@ const InviteMemberModal = ({ isOpen, onClose, teamId, darkMode }) => {
               </div>
             ) : (
               <div className="py-8 text-center">
-                <p className={`text-sm ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
+                <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                   No users found matching "{debouncedQuery}"
                 </p>
               </div>
@@ -647,16 +647,16 @@ const InviteMemberModal = ({ isOpen, onClose, teamId, darkMode }) => {
         {selectedUser && (
           <div className={`p-3 rounded-lg border ${
             darkMode 
-              ? 'bg-[rgb(119,136,115)]/10 border-[rgb(119,136,115)]/30' 
-              : 'bg-[rgb(161,188,152)]/10 border-[rgb(161,188,152)]/30'
+              ? 'bg-blue-500/10 border-blue-500/30' 
+              : 'bg-blue-50 border-blue-200'
           }`}>
             <div className="flex items-center gap-3">
-              <Mail size={16} className="text-[rgb(119,136,115)]" />
+              <Mail size={16} className="text-gray-400" />
               <div className="flex-1">
-                <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
+                <p className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-black'}`}>
                   {selectedUser.username}
                 </p>
-                <p className={`text-xs ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
+                <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                   {selectedUser.email}
                 </p>
               </div>
@@ -680,14 +680,14 @@ const InviteMemberModal = ({ isOpen, onClose, teamId, darkMode }) => {
               onChange={(e) => setSelectedRole(e.target.value)}
               className={`w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 transition-all ${
                 darkMode 
-                  ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white focus:ring-[rgb(119,136,115)]/50' 
-                  : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)] focus:ring-[rgb(119,136,115)]/50'
+                  ? 'bg-dark-secondary border border-[#171717] text-white focus:ring-blue-500/20' 
+                  : 'bg-white border border-gray-200 text-black focus:ring-blue-500/20'
               }`}
             >
               <option value="member">Member</option>
               <option value="admin">Admin</option>
             </select>
-            <p className={`text-xs mt-1 ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
+            <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
               {selectedRole === 'admin' ? 'Can manage team settings and members' : 'Can view and work on projects'}
             </p>
           </div>
@@ -700,7 +700,7 @@ const InviteMemberModal = ({ isOpen, onClose, teamId, darkMode }) => {
             onClick={onClose}
             disabled={isSubmitting}
             className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
-              darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)]/70' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]'
+              darkMode ? 'bg-[#171717] text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             } disabled:opacity-50`}
           >
             Cancel
@@ -709,7 +709,7 @@ const InviteMemberModal = ({ isOpen, onClose, teamId, darkMode }) => {
             type="button"
             onClick={handleInvite}
             disabled={!selectedUser || isSubmitting}
-            className="flex-1 px-6 py-3 bg-[rgb(119,136,115)] hover:bg-[rgb(119,136,115)]/90 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="flex-1 px-6 py-3 bg-[#006239] hover:bg-[#005230] text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isSubmitting ? (
               <>
@@ -734,9 +734,9 @@ const PendingInvitationsList = ({ invitations, onRevoke, darkMode }) => {
 
   return (
     <div className={`${
-      darkMode ? 'bg-[rgb(30,36,30)]/50 border-[rgb(45,52,45)]/50' : 'bg-white border-[rgb(210,220,182)] shadow-sm'
+      darkMode ? 'bg-dark-secondary border-[#171717]' : 'bg-white border-gray-200 shadow-sm'
     } border rounded-xl p-5 transition-all mb-6`}>
-      <h3 className={`font-bold mb-4 ${darkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
+      <h3 className={`font-bold mb-4 ${darkMode ? 'text-white' : 'text-black'}`}>
         Pending Invitations ({invitations.length})
       </h3>
       
@@ -744,34 +744,34 @@ const PendingInvitationsList = ({ invitations, onRevoke, darkMode }) => {
         <table className="w-full">
           <thead>
             <tr className={`border-b ${
-              darkMode ? 'border-[rgb(45,52,45)]' : 'border-[rgb(210,220,182)]'
+              darkMode ? 'border-[#171717]' : 'border-gray-200'
             }`}>
               <th className={`text-left py-2 px-3 text-xs font-semibold uppercase tracking-wider ${
-                darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'
+                darkMode ? 'text-gray-400' : 'text-gray-600'
               }`}>Email</th>
               <th className={`text-left py-2 px-3 text-xs font-semibold uppercase tracking-wider ${
-                darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'
+                darkMode ? 'text-gray-400' : 'text-gray-600'
               }`}>Role</th>
               <th className={`text-left py-2 px-3 text-xs font-semibold uppercase tracking-wider ${
-                darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'
+                darkMode ? 'text-gray-400' : 'text-gray-600'
               }`}>Sent Date</th>
               <th className={`text-left py-2 px-3 text-xs font-semibold uppercase tracking-wider ${
-                darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'
+                darkMode ? 'text-gray-400' : 'text-gray-600'
               }`}>Status</th>
               <th className={`text-right py-2 px-3 text-xs font-semibold uppercase tracking-wider ${
-                darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'
+                darkMode ? 'text-gray-400' : 'text-gray-600'
               }`}>Action</th>
             </tr>
           </thead>
           <tbody className={`divide-y ${
-            darkMode ? 'divide-[rgb(45,52,45)]' : 'divide-[rgb(210,220,182)]'
+            darkMode ? 'divide-[#171717]' : 'divide-gray-200'
           }`}>
             {invitations.map((invite) => (
               <tr key={invite.id} className={`transition-colors ${
-                darkMode ? 'hover:bg-[rgb(45,52,45)]/30' : 'hover:bg-[rgb(210,220,182)]/20'
+                darkMode ? 'hover:bg-[#171717]' : 'hover:bg-gray-50'
               }`}>
                 <td className={`py-3 px-3 text-sm ${
-                  darkMode ? 'text-[rgb(210,220,182)]' : 'text-[rgb(60,68,58)]'
+                  darkMode ? 'text-gray-300' : 'text-black'
                 }`}>
                   {invite.email}
                 </td>
@@ -785,7 +785,7 @@ const PendingInvitationsList = ({ invitations, onRevoke, darkMode }) => {
                   </span>
                 </td>
                 <td className={`py-3 px-3 text-sm ${
-                  darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'
+                  darkMode ? 'text-gray-400' : 'text-gray-600'
                 }`}>
                   {new Date(invite.sentDate).toLocaleDateString('en-US', { 
                     month: 'short', 
@@ -962,8 +962,8 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
       hasError 
         ? 'border-2 border-red-500 focus:ring-red-500/50 bg-red-50 dark:bg-red-500/10' 
         : darkMode 
-          ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white placeholder-[rgb(119,136,115)] focus:ring-[rgb(119,136,115)]/50' 
-          : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)] placeholder-[rgb(119,136,115)] focus:ring-[rgb(119,136,115)]/50'
+          ? 'bg-dark-secondary border border-[#171717] text-white placeholder-gray-500 focus:ring-blue-500/20' 
+          : 'bg-white border border-gray-200 text-black placeholder-gray-500 focus:ring-blue-500/20'
     }`;
   };
 
@@ -971,7 +971,7 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
     <Modal isOpen={isOpen} onClose={onClose} title="Create New Project" darkMode={darkMode}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
             Project Name <span className="text-red-500">*</span>
           </label>
           <input
@@ -991,14 +991,14 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
               {fieldErrors.name}
             </p>
           ) : (
-            <p className={`text-xs mt-1 ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
+            <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-400'}`}>
               {formData.name.length}/100 characters
             </p>
           )}
         </div>
 
         <div>
-          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
             Description
           </label>
           <textarea
@@ -1018,14 +1018,14 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
               {fieldErrors.description}
             </p>
           ) : (
-            <p className={`text-xs mt-1 ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
+            <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-400'}`}>
               {formData.description.length}/500 characters
             </p>
           )}
         </div>
 
         <div>
-          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
             Status
           </label>
           <select
@@ -1050,7 +1050,7 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+            <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
               Start Date
             </label>
             <input
@@ -1070,7 +1070,7 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
             )}
           </div>
           <div>
-            <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+            <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
               End Date
             </label>
             <input
@@ -1103,40 +1103,40 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
 
         {/* Member Selection */}
         <div>
-          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
             Team Members <span className="text-xs font-normal">(You will be added as lead automatically)</span>
           </label>
           <div className={`max-h-48 overflow-y-auto rounded-lg border ${
-            darkMode ? 'border-[rgb(45,52,45)] bg-[rgb(24,28,24)]' : 'border-[rgb(210,220,182)] bg-white'
+            darkMode ? 'border-[#171717] bg-dark-secondary' : 'border-gray-200 bg-white'
           }`}>
             {teamMembers && teamMembers.length > 0 ? (
-              <div className="divide-y divide-[rgb(45,52,45)]">
+              <div className="divide-y divide-[#171717]">
                 {teamMembers.map((member) => {
                   const isSelected = formData.selectedMembers.find(m => m.userId === member.user_id);
                   return (
-                    <div key={member.user_id} className={`p-3 flex items-center justify-between hover:bg-[rgb(45,52,45)]/30 transition-colors`}>
+                    <div key={member.user_id} className={`p-3 flex items-center justify-between hover:bg-[#171717]/30 transition-colors`}>
                       <div className="flex items-center gap-3 flex-1">
                         <input
                           type="checkbox"
                           checked={!!isSelected}
                           onChange={() => toggleMember(member)}
-                          className="w-4 h-4 rounded border-[rgb(119,136,115)] text-[rgb(119,136,115)] focus:ring-[rgb(119,136,115)]"
+                          className="w-4 h-4 rounded border-[rgb(119,136,115)] text-gray-400 focus:ring-[rgb(119,136,115)]"
                         />
                         <div className="flex items-center gap-2">
                           {member.avatar_url ? (
                             <img src={member.avatar_url} alt={member.username} className="w-8 h-8 rounded-full" />
                           ) : (
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-                              darkMode ? 'bg-[rgb(119,136,115)] text-white' : 'bg-[rgb(210,220,182)] text-[rgb(60,68,58)]'
+                              darkMode ? 'bg-[#006239] text-white' : 'bg-gray-200 text-black'
                             }`}>
                               {member.username[0].toUpperCase()}
                             </div>
                           )}
-                          <span className={`text-sm ${darkMode ? 'text-[rgb(241,243,224)]' : 'text-[rgb(60,68,58)]'}`}>
+                          <span className={`text-sm ${darkMode ? 'text-[rgb(241,243,224)]' : 'text-black'}`}>
                             {member.username}
                           </span>
                           <span className={`text-xs px-2 py-0.5 rounded-full ${
-                            darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)]'
+                            darkMode ? 'bg-[rgb(45,52,45)] text-gray-300' : 'bg-gray-200/50 text-gray-400'
                           }`}>
                             {member.role}
                           </span>
@@ -1147,7 +1147,7 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
                           value={isSelected.role}
                           onChange={(e) => updateMemberRole(member.user_id, e.target.value)}
                           className={`text-xs px-2 py-1 rounded border focus:outline-none focus:ring-1 focus:ring-[rgb(119,136,115)] ${
-                            darkMode ? 'bg-[rgb(30,36,30)] border-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'bg-white border-[rgb(210,220,182)] text-[rgb(119,136,115)]'
+                            darkMode ? 'bg-dark-secondary border-[#171717] text-gray-300' : 'bg-white border-gray-200 text-gray-400'
                           }`}
                           onClick={(e) => e.stopPropagation()}
                         >
@@ -1161,12 +1161,12 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
                 })}
               </div>
             ) : (
-              <div className={`p-4 text-center text-sm ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+              <div className={`p-4 text-center text-sm ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
                 No team members available
               </div>
             )}
           </div>
-          <p className={`text-xs mt-1 ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
+          <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-400'}`}>
             {formData.selectedMembers.length} member(s) selected (+ you as lead)
           </p>
         </div>
@@ -1188,7 +1188,7 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
             onClick={onClose}
             disabled={isSubmitting}
             className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
-              darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)]/70' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]'
+              darkMode ? 'bg-[rgb(45,52,45)] text-gray-300 hover:bg-[#171717]/70' : 'bg-gray-200/50 text-gray-400 hover:bg-gray-200'
             } disabled:opacity-50`}
           >
             Cancel
@@ -1197,7 +1197,7 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
             type="submit"
             disabled={isSubmitting || !formData.name.trim()}
             className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-              darkMode ? 'bg-[rgb(119,136,115)] hover:bg-[rgb(119,136,115)]/80 text-white' : 'bg-[rgb(119,136,115)] hover:bg-[rgb(119,136,115)]/90 text-white'
+              darkMode ? 'bg-[#006239] hover:bg-[#006239]/80 text-white' : 'bg-[#006239] hover:bg-[#006239]/90 text-white'
             }`}
           >
             {isSubmitting ? 'Creating...' : 'Create Project'}
@@ -1241,27 +1241,27 @@ const RemoveMemberConfirmModal = ({ isOpen, onClose, memberInfo, onConfirm, dark
   };
 
   const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all ${
-    darkMode ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white' : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)]'
+    darkMode ? 'bg-dark-secondary border border-[#171717] text-white' : 'bg-white border border-gray-200 text-black'
   }`;
 
   return (
     <div className={`${isOpen ? 'fixed' : 'hidden'} inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto`}>
       <div 
         className={`w-full max-w-lg rounded-xl shadow-2xl my-8 ${
-          darkMode ? 'bg-[rgb(30,36,30)] border border-[rgb(45,52,45)]' : 'bg-white border border-[rgb(210,220,182)]'
+          darkMode ? 'bg-dark-secondary border border-[#171717]' : 'bg-white border border-gray-200'
         }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className={`flex items-center justify-between p-6 border-b ${
-          darkMode ? 'border-[rgb(45,52,45)] bg-[rgb(30,36,30)]' : 'border-[rgb(210,220,182)] bg-white'
+          darkMode ? 'border-[#171717] bg-dark-secondary' : 'border-gray-200 bg-white'
         }`}>
-          <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
+          <h2 className={`text-xl font-bold ${darkMode ? 'text-white' : 'text-black'}`}>
             Remove Project Member
           </h2>
           <button
             onClick={onClose}
             className={`p-2 rounded-lg transition-colors ${
-              darkMode ? 'hover:bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'hover:bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)]'
+              darkMode ? 'hover:bg-[#171717] text-gray-300' : 'hover:bg-gray-200/50 text-gray-400'
             }`}
           >
             <X size={20} />
@@ -1294,7 +1294,7 @@ const RemoveMemberConfirmModal = ({ isOpen, onClose, memberInfo, onConfirm, dark
         </div>
 
         <div>
-          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
             Type <span className="font-mono text-red-500">"Yes"</span> to confirm:
           </label>
           <input
@@ -1323,7 +1323,7 @@ const RemoveMemberConfirmModal = ({ isOpen, onClose, memberInfo, onConfirm, dark
             onClick={onClose}
             disabled={isRemoving}
             className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
-              darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)]/70' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]'
+              darkMode ? 'bg-[rgb(45,52,45)] text-gray-300 hover:bg-[#171717]/70' : 'bg-gray-200/50 text-gray-400 hover:bg-gray-200'
             } disabled:opacity-50`}
           >
             Cancel
@@ -1651,8 +1651,8 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
       hasError 
         ? 'border-2 border-red-500 focus:ring-red-500/50 bg-red-50 dark:bg-red-500/10' 
         : darkMode 
-          ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white placeholder-[rgb(119,136,115)] focus:ring-[rgb(119,136,115)]/50' 
-          : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)] placeholder-[rgb(119,136,115)] focus:ring-[rgb(119,136,115)]/50'
+          ? 'bg-dark-secondary border border-[#171717] text-white placeholder-gray-500 focus:ring-blue-500/20' 
+          : 'bg-white border border-gray-200 text-black placeholder-gray-500 focus:ring-blue-500/20'
     }`;
   };
 
@@ -1674,7 +1674,7 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
       <Modal isOpen={isOpen} onClose={onClose} title="Edit Project" darkMode={darkMode}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
             Project Name <span className="text-red-500">*</span>
           </label>
           <input
@@ -1694,14 +1694,14 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
               {fieldErrors.name}
             </p>
           ) : (
-            <p className={`text-xs mt-1 ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
+            <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-400'}`}>
               {formData.name.length}/100 characters
             </p>
           )}
         </div>
 
         <div>
-          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
             Description
           </label>
           <textarea
@@ -1721,14 +1721,14 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
               {fieldErrors.description}
             </p>
           ) : (
-            <p className={`text-xs mt-1 ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
+            <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-400'}`}>
               {formData.description.length}/500 characters
             </p>
           )}
         </div>
 
         <div>
-          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
             Status
           </label>
           <select
@@ -1753,7 +1753,7 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+            <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
               Start Date
             </label>
             <input
@@ -1773,7 +1773,7 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
             )}
           </div>
           <div>
-            <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+            <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
               End Date
             </label>
             <input
@@ -1806,40 +1806,40 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
 
         {/* Member Selection */}
         <div>
-          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
             Project Members
           </label>
           <div className={`max-h-48 overflow-y-auto rounded-lg border ${
-            darkMode ? 'border-[rgb(45,52,45)] bg-[rgb(24,28,24)]' : 'border-[rgb(210,220,182)] bg-white'
+            darkMode ? 'border-[#171717] bg-dark-secondary' : 'border-gray-200 bg-white'
           }`}>
             {teamMembers && teamMembers.length > 0 ? (
-              <div className="divide-y divide-[rgb(45,52,45)]">
+              <div className="divide-y divide-[#171717]">
                 {teamMembers.map((member) => {
                   const isSelected = formData.selectedMembers.find(m => m.userId === member.user_id);
                   return (
-                    <div key={member.user_id} className={`p-3 flex items-center justify-between hover:bg-[rgb(45,52,45)]/30 transition-colors`}>
+                    <div key={member.user_id} className={`p-3 flex items-center justify-between hover:bg-[#171717]/30 transition-colors`}>
                       <div className="flex items-center gap-3 flex-1">
                         <input
                           type="checkbox"
                           checked={!!isSelected}
                           onChange={() => toggleMember(member)}
-                          className="w-4 h-4 rounded border-[rgb(119,136,115)] text-[rgb(119,136,115)] focus:ring-[rgb(119,136,115)]"
+                          className="w-4 h-4 rounded border-[rgb(119,136,115)] text-gray-400 focus:ring-[rgb(119,136,115)]"
                         />
                         <div className="flex items-center gap-2">
                           {member.avatar_url ? (
                             <img src={member.avatar_url} alt={member.username} className="w-8 h-8 rounded-full" />
                           ) : (
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-                              darkMode ? 'bg-[rgb(119,136,115)] text-white' : 'bg-[rgb(210,220,182)] text-[rgb(60,68,58)]'
+                              darkMode ? 'bg-[#006239] text-white' : 'bg-gray-200 text-black'
                             }`}>
                               {member.username[0].toUpperCase()}
                             </div>
                           )}
-                          <span className={`text-sm ${darkMode ? 'text-[rgb(241,243,224)]' : 'text-[rgb(60,68,58)]'}`}>
+                          <span className={`text-sm ${darkMode ? 'text-[rgb(241,243,224)]' : 'text-black'}`}>
                             {member.username}
                           </span>
                           <span className={`text-xs px-2 py-0.5 rounded-full ${
-                            darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)]'
+                            darkMode ? 'bg-[rgb(45,52,45)] text-gray-300' : 'bg-gray-200/50 text-gray-400'
                           }`}>
                             {member.role}
                           </span>
@@ -1850,7 +1850,7 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
                           value={isSelected.role}
                           onChange={(e) => updateMemberRole(member.user_id, e.target.value)}
                           className={`text-xs px-2 py-1 rounded border focus:outline-none focus:ring-1 focus:ring-[rgb(119,136,115)] ${
-                            darkMode ? 'bg-[rgb(30,36,30)] border-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'bg-white border-[rgb(210,220,182)] text-[rgb(119,136,115)]'
+                            darkMode ? 'bg-dark-secondary border-[#171717] text-gray-300' : 'bg-white border-gray-200 text-gray-400'
                           }`}
                           onClick={(e) => e.stopPropagation()}
                         >
@@ -1864,12 +1864,12 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
                 })}
               </div>
             ) : (
-              <div className={`p-4 text-center text-sm ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+              <div className={`p-4 text-center text-sm ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
                 No team members available
               </div>
             )}
           </div>
-          <p className={`text-xs mt-1 ${darkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(119,136,115)]'}`}>
+          <p className={`text-xs mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-400'}`}>
             {formData.selectedMembers.length} member(s) selected
           </p>
         </div>
@@ -1891,7 +1891,7 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
             onClick={onClose}
             disabled={isSubmitting}
             className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
-              darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)]/70' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]'
+              darkMode ? 'bg-[rgb(45,52,45)] text-gray-300 hover:bg-[#171717]/70' : 'bg-gray-200/50 text-gray-400 hover:bg-gray-200'
             } disabled:opacity-50`}
           >
             Cancel
@@ -1900,7 +1900,7 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
             type="submit"
             disabled={isSubmitting || !formData.name.trim()}
             className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-              darkMode ? 'bg-[rgb(119,136,115)] hover:bg-[rgb(119,136,115)]/80 text-white' : 'bg-[rgb(119,136,115)] hover:bg-[rgb(119,136,115)]/90 text-white'
+              darkMode ? 'bg-[#006239] hover:bg-[#006239]/80 text-white' : 'bg-[#006239] hover:bg-[#006239]/90 text-white'
             }`}
           >
             {isSubmitting ? 'Saving...' : 'Save Changes'}
@@ -1945,7 +1945,7 @@ const DeleteProjectModal = ({ isOpen, onClose, project, onConfirm, darkMode }) =
   };
 
   const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all ${
-    darkMode ? 'bg-[rgb(24,28,24)] border border-[rgb(45,52,45)] text-white' : 'bg-white border border-[rgb(210,220,182)] text-[rgb(60,68,58)]'
+    darkMode ? 'bg-dark-secondary border border-[#171717] text-white' : 'bg-white border border-gray-200 text-black'
   }`;
 
   return (
@@ -1974,7 +1974,7 @@ const DeleteProjectModal = ({ isOpen, onClose, project, onConfirm, darkMode }) =
         </div>
 
         <div>
-          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+          <label className={`block text-sm font-bold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
             Type <span className="font-mono text-red-500">"{project?.name}"</span> to confirm:
           </label>
           <input
@@ -2003,7 +2003,7 @@ const DeleteProjectModal = ({ isOpen, onClose, project, onConfirm, darkMode }) =
             onClick={onClose}
             disabled={isDeleting}
             className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
-              darkMode ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)]/70' : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]'
+              darkMode ? 'bg-[rgb(45,52,45)] text-gray-300 hover:bg-[#171717]/70' : 'bg-gray-200/50 text-gray-400 hover:bg-gray-200'
             } disabled:opacity-50`}
           >
             Cancel
@@ -2027,10 +2027,10 @@ const FilterButton = ({ active, onClick, children, darkMode }) => (
     onClick={onClick}
     className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
       active
-        ? 'bg-[rgb(119,136,115)] text-white shadow-md'
+        ? 'bg-[#006239] text-white shadow-md'
         : darkMode
-        ? 'bg-[rgb(45,52,45)] text-[rgb(161,188,152)] hover:bg-[rgb(45,52,45)]/70'
-        : 'bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)] hover:bg-[rgb(210,220,182)]'
+        ? 'bg-[#171717] text-gray-300 hover:bg-gray-700'
+        : 'bg-gray-200/50 text-gray-600 hover:bg-gray-200'
     }`}
   >
     {children}
@@ -2072,13 +2072,13 @@ const ProjectCard = ({ project, darkMode, onClick, onEdit, onDelete }) => {
 
   return (
     <div 
-      className={`${darkMode ? 'bg-[rgb(30,36,30)]/50 border-[rgb(45,52,45)]/50' : 'bg-white border-[rgb(210,220,182)] shadow-sm'} border rounded-xl p-5 hover:border-[rgb(161,188,152)] transition-all flex flex-col h-full relative group`}
+      className={`${darkMode ? 'bg-dark-secondary/50 border-[#171717]/50' : 'bg-white border-gray-200 shadow-sm'} border rounded-xl p-5 hover:border-[rgb(161,188,152)] transition-all flex flex-col h-full relative group`}
     >
       {/* Project card header with menu */}
       <div className="flex justify-between items-start mb-3">
         <h3 
           onClick={onClick}
-          className={`font-semibold text-lg cursor-pointer hover:text-[rgb(119,136,115)] transition-colors ${darkMode ? 'text-[rgb(241,243,224)]' : 'text-[rgb(60,68,58)]'}`}
+          className={`font-semibold text-lg cursor-pointer hover:text-gray-400 transition-colors ${darkMode ? 'text-[rgb(241,243,224)]' : 'text-black'}`}
         >
           {project.name}
         </h3>
@@ -2096,7 +2096,7 @@ const ProjectCard = ({ project, darkMode, onClick, onEdit, onDelete }) => {
                 setShowMenu(!showMenu);
               }}
               className={`p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all ${
-                darkMode ? 'hover:bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'hover:bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)]'
+                darkMode ? 'hover:bg-[#171717] text-gray-300' : 'hover:bg-gray-200/50 text-gray-400'
               } ${showMenu ? 'opacity-100' : ''}`}
             >
               <MoreVertical size={16} />
@@ -2105,7 +2105,7 @@ const ProjectCard = ({ project, darkMode, onClick, onEdit, onDelete }) => {
             {showMenu && (
               <div 
                 className={`absolute right-0 mt-2 w-40 rounded-lg shadow-lg border z-10 ${
-                  darkMode ? 'bg-[rgb(30,36,30)] border-[rgb(45,52,45)]' : 'bg-white border-[rgb(210,220,182)]'
+                  darkMode ? 'bg-dark-secondary border-[#171717]' : 'bg-white border-gray-200'
                 }`}
               >
                 <button
@@ -2115,7 +2115,7 @@ const ProjectCard = ({ project, darkMode, onClick, onEdit, onDelete }) => {
                     onEdit(project);
                   }}
                   className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${
-                    darkMode ? 'hover:bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'hover:bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)]'
+                    darkMode ? 'hover:bg-[#171717] text-gray-300' : 'hover:bg-gray-200/50 text-gray-400'
                   }`}
                 >
                   <Edit3 size={14} />
@@ -2142,39 +2142,39 @@ const ProjectCard = ({ project, darkMode, onClick, onEdit, onDelete }) => {
       
       <p 
         onClick={onClick}
-        className={`${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'} text-sm mb-6 line-clamp-2 flex-grow cursor-pointer`}
+        className={`${darkMode ? 'text-gray-300' : 'text-gray-400'} text-sm mb-6 line-clamp-2 flex-grow cursor-pointer`}
       >
         {project.description || 'No description provided'}
       </p>
 
       <div onClick={onClick} className="mt-auto space-y-4 cursor-pointer">
         <div className="flex items-center gap-2">
-          <Users size={14} className={darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'} />
-          <span className={`text-xs ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+          <Users size={14} className={darkMode ? 'text-gray-300' : 'text-gray-400'} />
+          <span className={`text-xs ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
             {project.member_count} {project.member_count === 1 ? 'member' : 'members'}
           </span>
         </div>
 
         <div>
-          <div className={`flex justify-between text-xs mb-1.5 ${darkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+          <div className={`flex justify-between text-xs mb-1.5 ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
             <span>Progress</span>
-            <span className={`font-medium ${darkMode ? 'text-[rgb(210,220,182)]' : 'text-[rgb(60,68,58)]'}`}>{progress}%</span>
+            <span className={`font-medium ${darkMode ? 'text-gray-300' : 'text-black'}`}>{progress}%</span>
           </div>
-          <div className={`w-full rounded-full h-1.5 ${darkMode ? 'bg-[rgb(45,52,45)]' : 'bg-[rgb(210,220,182)]'}`}>
+          <div className={`w-full rounded-full h-1.5 ${darkMode ? 'bg-[rgb(45,52,45)]' : 'bg-gray-200'}`}>
             <div 
-              className="bg-[rgb(119,136,115)] h-1.5 rounded-full transition-all duration-500" 
+              className="bg-[#006239] h-1.5 rounded-full transition-all duration-500" 
               style={{ width: `${progress}%` }}
             ></div>
           </div>
         </div>
 
-        <div className={`pt-3 border-t flex items-center justify-between text-xs ${darkMode ? 'border-[rgb(45,52,45)]/50 text-[rgb(161,188,152)]' : 'border-[rgb(210,220,182)] text-[rgb(119,136,115)]'}`}>
+        <div className={`pt-3 border-t flex items-center justify-between text-xs ${darkMode ? 'border-[#171717]/50 text-gray-300' : 'border-gray-200 text-gray-400'}`}>
           <div className="flex items-center">
             <Clock size={14} className="mr-1.5" />
             <span>{project.completed_tasks}/{project.total_tasks} tasks</span>
           </div>
           {project.end_date && (
-            <span className={`${darkMode ? 'text-[rgb(210,220,182)]' : 'text-[rgb(60,68,58)]'}`}>
+            <span className={`${darkMode ? 'text-gray-300' : 'text-black'}`}>
               {new Date(project.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </span>
           )}
@@ -2331,7 +2331,7 @@ export default function TeamPage() {
     },
   });
 
-  const cardBg = isDarkMode ? 'bg-[rgb(30,36,30)]/50 border-[rgb(45,52,45)]/50' : 'bg-white border-[rgb(210,220,182)] shadow-sm';
+  const cardBg = isDarkMode ? 'bg-dark-secondary/50 border-[#171717]/50' : 'bg-white border-gray-200 shadow-sm';
 
   // Handle loading state
   if (teamLoading || statsLoading) {
@@ -2340,7 +2340,7 @@ export default function TeamPage() {
         <div className="max-w-7xl mx-auto">
           <div className={`${cardBg} border rounded-xl p-8 text-center`}>
             <div className={`inline-block animate-spin rounded-full h-8 w-8 border-b-2 ${isDarkMode ? 'border-[rgb(119,136,115)]' : 'border-[rgb(119,136,115)]'}`}></div>
-            <p className={`mt-4 ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>Loading team data...</p>
+            <p className={`mt-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>Loading team data...</p>
           </div>
         </div>
       </div>
@@ -2413,10 +2413,10 @@ export default function TeamPage() {
         {/* WELCOME */}
         <div className="mb-8 flex items-start justify-between gap-4">
           <div className="flex-1">
-            <h1 className={`text-2xl md:text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
+            <h1 className={`text-2xl md:text-3xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-black'}`}>
               {team?.name || 'Team Dashboard'} 👋
             </h1>
-            <p className={`${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+            <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>
               {team?.description || "Here's what's happening with team projects today."}
             </p>
           </div>
@@ -2426,7 +2426,7 @@ export default function TeamPage() {
             <button
               onClick={() => setShowSettingsMenu(!showSettingsMenu)}
               className={`p-2.5 rounded-lg transition-colors ${
-                isDarkMode ? 'hover:bg-[rgb(45,52,45)] text-[rgb(161,188,152)]' : 'hover:bg-[rgb(210,220,182)]/50 text-[rgb(119,136,115)]'
+                isDarkMode ? 'hover:bg-[#171717] text-gray-300' : 'hover:bg-gray-200/50 text-gray-400'
               }`}
               title="Team Settings"
             >
@@ -2435,12 +2435,12 @@ export default function TeamPage() {
 
             {showSettingsMenu && (
               <div className={`absolute right-0 mt-2 w-48 rounded-lg shadow-lg border overflow-hidden z-10 ${
-                isDarkMode ? 'bg-[rgb(30,36,30)] border-[rgb(45,52,45)]' : 'bg-white border-[rgb(210,220,182)]'
+                isDarkMode ? 'bg-dark-secondary border-[#171717]' : 'bg-white border-gray-200'
               }`}>
                 <button
                   onClick={() => { setShowEditModal(true); setShowSettingsMenu(false); }}
                   className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${
-                    isDarkMode ? 'hover:bg-[rgb(45,52,45)] text-[rgb(210,220,182)]' : 'hover:bg-[rgb(210,220,182)]/30 text-[rgb(60,68,58)]'
+                    isDarkMode ? 'hover:bg-[#171717] text-gray-300' : 'hover:bg-gray-200/30 text-black'
                   }`}
                 >
                   <Edit3 size={14} />
@@ -2449,7 +2449,7 @@ export default function TeamPage() {
                 <button
                   onClick={() => { setShowDeleteModal(true); setShowSettingsMenu(false); }}
                   className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${
-                    isDarkMode ? 'hover:bg-[rgb(45,52,45)] text-red-400' : 'hover:bg-[rgb(210,220,182)]/30 text-red-600'
+                    isDarkMode ? 'hover:bg-[#171717] text-red-400' : 'hover:bg-gray-200/30 text-red-600'
                   }`}
                 >
                   <Trash2 size={14} />
@@ -2473,13 +2473,13 @@ export default function TeamPage() {
           {/* TEAM MEMBERS WIDGET */}
           <div className={`${cardBg} border rounded-xl p-5 transition-all`}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className={`font-bold ${isDarkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>Team Members</h3>
+              <h3 className={`font-bold ${isDarkMode ? 'text-white' : 'text-black'}`}>Team Members</h3>
               <button
                 onClick={() => setShowInviteMemberModal(true)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                   isDarkMode 
-                    ? 'bg-[rgb(119,136,115)] hover:bg-[rgb(119,136,115)]/80 text-white' 
-                    : 'bg-[rgb(119,136,115)] hover:bg-[rgb(119,136,115)]/90 text-white'
+                    ? 'bg-[#006239] hover:bg-[#006239]/80 text-white' 
+                    : 'bg-[#006239] hover:bg-[#006239]/90 text-white'
                 }`}
                 title="Invite a new member"
               >
@@ -2493,20 +2493,20 @@ export default function TeamPage() {
                 <div className={`inline-block animate-spin rounded-full h-5 w-5 border-b-2 ${isDarkMode ? 'border-[rgb(119,136,115)]' : 'border-[rgb(119,136,115)]'}`}></div>
               </div>
             ) : members.length === 0 ? (
-              <p className={`text-sm ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>No members found</p>
+              <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>No members found</p>
             ) : (
               <>
                 <div className="space-y-3">
                   {members.slice(0, 4).map((member) => (
-                    <div key={member.id} className={`flex items-center gap-4 p-2 rounded-lg transition-all ${isDarkMode ? 'hover:bg-[rgb(45,52,45)]/50' : 'hover:bg-[rgb(210,220,182)]/20'}`}>
-                      <div className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-medium ${isDarkMode ? 'bg-[rgb(119,136,115)] text-white' : 'bg-[rgb(210,220,182)] text-[rgb(60,68,58)]'}`}>
+                    <div key={member.id} className={`flex items-center gap-4 p-2 rounded-lg transition-all ${isDarkMode ? 'hover:bg-[#171717]/50' : 'hover:bg-gray-200/20'}`}>
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-medium ${isDarkMode ? 'bg-[#006239] text-white' : 'bg-gray-200 text-black'}`}>
                         {member.username?.substring(0, 2).toUpperCase() || 'U'}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium truncate ${isDarkMode ? 'text-[rgb(210,220,182)]' : 'text-[rgb(60,68,58)]'}`}>
+                        <p className={`text-sm font-medium truncate ${isDarkMode ? 'text-gray-300' : 'text-black'}`}>
                           {member.username}
                         </p>
-                        <p className={`text-xs truncate ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+                        <p className={`text-xs truncate ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>
                           {member.role}
                         </p>
                       </div>
@@ -2514,7 +2514,7 @@ export default function TeamPage() {
                   ))}
                 </div>
                 {members.length > 4 && (
-                  <button className={`w-full mt-3 py-2 text-sm font-medium border-t transition-colors ${isDarkMode ? 'text-[rgb(161,188,152)] hover:text-white border-[rgb(45,52,45)]/50' : 'text-[rgb(119,136,115)] hover:text-[rgb(60,68,58)] border-[rgb(210,220,182)]'}`}>
+                  <button className={`w-full mt-3 py-2 text-sm font-medium border-t transition-colors ${isDarkMode ? 'text-gray-300 hover:text-white border-[#171717]/50' : 'text-gray-400 hover:text-black border-gray-200'}`}>
                     View All {members.length} Members
                   </button>
                 )}
@@ -2524,23 +2524,23 @@ export default function TeamPage() {
 
           {/* TEAM PROGRESS WIDGET */}
           <div className={`${cardBg} border rounded-xl p-5 transition-all`}>
-            <h3 className={`font-bold mb-4 ${isDarkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>Team Progress</h3>
+            <h3 className={`font-bold mb-4 ${isDarkMode ? 'text-white' : 'text-black'}`}>Team Progress</h3>
             
             {/* Stats Grid */}
             <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className={`${isDarkMode ? 'bg-[rgb(45,52,45)]/50' : 'bg-[rgb(210,220,182)]/30'} rounded-lg p-4 text-center`}>
-                <div className={`text-3xl font-bold mb-1 ${isDarkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
+              <div className={`${isDarkMode ? 'bg-[rgb(45,52,45)]/50' : 'bg-gray-200/30'} rounded-lg p-4 text-center`}>
+                <div className={`text-3xl font-bold mb-1 ${isDarkMode ? 'text-white' : 'text-black'}`}>
                   {stats.total_projects || 0}
                 </div>
-                <div className={`text-xs font-medium ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+                <div className={`text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>
                   Total Projects
                 </div>
               </div>
-              <div className={`${isDarkMode ? 'bg-[rgb(45,52,45)]/50' : 'bg-[rgb(210,220,182)]/30'} rounded-lg p-4 text-center`}>
-                <div className={`text-3xl font-bold mb-1 ${isDarkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
+              <div className={`${isDarkMode ? 'bg-[rgb(45,52,45)]/50' : 'bg-gray-200/30'} rounded-lg p-4 text-center`}>
+                <div className={`text-3xl font-bold mb-1 ${isDarkMode ? 'text-white' : 'text-black'}`}>
                   {stats.total_members || 0}
                 </div>
-                <div className={`text-xs font-medium ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+                <div className={`text-xs font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>
                   Team Members
                 </div>
               </div>
@@ -2549,13 +2549,13 @@ export default function TeamPage() {
             {/* Progress Bars */}
             <div className="space-y-3">
               <div>
-                <div className={`flex justify-between items-center mb-1.5 ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+                <div className={`flex justify-between items-center mb-1.5 ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>
                   <span className="text-xs">Tasks Completed</span>
-                  <span className={`text-sm font-bold ${isDarkMode ? 'text-[rgb(210,220,182)]' : 'text-[rgb(60,68,58)]'}`}>
+                  <span className={`text-sm font-bold ${isDarkMode ? 'text-gray-300' : 'text-black'}`}>
                     {stats.completed_tasks || 0}/{stats.total_tasks || 0}
                   </span>
                 </div>
-                <div className={`w-full rounded-full h-2 ${isDarkMode ? 'bg-[rgb(45,52,45)]' : 'bg-[rgb(210,220,182)]'}`}>
+                <div className={`w-full rounded-full h-2 ${isDarkMode ? 'bg-[rgb(45,52,45)]' : 'bg-gray-200'}`}>
                   <div 
                     className="bg-green-500 h-2 rounded-full transition-all duration-500" 
                     style={{ width: `${stats.total_tasks > 0 ? (stats.completed_tasks / stats.total_tasks * 100) : 0}%` }}
@@ -2564,13 +2564,13 @@ export default function TeamPage() {
               </div>
               
               <div>
-                <div className={`flex justify-between items-center mb-1.5 ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+                <div className={`flex justify-between items-center mb-1.5 ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>
                   <span className="text-xs">In Progress</span>
-                  <span className={`text-sm font-bold ${isDarkMode ? 'text-[rgb(210,220,182)]' : 'text-[rgb(60,68,58)]'}`}>
+                  <span className={`text-sm font-bold ${isDarkMode ? 'text-gray-300' : 'text-black'}`}>
                     {stats.in_progress_tasks || 0}
                   </span>
                 </div>
-                <div className={`w-full rounded-full h-2 ${isDarkMode ? 'bg-[rgb(45,52,45)]' : 'bg-[rgb(210,220,182)]'}`}>
+                <div className={`w-full rounded-full h-2 ${isDarkMode ? 'bg-[rgb(45,52,45)]' : 'bg-gray-200'}`}>
                   <div 
                     className="bg-amber-500 h-2 rounded-full transition-all duration-500" 
                     style={{ width: `${stats.total_tasks > 0 ? (stats.in_progress_tasks / stats.total_tasks * 100) : 0}%` }}
@@ -2589,22 +2589,22 @@ export default function TeamPage() {
           <div className={`${cardBg} border rounded-xl p-6`}>
             <div className="flex flex-col md:flex-row gap-4 mb-6">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[rgb(119,136,115)]" size={18} />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                 <input
                   type="text"
                   placeholder="Search projects..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className={`w-full rounded-lg py-2.5 pl-10 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all placeholder:opacity-60 ${
+                  className={`w-full rounded-lg py-2.5 pl-10 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder:opacity-60 ${
                     isDarkMode 
-                      ? 'bg-[rgb(24,28,24)] text-white border border-[rgb(45,52,45)] placeholder:text-[rgb(161,188,152)]' 
-                      : 'bg-white text-[rgb(60,68,58)] border border-[rgb(210,220,182)] placeholder:text-[rgb(119,136,115)]'
+                      ? 'bg-dark-secondary text-white border border-[#171717] placeholder:text-gray-300' 
+                      : 'bg-white text-black border border-gray-200 placeholder:text-gray-400'
                   }`}
                 />
                 {searchQuery && (
                   <button
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[rgb(119,136,115)] hover:text-[rgb(161,188,152)]"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
                   >
                     <X size={18} />
                   </button>
@@ -2613,7 +2613,7 @@ export default function TeamPage() {
 
               <button
                 onClick={() => setShowCreateProjectModal(true)}
-                className="flex items-center justify-center gap-2 bg-[rgb(119,136,115)] hover:bg-[rgb(161,188,152)] text-white px-6 py-2.5 rounded-lg font-semibold shadow-lg shadow-[rgb(119,136,115)]/20 transition-all active:scale-95 whitespace-nowrap"
+                className="flex items-center justify-center gap-2 bg-[#006239] hover:bg-[#005230] text-white px-6 py-2.5 rounded-lg font-semibold shadow-lg shadow-[rgb(119,136,115)]/20 transition-all active:scale-95 whitespace-nowrap"
               >
                 <Plus size={18} />
                 Create Project
@@ -2622,7 +2622,7 @@ export default function TeamPage() {
 
             <div className="space-y-4">
               <div>
-                <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+                <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>
                   Status
                 </label>
                 <div className="flex flex-wrap gap-2">
@@ -2634,16 +2634,16 @@ export default function TeamPage() {
               </div>
 
               <div>
-                <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+                <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>
                   Sort By
                 </label>
                 <select 
                   value={sortBy} 
                   onChange={(e) => setSortBy(e.target.value)} 
-                  className={`w-full md:w-auto rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[rgb(119,136,115)]/50 transition-all ${
+                  className={`w-full md:w-auto rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
                     isDarkMode 
-                      ? 'bg-[rgb(24,28,24)] text-white border border-[rgb(45,52,45)]' 
-                      : 'bg-white text-[rgb(60,68,58)] border border-[rgb(210,220,182)]'
+                      ? 'bg-dark-secondary text-white border border-[#171717]' 
+                      : 'bg-white text-black border border-gray-200'
                   }`}
                 >
                   <option value="created_at">Recently Created</option>
@@ -2656,10 +2656,10 @@ export default function TeamPage() {
 
           {/* Projects Header */}
           <div className="flex items-center justify-between">
-            <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-[rgb(60,68,58)]'}`}>
+            <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-black'}`}>
               Projects
               {!projectsLoading && filteredProjects.length > 0 && (
-                <span className={`ml-2 text-sm font-normal ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+                <span className={`ml-2 text-sm font-normal ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>
                   ({filteredProjects.length} {filteredProjects.length !== projects.length ? `of ${projects.length}` : ''})
                 </span>
               )}
@@ -2670,12 +2670,12 @@ export default function TeamPage() {
           {projectsLoading ? (
             <div className={`${cardBg} border rounded-xl p-8 text-center`}>
               <div className={`inline-block animate-spin rounded-full h-6 w-6 border-b-2 ${isDarkMode ? 'border-[rgb(119,136,115)]' : 'border-[rgb(119,136,115)]'}`}></div>
-              <p className={`mt-3 text-sm ${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>Loading projects...</p>
+              <p className={`mt-3 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>Loading projects...</p>
             </div>
           ) : filteredProjects.length === 0 ? (
             <div className={`${cardBg} border rounded-xl p-8 text-center`}>
-              <FolderKanban size={48} className={`mx-auto mb-4 ${isDarkMode ? 'text-[rgb(119,136,115)]' : 'text-[rgb(161,188,152)]'}`} />
-              <p className={`${isDarkMode ? 'text-[rgb(161,188,152)]' : 'text-[rgb(119,136,115)]'}`}>
+              <FolderKanban size={48} className={`mx-auto mb-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-300'}`} />
+              <p className={`${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>
                 {searchQuery || statusFilter !== 'all' 
                   ? 'No projects match your filters' 
                   : 'No projects yet in this team'}
@@ -2683,7 +2683,7 @@ export default function TeamPage() {
               {(searchQuery || statusFilter !== 'all') && (
                 <button
                   onClick={() => { setSearchQuery(''); setStatusFilter('all'); }}
-                  className={`mt-4 text-sm font-medium ${isDarkMode ? 'text-[rgb(161,188,152)] hover:text-white' : 'text-[rgb(119,136,115)] hover:text-[rgb(60,68,58)]'}`}
+                  className={`mt-4 text-sm font-medium ${isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-400 hover:text-black'}`}
                 >
                   Clear filters
                 </button>
