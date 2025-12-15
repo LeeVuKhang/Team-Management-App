@@ -42,6 +42,26 @@ import {
 // TODO: Replace with actual user from auth context
 const CURRENT_USER_ID = 1; // Mock user ID for development
 const MAX_MESSAGE_LENGTH = 2000; // Character limit for messages (matches DB constraint)
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB per file
+const MAX_FILES = 5; // Maximum files per message
+const ALLOWED_FILE_TYPES = [
+  // Images
+  'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+  // Documents
+  'application/pdf', 'text/plain', 'text/markdown',
+  'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  // Archives
+  'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed',
+  // Code
+  'text/javascript', 'text/html', 'text/css', 'application/json', 'text/xml',
+  'text/x-python', 'text/x-java', 'text/x-c', 'text/x-cpp',
+  // Video
+  'video/mp4', 'video/webm', 'video/quicktime',
+  // Audio
+  'audio/mpeg', 'audio/wav', 'audio/ogg'
+];
 
 /**
  * SUB-COMPONENT: Create Channel Modal
@@ -202,6 +222,11 @@ export default function ChatPage() {
   // Info sidebar state
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  
+  // File attachment state
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef(null);
   
   // Mock data for files and links (TODO: Replace with API calls)
   const [channelFiles] = useState([
@@ -391,6 +416,92 @@ export default function ChatPage() {
   }, [hasMoreMessages, isLoadingMore, loadMoreMessages]);
 
   /**
+   * Handle file selection
+   */
+  const handleFileSelect = (e) => {
+    const files = Array.from(e.target.files || []);
+    
+    // Validate file count
+    if (selectedFiles.length + files.length > MAX_FILES) {
+      toast.error(`Maximum ${MAX_FILES} files allowed per message`);
+      return;
+    }
+    
+    // Validate each file
+    const validFiles = [];
+    for (const file of files) {
+      // Check file size
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`${file.name} is too large. Maximum size is 10MB`);
+        continue;
+      }
+      
+      // Check file type
+      if (!ALLOWED_FILE_TYPES.includes(file.type) && file.type !== '') {
+        toast.error(`${file.name} has unsupported file type`);
+        continue;
+      }
+      
+      validFiles.push(file);
+    }
+    
+    if (validFiles.length > 0) {
+      setSelectedFiles(prev => [...prev, ...validFiles]);
+      toast.success(`${validFiles.length} file(s) selected`);
+    }
+    
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  /**
+   * Remove a selected file
+   */
+  const removeFile = (index) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  /**
+   * Open file picker
+   */
+  const openFilePicker = () => {
+    if (!activeChannel) {
+      toast.error('Please select a channel first');
+      return;
+    }
+    fileInputRef.current?.click();
+  };
+
+  /**
+   * Format file size for display
+   */
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  };
+
+  /**
+   * Get file icon based on type
+   */
+  const getFileIcon = (fileType) => {
+    if (fileType.startsWith('image/')) return '🖼️';
+    if (fileType.startsWith('video/')) return '🎥';
+    if (fileType.startsWith('audio/')) return '🎵';
+    if (fileType === 'application/pdf') return '📄';
+    if (fileType.includes('word')) return '📝';
+    if (fileType.includes('excel') || fileType.includes('sheet')) return '📊';
+    if (fileType.includes('powerpoint') || fileType.includes('presentation')) return '📽️';
+    if (fileType.includes('zip') || fileType.includes('rar') || fileType.includes('7z')) return '🗜️';
+    if (fileType.includes('javascript') || fileType.includes('python') || fileType.includes('java')) return '💻';
+    return '📎';
+  };
+
+  /**
    * Search messages when debounced query changes
    */
   useEffect(() => {
@@ -520,39 +631,65 @@ export default function ChatPage() {
   }));
 
   /**
-   * Send message via Socket.io
+   * Send message via Socket.io (with optional file attachments)
    */
   const handleSendMessage = useCallback(async (e) => {
     e.preventDefault();
     
     const trimmedMessage = inputMessage.trim();
-    if (!trimmedMessage || !activeChannel || isSending) return;
+    
+    // Require either message text or files
+    if (!trimmedMessage && selectedFiles.length === 0) return;
+    if (!activeChannel || isSending) return;
     
     if (trimmedMessage.length > MAX_MESSAGE_LENGTH) {
-      alert(`Message too long. Maximum ${MAX_MESSAGE_LENGTH} characters allowed.`);
+      toast.error(`Message too long. Maximum ${MAX_MESSAGE_LENGTH} characters allowed.`);
       return;
     }
 
     setIsSending(true);
+    setIsUploading(selectedFiles.length > 0);
     emitTypingStop(activeChannel.id);
 
     try {
-      // Send via socket (message will be broadcast back via 'new-message' event)
-      await socketSendMessage(activeChannel.id, trimmedMessage);
+      // If files are attached, upload them first
+      if (selectedFiles.length > 0) {
+        const formData = new FormData();
+        formData.append('content', trimmedMessage);
+        formData.append('channelId', activeChannel.id);
+        
+        selectedFiles.forEach((file) => {
+          formData.append('files', file);
+        });
+        
+        // TODO: Call API endpoint to upload files and send message
+        // For now, simulate upload delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        toast.success('Files uploaded successfully!');
+        console.log('[ChatPage] Would upload files:', selectedFiles.map(f => f.name));
+        
+        // Clear files after successful upload
+        setSelectedFiles([]);
+      } else {
+        // Send text-only message via socket
+        await socketSendMessage(activeChannel.id, trimmedMessage);
+      }
+      
       setInputMessage('');
       
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
-        // Keep focus on the input after sending
         textareaRef.current.focus();
       }
     } catch (err) {
       console.error('Failed to send message:', err);
-      alert('Failed to send message. Please try again.');
+      toast.error('Failed to send message. Please try again.');
     } finally {
       setIsSending(false);
+      setIsUploading(false);
     }
-  }, [inputMessage, activeChannel, isSending]);
+  }, [inputMessage, activeChannel, isSending, selectedFiles]);
 
   /**
    * Handle input change with typing indicator
@@ -1240,12 +1377,52 @@ export default function ChatPage() {
 
         {/* Input Area */}
         <div className={`p-4 border-t flex-shrink-0 ${isDarkMode ? 'bg-dark-secondary border-[#171717]' : 'bg-white border-gray-200'}`}>
+          {/* File Preview Area */}
+          {selectedFiles.length > 0 && (
+            <div className="mb-3 space-y-2">
+              {selectedFiles.map((file, index) => (
+                <div
+                  key={index}
+                  className={`flex items-center gap-3 p-3 rounded-lg border ${isDarkMode ? 'bg-[#1F1F1F] border-[#333]' : 'bg-gray-50 border-gray-200'}`}
+                >
+                  <span className="text-2xl">{getFileIcon(file.type)}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium truncate ${textPrimary}`}>
+                      {file.name}
+                    </p>
+                    <p className={`text-xs ${textSecondary}`}>
+                      {formatFileSize(file.size)}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => removeFile(index)}
+                    className={`p-1 rounded-lg ${hoverBg} ${textSecondary} hover:text-red-500`}
+                    title="Remove file"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {/* Hidden File Input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept={ALLOWED_FILE_TYPES.join(',')}
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          
           <div className={`flex items-end gap-2 p-2 rounded-xl border ${inputBg} focus-within:ring-2 focus-within:ring-[#006239]/50 transition-all ${!activeChannel ? 'opacity-50' : ''}`}>
             
             <button 
-              className={`p-2 rounded-lg ${hoverBg} ${textSecondary} flex-shrink-0`}
-              title="Attach file"
-              disabled={!activeChannel}
+              onClick={openFilePicker}
+              className={`p-2 rounded-lg ${hoverBg} ${textSecondary} flex-shrink-0 ${selectedFiles.length >= MAX_FILES ? 'opacity-50 cursor-not-allowed' : ''}`}
+              title={selectedFiles.length >= MAX_FILES ? `Maximum ${MAX_FILES} files` : 'Attach file'}
+              disabled={!activeChannel || selectedFiles.length >= MAX_FILES}
             >
               <Paperclip size={20} />
             </button>
@@ -1282,21 +1459,25 @@ export default function ChatPage() {
               </button>
               <button 
                 onClick={handleSendMessage}
-                disabled={!inputMessage.trim() || !activeChannel || isSending}
+                disabled={(!inputMessage.trim() && selectedFiles.length === 0) || !activeChannel || isSending}
                 className={`p-2 rounded-lg transition-all ${
-                  inputMessage.trim() && activeChannel && !isSending
+                  (inputMessage.trim() || selectedFiles.length > 0) && activeChannel && !isSending
                     ? 'bg-[#006239] text-white hover:bg-[#005230]' 
                     : `${isDarkMode ? 'bg-[#333]' : 'bg-gray-200'} ${textSecondary} cursor-not-allowed`
                 }`}
-                title="Send message"
+                title={isUploading ? 'Uploading files...' : 'Send message'}
               >
-                <Send size={18} />
+                {isUploading ? (
+                  <div className="w-[18px] h-[18px] border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Send size={18} />
+                )}
               </button>
             </div>
           </div>
           <div className={`flex items-center justify-between text-xs mt-2 ${textSecondary}`}>
             <span>
-              <strong>Tip:</strong> Press Enter to send, Shift + Enter for new line
+              <strong>Tip:</strong> Press Enter to send, Shift + Enter for new line{selectedFiles.length > 0 && ` • ${selectedFiles.length}/${MAX_FILES} files`}
             </span>
             <span className={inputMessage.length > MAX_MESSAGE_LENGTH * 0.9 ? 'text-red-500 font-semibold' : ''}>
               {inputMessage.length}/{MAX_MESSAGE_LENGTH}
