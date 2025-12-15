@@ -1,20 +1,26 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useOutletContext, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { 
-  Hash, 
-  Volume2, 
-  Search, 
-  Plus, 
-  Send, 
-  Paperclip, 
-  MoreVertical, 
+import {
+  Hash,
+  Volume2,
+  Search,
+  Plus,
+  Send,
+  Paperclip,
+  MoreVertical,
   Smile,
   Menu,
   Info,
   WifiOff,
   X,
-  ChevronDown
+  ChevronDown,
+  Bell,
+  BellOff,
+  FileText,
+  Link as LinkIcon,
+  Download,
+  ExternalLink
 } from 'lucide-react';
 import { fetchTeamChannels, fetchChannelMessages, createChannel, searchMessages } from './services/channelApi.js';
 import { getTeamProjects } from './services/projectApi.js';
@@ -192,6 +198,18 @@ export default function ChatPage() {
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const debouncedSearchQuery = useDebounce(searchQuery, 500);
+  
+  // Info sidebar state
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  
+  // Mock data for files and links (TODO: Replace with API calls)
+  const [channelFiles] = useState([
+    { id: 1, name: 'demo TeamApp.mp4', size: '19.3 MB', date: '12/12/2025', type: 'video' },
+    { id: 2, name: 'copilot-instructions.md', size: '3.64 KB', date: '05/12/2025', type: 'document' },
+    { id: 3, name: 'seed.sql', size: '5.57 KB', date: '04/12/2025', type: 'code' },
+  ]);
+  const [channelLinks] = useState([]);
   
   // Team projects state (for dropdown in create channel modal)
   const [teamProjects, setTeamProjects] = useState([]);
@@ -1110,8 +1128,14 @@ export default function ChatPage() {
               <Search size={20} />
             </button>
             <button 
-              className={`p-2 rounded-full ${hoverBg} ${textSecondary}`}
+              onClick={() => setIsInfoOpen(!isInfoOpen)}
+              className={`p-2 rounded-full transition-colors ${
+                isInfoOpen 
+                  ? 'bg-[#006239] text-white hover:bg-[#005230]' 
+                  : `${hoverBg} ${textSecondary}`
+              } ${!activeChannel ? 'opacity-50 cursor-not-allowed' : ''}`}
               title="Channel info"
+              disabled={!activeChannel}
             >
               <Info size={20} />
             </button>
@@ -1281,6 +1305,172 @@ export default function ChatPage() {
         </div>
 
       </div>
+
+      {/* CHANNEL INFO SIDEBAR */}
+      {isInfoOpen && activeChannel && (
+        <div className={`w-80 border-l flex-shrink-0 overflow-y-auto ${isDarkMode ? 'bg-dark-secondary border-[#171717]' : 'bg-white border-gray-200'}`}>
+          {/* Info Header */}
+          <div className={`p-4 border-b ${isDarkMode ? 'border-[#171717]' : 'border-gray-200'}`}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className={`font-bold text-lg ${textPrimary}`}>Channel Info</h3>
+              <button
+                onClick={() => setIsInfoOpen(false)}
+                className={`p-1 rounded-lg ${hoverBg} ${textSecondary}`}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              {activeChannel.type === 'voice' ? <Volume2 size={20} className={textSecondary} /> : <Hash size={20} className={textSecondary} />}
+              <div>
+                <h4 className={`font-semibold ${textPrimary}`}>{activeChannel.name}</h4>
+                <p className={`text-xs ${textSecondary}`}>
+                  {activeChannel.project_name || 'Team Channel'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Notifications Toggle */}
+          <div className={`p-4 border-b ${isDarkMode ? 'border-[#171717]' : 'border-gray-200'}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {notificationsEnabled ? (
+                  <Bell size={20} className={textSecondary} />
+                ) : (
+                  <BellOff size={20} className={textSecondary} />
+                )}
+                <div>
+                  <p className={`text-sm font-medium ${textPrimary}`}>Notifications</p>
+                  <p className={`text-xs ${textSecondary}`}>
+                    {notificationsEnabled ? 'Enabled' : 'Muted'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setNotificationsEnabled(!notificationsEnabled)}
+                className={`relative w-11 h-6 rounded-full transition-colors ${
+                  notificationsEnabled ? 'bg-[#006239]' : isDarkMode ? 'bg-gray-700' : 'bg-gray-300'
+                }`}
+              >
+                <div
+                  className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                    notificationsEnabled ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+
+          {/* Files Section */}
+          <div className={`border-b ${isDarkMode ? 'border-[#171717]' : 'border-gray-200'}`}>
+            <button
+              className={`w-full p-4 flex items-center justify-between ${hoverBg}`}
+              onClick={() => {}}
+            >
+              <div className="flex items-center gap-2">
+                <FileText size={18} className={textSecondary} />
+                <span className={`font-medium ${textPrimary}`}>File</span>
+              </div>
+              <ChevronDown size={18} className={textSecondary} />
+            </button>
+            <div className="px-4 pb-4 space-y-2">
+              {channelFiles.length === 0 ? (
+                <p className={`text-sm text-center py-4 ${textSecondary}`}>
+                  No files shared yet
+                </p>
+              ) : (
+                channelFiles.map(file => (
+                  <div
+                    key={file.id}
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      isDarkMode
+                        ? 'bg-[#1F1F1F] border-[#333] hover:bg-[#252525]'
+                        : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className={`w-10 h-10 rounded flex items-center justify-center flex-shrink-0 ${
+                      file.type === 'video' ? 'bg-purple-500' :
+                      file.type === 'document' ? 'bg-blue-500' :
+                      'bg-cyan-500'
+                    }`}>
+                      <FileText size={20} className="text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium truncate ${textPrimary}`}>
+                        {file.name}
+                      </p>
+                      <div className={`flex items-center gap-2 text-xs ${textSecondary}`}>
+                        <span>{file.size}</span>
+                        <span>•</span>
+                        <span>{file.date}</span>
+                      </div>
+                    </div>
+                    <button
+                      className={`p-1.5 rounded ${hoverBg}`}
+                      title="Download"
+                    >
+                      <Download size={16} className={textSecondary} />
+                    </button>
+                  </div>
+                ))
+              )}
+              {channelFiles.length > 0 && (
+                <button className={`w-full text-center text-sm py-2 ${textSecondary} hover:underline`}>
+                  View all files
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Links Section */}
+          <div>
+            <button
+              className={`w-full p-4 flex items-center justify-between ${hoverBg}`}
+              onClick={() => {}}
+            >
+              <div className="flex items-center gap-2">
+                <LinkIcon size={18} className={textSecondary} />
+                <span className={`font-medium ${textPrimary}`}>Link</span>
+              </div>
+              <ChevronDown size={18} className={textSecondary} />
+            </button>
+            <div className="px-4 pb-4">
+              {channelLinks.length === 0 ? (
+                <p className={`text-sm text-center py-8 ${textSecondary}`}>
+                  No links shared yet
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {channelLinks.map(link => (
+                    <a
+                      key={link.id}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                        isDarkMode
+                          ? 'bg-[#1F1F1F] border-[#333] hover:bg-[#252525]'
+                          : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                      }`}
+                    >
+                      <ExternalLink size={16} className={textSecondary} />
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm truncate ${textPrimary}`}>
+                          {link.title || link.url}
+                        </p>
+                        <p className={`text-xs truncate ${textSecondary}`}>
+                          {link.domain}
+                        </p>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
