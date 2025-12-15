@@ -16,13 +16,13 @@ export default function LandingPage() {
             <div className="flex items-center gap-4">
               <button 
                 onClick={() => navigate('/login')}
-                className="text-sm font-semibold text-gray-600 hover:text-black transition-colors"
+                className="text-sm font-semibold text-gray-600 hover:text-black transition-all hover:scale-105 active:scale-95"
               >
                 Sign In
               </button>
               <button 
                 onClick={() => navigate('/login')}
-                className="px-4 py-2 bg-[#171717] text-white text-sm font-semibold rounded-md hover:bg-[#1F1F1F] transition-colors"
+                className="px-4 py-2 bg-[#171717] text-white text-sm font-semibold rounded-md hover:bg-[#1F1F1F] transition-all hover:shadow-lg hover:-translate-y-0.5 active:scale-95"
               >
                 Get Started
               </button>
@@ -45,7 +45,7 @@ export default function LandingPage() {
           </p>
           <button 
             onClick={() => navigate('/login')}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-[#171717] text-white rounded-lg hover:bg-[#1F1F1F] transition-all text-lg font-medium"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-[#171717] text-white rounded-lg hover:bg-[#1F1F1F] transition-all text-lg font-medium hover:shadow-lg hover:-translate-y-1 active:scale-[0.98]"
           >
             Start Managing Now
             <ArrowRight size={20} />
@@ -124,7 +124,7 @@ export default function LandingPage() {
           </p>
           <button 
             onClick={() => navigate('/login')}
-            className="inline-flex items-center gap-2 px-8 py-4 bg-[#171717] text-white rounded-lg hover:bg-[#1F1F1F] transition-all text-lg font-medium"
+            className="inline-flex items-center gap-2 px-8 py-4 bg-[#171717] text-white rounded-lg hover:bg-[#1F1F1F] transition-all text-lg font-medium hover:shadow-lg hover:-translate-y-1 active:scale-[0.98]"
           >
             Get Started Free
             <ArrowRight size={20} />
