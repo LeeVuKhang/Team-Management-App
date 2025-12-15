@@ -33,7 +33,7 @@ export const mockAuth = async (req, res, next) => {
       username: user.username,
     };
     
-    console.warn('⚠️  Using MOCK AUTH - User ID 1 (Replace with real auth before production)');
+    console.warn('Using MOCK AUTH - User ID 1 (Replace with real auth before production)');
     next();
   } catch (error) {
     console.error('Mock auth error:', error);

@@ -11,7 +11,9 @@ import {
   Smile,
   Menu,
   Info,
-  WifiOff
+  WifiOff,
+  X,
+  ChevronDown
 } from 'lucide-react';
 import { fetchTeamChannels, fetchChannelMessages } from './services/channelApi.js';
 import {
@@ -32,6 +34,130 @@ import {
 const CURRENT_USER_ID = 1; // Mock user ID for development
 const MAX_MESSAGE_LENGTH = 2000; // Character limit for messages (matches DB constraint)
 
+/**
+ * SUB-COMPONENT: Create Channel Modal
+ * Extracted outside main component to prevent re-creation on every render
+ */
+const CreateChannelModal = ({ 
+  isModalOpen, 
+  modalContext, 
+  availableProjects,
+  newChannelName,
+  setNewChannelName,
+  selectedProjectId,
+  setSelectedProjectId,
+  isCreatingChannel,
+  closeCreateChannelModal,
+  handleCreateChannel,
+  isDarkMode 
+}) => {
+  if (!isModalOpen) return null;
+
+  const isProjectLocked = modalContext?.type === 'project';
+  
+  const textPrimary = isDarkMode ? 'text-gray-100' : 'text-gray-900';
+  const textSecondary = isDarkMode ? 'text-gray-400' : 'text-gray-500';
+  const hoverBg = isDarkMode ? 'hover:bg-[#171717]' : 'hover:bg-gray-100';
+  const inputBg = isDarkMode ? 'bg-[#171717] text-white border-[#333]' : 'bg-white text-black border-gray-300';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className={`w-full max-w-md rounded-xl shadow-2xl ${isDarkMode ? 'bg-dark-secondary' : 'bg-white'}`}>
+        {/* Modal Header */}
+        <div className={`flex items-center justify-between px-6 py-4 border-b ${isDarkMode ? 'border-[#171717]' : 'border-gray-200'}`}>
+          <h2 className={`text-xl font-bold ${textPrimary}`}>
+            Create Channel
+          </h2>
+          <button
+            onClick={closeCreateChannelModal}
+            className={`p-1 rounded-lg ${hoverBg} ${textSecondary}`}
+            disabled={isCreatingChannel}
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <form onSubmit={handleCreateChannel} className="p-6 space-y-5">
+          
+          {/* Project Selector */}
+          <div>
+            <label className={`block text-sm font-semibold mb-2 ${textPrimary}`}>
+              Project {isProjectLocked && <span className={`text-xs font-normal ${textSecondary}`}>(locked)</span>}
+            </label>
+            
+            {isProjectLocked ? (
+              <div className={`w-full px-4 py-3 rounded-lg border ${isDarkMode ? 'bg-[#171717] border-[#333] text-gray-400' : 'bg-gray-100 border-gray-300 text-gray-600'} cursor-not-allowed`}>
+                {modalContext.projectName}
+              </div>
+            ) : (
+              <div className="relative">
+                <select
+                  value={selectedProjectId}
+                  onChange={(e) => setSelectedProjectId(e.target.value)}
+                  className={`w-full px-4 py-3 rounded-lg border appearance-none cursor-pointer ${inputBg} focus:outline-none focus:ring-2 focus:ring-[#006239]/50 ${textPrimary}`}
+                  disabled={isCreatingChannel}
+                  required
+                >
+                  <option value="">-- Select a Project --</option>
+                  {availableProjects.map(project => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={18} className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${textSecondary}`} />
+              </div>
+            )}
+          </div>
+
+          {/* Channel Name Input */}
+          <div>
+            <label className={`block text-sm font-semibold mb-2 ${textPrimary}`}>
+              Channel Name
+            </label>
+            <div className="relative">
+              <Hash size={18} className={`absolute left-3 top-1/2 -translate-y-1/2 ${textSecondary}`} />
+              <input
+                type="text"
+                value={newChannelName}
+                onChange={(e) => setNewChannelName(e.target.value)}
+                placeholder="e.g., dev-team"
+                className={`w-full pl-10 pr-4 py-3 rounded-lg border ${inputBg} focus:outline-none focus:ring-2 focus:ring-[#006239]/50 ${textPrimary}`}
+                maxLength={50}
+                disabled={isCreatingChannel}
+                required
+              />
+            </div>
+            <p className={`text-xs mt-1 ${textSecondary}`}>
+              Use lowercase letters, numbers, and hyphens
+            </p>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={closeCreateChannelModal}
+              className={`flex-1 px-4 py-2.5 rounded-lg font-medium border transition-colors ${isDarkMode ? 'border-[#333] text-gray-300 hover:bg-[#171717]' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+              disabled={isCreatingChannel}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-white transition-colors ${isCreatingChannel ? 'bg-gray-400 cursor-not-allowed' : 'bg-[#006239] hover:bg-[#005230]'}`}
+              disabled={isCreatingChannel}
+            >
+              {isCreatingChannel ? 'Creating...' : 'Create Channel'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 export default function ChatPage() {
   const { isDarkMode } = useOutletContext();
   const { teamId } = useParams();
@@ -49,6 +175,13 @@ export default function ChatPage() {
   const [typingUsers, setTypingUsers] = useState([]);
   const [channelError, setChannelError] = useState(null);
   const [messageError, setMessageError] = useState(null);
+  
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalContext, setModalContext] = useState(null); // { type: 'global' } or { type: 'project', projectId, projectName }
+  const [newChannelName, setNewChannelName] = useState('');
+  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [isCreatingChannel, setIsCreatingChannel] = useState(false);
   
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
@@ -183,13 +316,25 @@ export default function ChatPage() {
   const generalChannels = channels.filter(c => !c.project_id);
   const projectChannels = channels.filter(c => c.project_id);
   
-  // Group project channels by project name
+  // Group project channels by project name and ID
   const groupedProjectChannels = projectChannels.reduce((acc, channel) => {
     const pName = channel.project_name;
-    if (!acc[pName]) acc[pName] = [];
-    acc[pName].push(channel);
+    const pId = channel.project_id;
+    if (!acc[pName]) {
+      acc[pName] = {
+        projectId: pId,
+        channels: []
+      };
+    }
+    acc[pName].channels.push(channel);
     return acc;
   }, {});
+
+  // Extract unique projects for dropdown
+  const availableProjects = Object.entries(groupedProjectChannels).map(([name, data]) => ({
+    id: data.projectId,
+    name
+  }));
 
   /**
    * Send message via Socket.io
@@ -259,6 +404,76 @@ export default function ChatPage() {
   const formatTimestamp = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  /**
+   * Open modal for creating a channel
+   * @param {Object} context - { type: 'global' } or { type: 'project', projectId, projectName }
+   */
+  const openCreateChannelModal = (context) => {
+    setModalContext(context);
+    setNewChannelName('');
+    
+    if (context.type === 'project') {
+      setSelectedProjectId(context.projectId);
+    } else {
+      setSelectedProjectId('');
+    }
+    
+    setIsModalOpen(true);
+  };
+
+  /**
+   * Close modal and reset state
+   */
+  const closeCreateChannelModal = () => {
+    setIsModalOpen(false);
+    setModalContext(null);
+    setNewChannelName('');
+    setSelectedProjectId('');
+  };
+
+  /**
+   * Handle channel creation
+   */
+  const handleCreateChannel = async (e) => {
+    e.preventDefault();
+    
+    const trimmedName = newChannelName.trim();
+    if (!trimmedName) {
+      alert('Channel name is required');
+      return;
+    }
+    
+    if (!selectedProjectId && modalContext?.type === 'global') {
+      alert('Please select a project');
+      return;
+    }
+    
+    setIsCreatingChannel(true);
+    
+    try {
+      // TODO: Implement API call to create channel
+      console.log('Creating channel:', {
+        name: trimmedName,
+        projectId: selectedProjectId,
+        teamId
+      });
+      
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      alert(`Channel "${trimmedName}" created successfully!`);
+      closeCreateChannelModal();
+      
+      // TODO: Refresh channels list or optimistically add to state
+      
+    } catch (err) {
+      console.error('Failed to create channel:', err);
+      alert('Failed to create channel. Please try again.');
+    } finally {
+      setIsCreatingChannel(false);
+    }
   };
 
   // Styles dynamic theo Dark Mode
@@ -419,6 +634,21 @@ export default function ChatPage() {
   return (
     <div className={`flex h-[calc(100vh-64px)] ${bgBase}`}>
       
+      {/* Create Channel Modal */}
+      <CreateChannelModal
+        isModalOpen={isModalOpen}
+        modalContext={modalContext}
+        availableProjects={availableProjects}
+        newChannelName={newChannelName}
+        setNewChannelName={setNewChannelName}
+        selectedProjectId={selectedProjectId}
+        setSelectedProjectId={setSelectedProjectId}
+        isCreatingChannel={isCreatingChannel}
+        closeCreateChannelModal={closeCreateChannelModal}
+        handleCreateChannel={handleCreateChannel}
+        isDarkMode={isDarkMode}
+      />
+      
       {/* Connection Status Indicator */}
       {!isConnected && (
         <div className="fixed top-16 left-0 right-0 z-50 bg-yellow-500 text-black text-center py-1 text-sm flex items-center justify-center gap-2">
@@ -437,7 +667,11 @@ export default function ChatPage() {
           <div className={`p-4 border-b ${isDarkMode ? 'border-[#171717]' : 'border-gray-200'}`}>
             <h2 className={`font-bold text-lg ${textPrimary} flex items-center justify-between`}>
               Channels
-              <button className={`p-1 rounded ${hoverBg}`}>
+              <button 
+                className={`p-1 rounded ${hoverBg} transition-colors`}
+                onClick={() => openCreateChannelModal({ type: 'global' })}
+                title="Create new channel"
+              >
                 <Plus size={18} />
               </button>
             </h2>
@@ -477,12 +711,25 @@ export default function ChatPage() {
                 )}
 
                 {/* 2. PROJECT CHANNELS (Grouped) */}
-                {Object.entries(groupedProjectChannels).map(([projectName, channels]) => (
+                {Object.entries(groupedProjectChannels).map(([projectName, data]) => (
                   <div key={projectName}>
-                    <h3 className={`text-xs font-bold uppercase tracking-wider mb-2 px-3 mt-4 ${textSecondary} flex items-center gap-1`}>
-                      <span className="truncate">{projectName}</span>
-                    </h3>
-                    {channels.map(channel => (
+                    <div className={`flex items-center justify-between px-3 mt-4 mb-2 group`}>
+                      <h3 className={`text-xs font-bold uppercase tracking-wider ${textSecondary} truncate`}>
+                        {projectName}
+                      </h3>
+                      <button
+                        onClick={() => openCreateChannelModal({ 
+                          type: 'project', 
+                          projectId: data.projectId, 
+                          projectName 
+                        })}
+                        className={`p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity ${hoverBg}`}
+                        title={`Add channel to ${projectName}`}
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
+                    {data.channels.map(channel => (
                       <ChannelItem key={channel.id} channel={channel} />
                     ))}
                   </div>

@@ -36,15 +36,15 @@ export const initSocket = (userId) => {
 
   // Connection event handlers
   socket.on('connect', () => {
-    console.log('✅ Socket connected:', socket.id);
+    console.log('Socket connected:', socket.id);
   });
 
   socket.on('connect_error', (error) => {
-    console.error('❌ Socket connection error:', error.message);
+    console.error('Socket connection error:', error.message);
   });
 
   socket.on('disconnect', (reason) => {
-    console.log('🔌 Socket disconnected:', reason);
+    console.log('Socket disconnected:', reason);
   });
 
   return socket;
