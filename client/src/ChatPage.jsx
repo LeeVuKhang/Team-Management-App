@@ -8,10 +8,9 @@ import {
   Send, 
   Paperclip, 
   MoreVertical, 
-  Phone, 
-  Video,
   Smile,
-  Menu
+  Menu,
+  Info
 } from 'lucide-react';
 
 /**
@@ -22,7 +21,6 @@ const MOCK_CHANNELS = [
   { id: 1, name: 'general', type: 'text', project_id: null, unread: 0 },
   { id: 2, name: 'announcements', type: 'text', project_id: null, unread: 3 },
   { id: 3, name: 'random', type: 'text', project_id: null, unread: 0 },
-  { id: 4, name: 'voice-lounge', type: 'voice', project_id: null, unread: 0 },
 
   // Project Specific Channels (Có project_id)
   { id: 5, name: 'dev-backend', type: 'text', project_id: 101, project_name: 'Website Revamp' },
@@ -39,6 +37,7 @@ const MOCK_MESSAGES = [
 ];
 
 const CURRENT_USER_ID = 2; // Giả lập ID của người đang login
+const MAX_MESSAGE_LENGTH = 2000; // Character limit for messages (matches DB constraint)
 
 export default function ChatPage() {
   const { isDarkMode } = useOutletContext();
@@ -48,8 +47,11 @@ export default function ChatPage() {
   const [messages, setMessages] = useState(MOCK_MESSAGES);
   const [inputMessage, setInputMessage] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingChannels, setIsLoadingChannels] = useState(false);
   
   const messagesEndRef = useRef(null);
+  const textareaRef = useRef(null);
 
   // Auto scroll to bottom khi có tin nhắn mới
   useEffect(() => {
@@ -70,18 +72,44 @@ export default function ChatPage() {
 
   const handleSendMessage = (e) => {
     e.preventDefault();
-    if (!inputMessage.trim()) return;
+    
+    // Input validation: Trim and check if empty
+    const trimmedMessage = inputMessage.trim();
+    if (!trimmedMessage) return;
+    
+    // Validate message length to prevent exceeding DB constraint
+    if (trimmedMessage.length > MAX_MESSAGE_LENGTH) {
+      alert(`Message too long. Maximum ${MAX_MESSAGE_LENGTH} characters allowed.`);
+      return;
+    }
 
     const newMsg = {
       id: Date.now(),
       user_id: CURRENT_USER_ID,
-      content: inputMessage,
+      content: trimmedMessage, // Use trimmed content
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       user: { username: 'You', avatar_url: null }
     };
 
     setMessages([...messages, newMsg]);
     setInputMessage('');
+    
+    // Reset textarea height
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+  };
+
+  // Auto-resize textarea as user types
+  const handleInputChange = (e) => {
+    const value = e.target.value;
+    setInputMessage(value);
+    
+    // Auto-resize textarea
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 128)}px`;
+    }
   };
 
   // Styles dynamic theo Dark Mode
@@ -93,7 +121,8 @@ export default function ChatPage() {
   const inputBg = isDarkMode ? 'bg-[#171717] text-white border-[#333]' : 'bg-white text-black border-gray-300';
 
   /**
-   * COMPONENT: Channel Item
+   * SUB-COMPONENT: Channel Item
+   * Displays individual channel with active state and unread count
    */
   const ChannelItem = ({ channel }) => {
     const isActive = activeChannel.id === channel.id;
@@ -124,6 +153,88 @@ export default function ChatPage() {
     );
   };
 
+  /**
+   * SUB-COMPONENT: Channel Skeleton Loader
+   * Shows loading state while fetching channels
+   */
+  const ChannelSkeleton = () => (
+    <div className="space-y-2 px-3">
+      {[1, 2, 3].map(i => (
+        <div key={i} className="flex items-center gap-2 px-3 py-2">
+          <div className={`w-4 h-4 rounded ${isDarkMode ? 'bg-gray-700' : 'bg-gray-300'} animate-pulse`} />
+          <div className={`h-4 flex-1 rounded ${isDarkMode ? 'bg-gray-700' : 'bg-gray-300'} animate-pulse`} />
+        </div>
+      ))}
+    </div>
+  );
+
+  /**
+   * SUB-COMPONENT: Message Bubble
+   * Renders individual message with proper styling
+   */
+  const MessageBubble = ({ msg, isMe, isSequence }) => (
+    <div className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''} ${isSequence ? 'mt-1' : 'mt-4'}`}>
+      {/* Avatar */}
+      <div className={`flex-shrink-0 w-8 h-8 ${isSequence ? 'invisible' : ''}`}>
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-300 text-black'}`}>
+          {msg.user.username.substring(0,2).toUpperCase()}
+        </div>
+      </div>
+
+      {/* Message Content */}
+      <div className={`flex flex-col max-w-[75%] md:max-w-[60%] ${isMe ? 'items-end' : 'items-start'}`}>
+        {!isSequence && (
+          <div className={`flex items-baseline gap-2 mb-1 ${isMe ? 'flex-row-reverse' : ''}`}>
+            <span className={`text-sm font-bold ${textPrimary}`}>{msg.user.username}</span>
+            <span className={`text-[10px] ${textSecondary}`}>{msg.timestamp}</span>
+          </div>
+        )}
+        
+        {/* Message Bubble - XSS Safe: React escapes text by default */}
+        <div className={`px-4 py-2 rounded-2xl text-sm leading-relaxed break-words ${
+          isMe 
+            ? 'bg-[#006239] text-white rounded-tr-sm' 
+            : `${isDarkMode ? 'bg-[#1F1F1F] text-gray-200' : 'bg-white border border-gray-200 text-gray-800 shadow-sm'} rounded-tl-sm`
+        }`}>
+          {msg.content}
+        </div>
+      </div>
+    </div>
+  );
+
+  /**
+   * SUB-COMPONENT: Message Skeleton Loader
+   */
+  const MessageSkeleton = () => (
+    <div className="space-y-4">
+      {[1, 2, 3].map(i => (
+        <div key={i} className="flex gap-3">
+          <div className={`w-8 h-8 rounded-full ${isDarkMode ? 'bg-gray-700' : 'bg-gray-300'} animate-pulse`} />
+          <div className="flex-1 space-y-2">
+            <div className={`h-4 w-32 rounded ${isDarkMode ? 'bg-gray-700' : 'bg-gray-300'} animate-pulse`} />
+            <div className={`h-16 w-3/4 rounded-xl ${isDarkMode ? 'bg-gray-700' : 'bg-gray-300'} animate-pulse`} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  /**
+   * SUB-COMPONENT: Empty State
+   */
+  const EmptyState = () => (
+    <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+      <Hash size={64} className={`${textSecondary} mb-4`} />
+      <h3 className={`text-xl font-bold ${textPrimary} mb-2`}>
+        Welcome to #{activeChannel.name}
+      </h3>
+      <p className={`${textSecondary} max-w-md`}>
+        This is the beginning of the <span className="font-semibold">#{activeChannel.name}</span> channel.
+        {activeChannel.project_name && ` This channel is part of the ${activeChannel.project_name} project.`}
+      </p>
+    </div>
+  );
+
   return (
     <div className={`flex h-[calc(100vh-64px)] ${bgBase}`}>
       
@@ -146,27 +257,33 @@ export default function ChatPage() {
           {/* Scrollable List */}
           <div className="flex-1 overflow-y-auto p-3 space-y-6">
             
-            {/* 1. TEAM CHANNELS */}
-            <div>
-              <h3 className={`text-xs font-bold uppercase tracking-wider mb-2 px-3 ${textSecondary}`}>
-                Team Channels
-              </h3>
-              {generalChannels.map(channel => (
-                <ChannelItem key={channel.id} channel={channel} />
-              ))}
-            </div>
+            {isLoadingChannels ? (
+              <ChannelSkeleton />
+            ) : (
+              <>
+                {/* 1. TEAM CHANNELS */}
+                <div>
+                  <h3 className={`text-xs font-bold uppercase tracking-wider mb-2 px-3 ${textSecondary}`}>
+                    Team Channels
+                  </h3>
+                  {generalChannels.map(channel => (
+                    <ChannelItem key={channel.id} channel={channel} />
+                  ))}
+                </div>
 
-            {/* 2. PROJECT CHANNELS (Grouped) */}
-            {Object.entries(groupedProjectChannels).map(([projectName, channels]) => (
-              <div key={projectName}>
-                <h3 className={`text-xs font-bold uppercase tracking-wider mb-2 px-3 mt-4 ${textSecondary} flex items-center gap-1`}>
-                  <span className="truncate">{projectName}</span>
-                </h3>
-                {channels.map(channel => (
-                  <ChannelItem key={channel.id} channel={channel} />
+                {/* 2. PROJECT CHANNELS (Grouped) */}
+                {Object.entries(groupedProjectChannels).map(([projectName, channels]) => (
+                  <div key={projectName}>
+                    <h3 className={`text-xs font-bold uppercase tracking-wider mb-2 px-3 mt-4 ${textSecondary} flex items-center gap-1`}>
+                      <span className="truncate">{projectName}</span>
+                    </h3>
+                    {channels.map(channel => (
+                      <ChannelItem key={channel.id} channel={channel} />
+                    ))}
+                  </div>
                 ))}
-              </div>
-            ))}
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -214,70 +331,62 @@ export default function ChatPage() {
                 </div>
               ))}
             </div>
-            <button className={`p-2 rounded-full ${hoverBg} ${textSecondary}`}>
-              <Phone size={20} />
-            </button>
-            <button className={`p-2 rounded-full ${hoverBg} ${textSecondary}`}>
-              <Video size={20} />
-            </button>
-            <button className={`p-2 rounded-full ${hoverBg} ${textSecondary}`}>
+            <button 
+              className={`p-2 rounded-full ${hoverBg} ${textSecondary}`}
+              title="Search in channel"
+            >
               <Search size={20} />
+            </button>
+            <button 
+              className={`p-2 rounded-full ${hoverBg} ${textSecondary}`}
+              title="Channel info"
+            >
+              <Info size={20} />
             </button>
           </div>
         </div>
 
         {/* Messages List Area */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-          {messages.map((msg, index) => {
-            const isMe = msg.user_id === CURRENT_USER_ID;
-            const isSequence = index > 0 && messages[index-1].user_id === msg.user_id;
+        <div className="flex-1 overflow-y-auto p-4 md:p-6">
+          {isLoading ? (
+            <MessageSkeleton />
+          ) : messages.length === 0 ? (
+            <EmptyState />
+          ) : (
+            <div className="space-y-1">
+              {messages.map((msg, index) => {
+                const isMe = msg.user_id === CURRENT_USER_ID;
+                const isSequence = index > 0 && messages[index-1].user_id === msg.user_id;
 
-            return (
-              <div 
-                key={msg.id} 
-                className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''} ${isSequence ? 'mt-1' : 'mt-4'}`}
-              >
-                {/* Avatar */}
-                <div className={`flex-shrink-0 w-8 h-8 ${isSequence ? 'invisible' : ''}`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-300 text-black'}`}>
-                    {msg.user.username.substring(0,2).toUpperCase()}
-                  </div>
-                </div>
-
-                {/* Bubble */}
-                <div className={`flex flex-col max-w-[75%] md:max-w-[60%] ${isMe ? 'items-end' : 'items-start'}`}>
-                  {!isSequence && (
-                    <div className={`flex items-baseline gap-2 mb-1 ${isMe ? 'flex-row-reverse' : ''}`}>
-                      <span className={`text-sm font-bold ${textPrimary}`}>{msg.user.username}</span>
-                      <span className={`text-[10px] ${textSecondary}`}>{msg.timestamp}</span>
-                    </div>
-                  )}
-                  
-                  <div className={`px-4 py-2 rounded-2xl text-sm leading-relaxed ${
-                    isMe 
-                      ? 'bg-[#006239] text-white rounded-tr-sm' 
-                      : `${isDarkMode ? 'bg-[#1F1F1F] text-gray-200' : 'bg-white border border-gray-200 text-gray-800 shadow-sm'} rounded-tl-sm`
-                  }`}>
-                    {msg.content}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-          <div ref={messagesEndRef} />
+                return (
+                  <MessageBubble 
+                    key={msg.id} 
+                    msg={msg} 
+                    isMe={isMe} 
+                    isSequence={isSequence} 
+                  />
+                );
+              })}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
         </div>
 
         {/* Input Area */}
         <div className={`p-4 border-t flex-shrink-0 ${isDarkMode ? 'bg-dark-secondary border-[#171717]' : 'bg-white border-gray-200'}`}>
           <div className={`flex items-end gap-2 p-2 rounded-xl border ${inputBg} focus-within:ring-2 focus-within:ring-[#006239]/50 transition-all`}>
             
-            <button className={`p-2 rounded-lg ${hoverBg} ${textSecondary} flex-shrink-0`}>
-              <Plus size={20} />
+            <button 
+              className={`p-2 rounded-lg ${hoverBg} ${textSecondary} flex-shrink-0`}
+              title="Attach file"
+            >
+              <Paperclip size={20} />
             </button>
             
             <textarea
+              ref={textareaRef}
               value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
+              onChange={handleInputChange}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
@@ -287,10 +396,14 @@ export default function ChatPage() {
               placeholder={`Message #${activeChannel.name}`}
               className="flex-1 bg-transparent border-none focus:ring-0 max-h-32 min-h-[24px] py-2 resize-none text-sm scrollbar-hide"
               rows={1}
+              maxLength={MAX_MESSAGE_LENGTH}
             />
 
             <div className="flex items-center gap-1 pb-1">
-               <button className={`p-2 rounded-lg ${hoverBg} ${textSecondary}`}>
+               <button 
+                className={`p-2 rounded-lg ${hoverBg} ${textSecondary}`}
+                title="Add emoji"
+              >
                 <Smile size={20} />
               </button>
               <button 
@@ -301,13 +414,19 @@ export default function ChatPage() {
                     ? 'bg-[#006239] text-white hover:bg-[#005230]' 
                     : `${isDarkMode ? 'bg-[#333]' : 'bg-gray-200'} ${textSecondary} cursor-not-allowed`
                 }`}
+                title="Send message"
               >
                 <Send size={18} />
               </button>
             </div>
           </div>
-          <div className={`text-xs text-center mt-2 ${textSecondary}`}>
-            <strong>Tip:</strong> Shift + Enter for new line
+          <div className={`flex items-center justify-between text-xs mt-2 ${textSecondary}`}>
+            <span>
+              <strong>Tip:</strong> Press Enter to send, Shift + Enter for new line
+            </span>
+            <span className={inputMessage.length > MAX_MESSAGE_LENGTH * 0.9 ? 'text-red-500 font-semibold' : ''}>
+              {inputMessage.length}/{MAX_MESSAGE_LENGTH}
+            </span>
           </div>
         </div>
 
