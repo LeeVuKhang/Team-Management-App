@@ -1,8 +1,9 @@
 import './App.css'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import LandingPage from './LandingPage.jsx';
 import Login from './Login.jsx';
+import Signup from './Signup.jsx';
 import Layout from './Layout.jsx';
 import Dashboard from './Dashboard.jsx';
 import TeamPage from './TeamPage.jsx';
@@ -23,7 +24,7 @@ function App() {
           },
           success: {
             iconTheme: {
-              primary: '#77885f',
+              primary: '#308f68',
               secondary: '#fff',
             },
           },
@@ -38,6 +39,7 @@ function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
         <Route path="/accept-invite" element={<AcceptInvitePage />} />
         <Route element={<Layout />}>
           <Route path="/dashboard" element={<Dashboard />} />
