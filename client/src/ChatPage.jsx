@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useOutletContext, useParams } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { 
   Hash, 
   Volume2, 
@@ -15,7 +16,8 @@ import {
   X,
   ChevronDown
 } from 'lucide-react';
-import { fetchTeamChannels, fetchChannelMessages } from './services/channelApi.js';
+import { fetchTeamChannels, fetchChannelMessages, createChannel } from './services/channelApi.js';
+import { getTeamProjects } from './services/projectApi.js';
 import {
   initSocket,
   disconnectSocket,
@@ -183,6 +185,9 @@ export default function ChatPage() {
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [isCreatingChannel, setIsCreatingChannel] = useState(false);
   
+  // Team projects state (for dropdown in create channel modal)
+  const [teamProjects, setTeamProjects] = useState([]);
+  
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -203,28 +208,41 @@ export default function ChatPage() {
   }, []);
 
   /**
-   * Fetch channels when teamId changes
+   * Fetch channels and projects when teamId changes
    */
   useEffect(() => {
     if (!teamId) {
       // No team selected - stop loading and show empty state
       setIsLoadingChannels(false);
       setChannels([]);
+      setTeamProjects([]);
       return;
     }
 
-    const loadChannels = async () => {
+    const loadData = async () => {
       console.log('[ChatPage] Fetching channels for team:', teamId);
       setIsLoadingChannels(true);
       setChannelError(null);
       try {
-        const data = await fetchTeamChannels(teamId);
-        console.log('[ChatPage] Received channels:', data);
-        setChannels(data);
+        // Fetch both channels and projects in parallel
+        const [channelsData, projectsData] = await Promise.all([
+          fetchTeamChannels(teamId),
+          getTeamProjects(teamId).catch(err => {
+            console.warn('[ChatPage] Failed to fetch projects:', err);
+            return { data: [] }; // Fallback to empty array if projects fail
+          })
+        ]);
+        
+        console.log('[ChatPage] Received channels:', channelsData);
+        console.log('[ChatPage] Received projects:', projectsData);
+        
+        setChannels(channelsData);
+        setTeamProjects(projectsData.data || []);
+        
         // Auto-select first channel if none selected
-        if (data.length > 0 && !activeChannel) {
-          console.log('[ChatPage] Auto-selecting first channel:', data[0]);
-          setActiveChannel(data[0]);
+        if (channelsData.length > 0 && !activeChannel) {
+          console.log('[ChatPage] Auto-selecting first channel:', channelsData[0]);
+          setActiveChannel(channelsData[0]);
         }
       } catch (err) {
         console.error('[ChatPage] Failed to fetch channels:', err);
@@ -234,7 +252,7 @@ export default function ChatPage() {
       }
     };
 
-    loadChannels();
+    loadData();
   }, [teamId]);
 
   /**
@@ -330,10 +348,10 @@ export default function ChatPage() {
     return acc;
   }, {});
 
-  // Extract unique projects for dropdown
-  const availableProjects = Object.entries(groupedProjectChannels).map(([name, data]) => ({
-    id: data.projectId,
-    name
+  // Use ALL team projects for dropdown (not just those with channels)
+  const availableProjects = teamProjects.map(project => ({
+    id: project.id,
+    name: project.name
   }));
 
   /**
@@ -441,36 +459,49 @@ export default function ChatPage() {
     
     const trimmedName = newChannelName.trim();
     if (!trimmedName) {
-      alert('Channel name is required');
+      toast.error('Channel name is required');
       return;
     }
     
     if (!selectedProjectId && modalContext?.type === 'global') {
-      alert('Please select a project');
+      toast.error('Please select a project');
       return;
     }
     
     setIsCreatingChannel(true);
     
     try {
-      // TODO: Implement API call to create channel
-      console.log('Creating channel:', {
+      const channelData = {
         name: trimmedName,
-        projectId: selectedProjectId,
-        teamId
-      });
+        projectId: selectedProjectId ? Number(selectedProjectId) : null,
+        type: 'text',
+        isPrivate: false,
+      };
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Call API to create channel
+      const newChannel = await createChannel(teamId, channelData);
       
-      alert(`Channel "${trimmedName}" created successfully!`);
+      toast.success(`Channel "${trimmedName}" created successfully!`);
       closeCreateChannelModal();
       
-      // TODO: Refresh channels list or optimistically add to state
+      // Refresh channels list and projects
+      const [updatedChannels, projectsData] = await Promise.all([
+        fetchTeamChannels(teamId),
+        getTeamProjects(teamId).catch(() => ({ data: [] }))
+      ]);
+      
+      setChannels(updatedChannels);
+      setTeamProjects(projectsData.data || []);
+      
+      // Auto-select the newly created channel
+      if (newChannel) {
+        setActiveChannel(newChannel);
+      }
       
     } catch (err) {
       console.error('Failed to create channel:', err);
-      alert('Failed to create channel. Please try again.');
+      const errorMessage = err.message || 'Failed to create channel. Please try again.';
+      toast.error(errorMessage);
     } finally {
       setIsCreatingChannel(false);
     }
@@ -892,7 +923,7 @@ export default function ChatPage() {
                 }
               }}
               placeholder={activeChannel ? `Message #${activeChannel.name}` : 'Select a channel to start chatting'}
-              className="flex-1 bg-transparent border-none focus:ring-0 max-h-32 min-h-[24px] py-2 resize-none text-sm scrollbar-hide"
+              className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none max-h-32 min-h-[24px] py-2 resize-none text-sm scrollbar-hide"
               rows={1}
               maxLength={MAX_MESSAGE_LENGTH}
               disabled={!activeChannel || isSending}

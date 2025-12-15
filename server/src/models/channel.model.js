@@ -117,23 +117,19 @@ export const getChannelById = async (channelId, userId) => {
 
 /**
  * Create a new channel
+ * 
+ * Security Note: Role-based access (owner/admin) is enforced at the middleware layer.
+ * This function focuses on data validation and insertion.
+ * 
  * @param {Object} data - Channel data {teamId, name, type, projectId, isPrivate}
- * @param {number} userId - Creator's user ID
+ * @param {number} userId - Creator's user ID (for audit/logging purposes)
  * @returns {Promise<Object>} Created channel
  */
 export const createChannel = async (data, userId) => {
   const { teamId, name, type = 'text', projectId = null, isPrivate = false } = data;
 
-  // SECURITY: Verify user is team admin/owner to create channels
-  const membership = await verifyTeamMembership(teamId, userId);
-  if (!membership) {
-    throw new Error('Access denied: User is not a member of this team');
-  }
-  if (!['owner', 'admin'].includes(membership.role)) {
-    throw new Error('Access denied: Only team owners/admins can create channels');
-  }
-
   // If project-specific, verify project exists and belongs to team
+  // Security: Prevents creating channels for projects in other teams
   if (projectId) {
     const [project] = await db`
       SELECT id FROM projects WHERE id = ${projectId} AND team_id = ${teamId}

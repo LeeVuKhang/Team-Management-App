@@ -3,7 +3,12 @@ import * as ChannelModel from '../models/channel.model.js';
 /**
  * Channel Controller
  * Handles HTTP requests for channel and message operations
- * Security: Relies on model-level RBAC checks for authorization
+ * 
+ * Security Notes:
+ * - Authentication: Handled by auth middleware (mockAuth/verifyToken)
+ * - Team Membership: Verified by verifyTeamMember middleware
+ * - Role-based Access: Enforced by verifyTeamRole middleware for create/delete operations
+ * - Project Membership: Checked at model layer for project-specific channels
  * 
  * Note: Use req.validated.params and req.validated.query for Zod-transformed values
  * (e.g., string IDs converted to numbers)
@@ -12,6 +17,8 @@ import * as ChannelModel from '../models/channel.model.js';
 /**
  * GET /teams/:teamId/channels
  * Get all channels for a team that user has access to
+ * 
+ * Middleware: verifyTeamMember (ensures user is team member)
  */
 export const getTeamChannels = async (req, res, next) => {
   try {
@@ -21,6 +28,8 @@ export const getTeamChannels = async (req, res, next) => {
 
     console.log(`[getTeamChannels] User ${userId} requesting channels for team ${teamId}`);
 
+    // Note: verifyTeamMember middleware already confirmed team membership
+    // Model still checks for project-specific channel access
     const channels = await ChannelModel.getTeamChannels(teamId, userId);
 
     console.log(`[getTeamChannels] Found ${channels.length} channels`);
@@ -31,7 +40,7 @@ export const getTeamChannels = async (req, res, next) => {
     });
   } catch (error) {
     console.error('[getTeamChannels] Error:', error.message);
-    // Handle known authorization errors
+    // Handle known authorization errors (from model layer project checks)
     if (error.message.includes('Access denied')) {
       return res.status(403).json({
         success: false,
@@ -45,6 +54,8 @@ export const getTeamChannels = async (req, res, next) => {
 /**
  * GET /teams/:teamId/channels/:channelId
  * Get a single channel by ID
+ * 
+ * Middleware: verifyTeamMember (ensures user is team member)
  */
 export const getChannel = async (req, res, next) => {
   try {
@@ -78,17 +89,29 @@ export const getChannel = async (req, res, next) => {
 /**
  * POST /teams/:teamId/channels
  * Create a new channel in a team
+ * 
+ * Middleware: 
+ * - verifyTeamMember (ensures user is team member)
+ * - verifyTeamRole(['owner', 'admin']) (ensures user has permission to create channels)
+ * 
+ * Security: Role check is done at middleware level, not repeated here
  */
 export const createChannel = async (req, res, next) => {
   try {
     const { teamId } = req.validated?.params || req.params;
     const userId = req.user.id;
-    const { name, type, projectId, isPrivate } = req.body;
+    
+    // Use validated body - Zod already sanitized and validated these
+    const { name, type, projectId, isPrivate } = req.validated?.body || req.body;
+
+    console.log(`[createChannel] User ${userId} (role: ${req.teamMembership?.role}) creating channel "${name}" in team ${teamId}`);
 
     const channel = await ChannelModel.createChannel(
       { teamId, name, type, projectId, isPrivate },
       userId
     );
+
+    console.log(`[createChannel] Channel created successfully: ID ${channel.id}`);
 
     res.status(201).json({
       success: true,
@@ -96,25 +119,32 @@ export const createChannel = async (req, res, next) => {
       data: channel,
     });
   } catch (error) {
-    // Handle duplicate channel name (unique constraint)
+    console.error('[createChannel] Error:', error.message);
+    
+    // Handle duplicate channel name (PostgreSQL unique constraint violation)
     if (error.code === '23505') {
       return res.status(409).json({
         success: false,
         message: 'A channel with this name already exists in the team',
       });
     }
-    if (error.message.includes('Access denied')) {
-      return res.status(403).json({
-        success: false,
-        message: error.message,
-      });
-    }
+    
+    // Handle project validation errors
     if (error.message.includes('Project not found')) {
       return res.status(400).json({
         success: false,
         message: error.message,
       });
     }
+    
+    // Handle access denied (shouldn't happen if middleware is configured correctly)
+    if (error.message.includes('Access denied')) {
+      return res.status(403).json({
+        success: false,
+        message: error.message,
+      });
+    }
+    
     next(error);
   }
 };

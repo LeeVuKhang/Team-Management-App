@@ -1,7 +1,7 @@
 import express from 'express';
 import * as ChannelController from '../controllers/channel.controller.js';
 import { validate } from '../middlewares/validate.js';
-import { mockAuth } from '../middlewares/auth.js';
+import { mockAuth, verifyTeamMember, verifyTeamRole } from '../middlewares/auth.js';
 import {
   teamIdParamSchema,
   teamChannelParamsSchema,
@@ -17,6 +17,7 @@ import {
  * Security:
  * - All routes require authentication (mockAuth for dev, replace with verifyToken)
  * - All inputs validated with Zod schemas
+ * - RBAC enforced via verifyTeamMember and verifyTeamRole middleware
  * - Model layer enforces team/project membership (IDOR prevention)
  */
 
@@ -29,16 +30,19 @@ router.use(mockAuth);
 /**
  * GET /teams/:teamId/channels
  * List all channels user has access to in the team
+ * Access: Any team member
  */
 router.get(
   '/',
   validate({ params: teamIdParamSchema }),
+  verifyTeamMember,
   ChannelController.getTeamChannels
 );
 
 /**
  * POST /teams/:teamId/channels
- * Create a new channel (admin/owner only)
+ * Create a new channel
+ * Access: Team OWNER or ADMIN only
  */
 router.post(
   '/',
@@ -46,22 +50,27 @@ router.post(
     params: teamIdParamSchema,
     body: createChannelSchema,
   }),
+  verifyTeamMember,
+  verifyTeamRole(['owner', 'admin']),
   ChannelController.createChannel
 );
 
 /**
  * GET /teams/:teamId/channels/:channelId
  * Get a single channel by ID
+ * Access: Any team member (project membership checked in model)
  */
 router.get(
   '/:channelId',
   validate({ params: teamChannelParamsSchema }),
+  verifyTeamMember,
   ChannelController.getChannel
 );
 
 /**
  * GET /teams/:teamId/channels/:channelId/messages
  * Get messages for a channel (with pagination)
+ * Access: Any team member (project membership checked in model)
  */
 router.get(
   '/:channelId/messages',
@@ -69,12 +78,14 @@ router.get(
     params: teamChannelParamsSchema,
     query: messagesQuerySchema,
   }),
+  verifyTeamMember,
   ChannelController.getChannelMessages
 );
 
 /**
  * POST /teams/:teamId/channels/:channelId/messages
  * Send a message to a channel (REST fallback - prefer WebSocket)
+ * Access: Any team member (project membership checked in model)
  */
 router.post(
   '/:channelId/messages',
@@ -82,6 +93,7 @@ router.post(
     params: teamChannelParamsSchema,
     body: createMessageSchema,
   }),
+  verifyTeamMember,
   ChannelController.createMessage
 );
 
