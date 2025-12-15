@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useOutletContext, useParams } from 'react-router-dom';
 import { 
   Hash, 
@@ -10,59 +10,180 @@ import {
   MoreVertical, 
   Smile,
   Menu,
-  Info
+  Info,
+  WifiOff
 } from 'lucide-react';
+import { fetchTeamChannels, fetchChannelMessages } from './services/channelApi.js';
+import {
+  initSocket,
+  disconnectSocket,
+  joinChannel,
+  leaveChannel,
+  sendMessage as socketSendMessage,
+  onNewMessage,
+  onUserTyping,
+  onUserStoppedTyping,
+  emitTypingStart,
+  emitTypingStop,
+  getSocket,
+} from './services/socketService.js';
 
-/**
- * MOCK DATA (Mô phỏng dữ liệu từ DB)
- */
-const MOCK_CHANNELS = [
-  // General Team Channels (project_id: null)
-  { id: 1, name: 'general', type: 'text', project_id: null, unread: 0 },
-  { id: 2, name: 'announcements', type: 'text', project_id: null, unread: 3 },
-  { id: 3, name: 'random', type: 'text', project_id: null, unread: 0 },
-
-  // Project Specific Channels (Có project_id)
-  { id: 5, name: 'dev-backend', type: 'text', project_id: 101, project_name: 'Website Revamp' },
-  { id: 6, name: 'dev-frontend', type: 'text', project_id: 101, project_name: 'Website Revamp' },
-  { id: 7, name: 'marketing-campaign', type: 'text', project_id: 102, project_name: 'Q4 Marketing' },
-];
-
-const MOCK_MESSAGES = [
-  { id: 1, user_id: 99, content: 'Hello everyone! Welcome to the new team workspace.', timestamp: '10:00 AM', user: { username: 'Admin', avatar_url: null } },
-  { id: 2, user_id: 2, content: 'Giao diện nhìn xịn quá sếp ơi!', timestamp: '10:05 AM', user: { username: 'Khang Le', avatar_url: null } },
-  { id: 3, user_id: 99, content: 'Thanks! Mọi người check phần Projects nhé.', timestamp: '10:06 AM', user: { username: 'Admin', avatar_url: null } },
-  // Giả lập tin nhắn dài
-  { id: 4, user_id: 2, content: 'Skibidi toilet qua ae, nhai discord', timestamp: '10:10 AM', user: { username: 'Khang Le', avatar_url: null } },
-];
-
-const CURRENT_USER_ID = 2; // Giả lập ID của người đang login
+// TODO: Replace with actual user from auth context
+const CURRENT_USER_ID = 1; // Mock user ID for development
 const MAX_MESSAGE_LENGTH = 2000; // Character limit for messages (matches DB constraint)
 
 export default function ChatPage() {
   const { isDarkMode } = useOutletContext();
   const { teamId } = useParams();
   
-  const [activeChannel, setActiveChannel] = useState(MOCK_CHANNELS[0]);
-  const [messages, setMessages] = useState(MOCK_MESSAGES);
+  // State
+  const [channels, setChannels] = useState([]);
+  const [activeChannel, setActiveChannel] = useState(null);
+  const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingChannels, setIsLoadingChannels] = useState(false);
+  const [isLoadingChannels, setIsLoadingChannels] = useState(true);
+  const [isSending, setIsSending] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [typingUsers, setTypingUsers] = useState([]);
+  const [channelError, setChannelError] = useState(null);
+  const [messageError, setMessageError] = useState(null);
   
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
+  const previousChannelRef = useRef(null);
 
-  // Auto scroll to bottom khi có tin nhắn mới
+  /**
+   * Initialize Socket connection on mount
+   */
+  useEffect(() => {
+    const socket = initSocket(CURRENT_USER_ID);
+    
+    socket.on('connect', () => setIsConnected(true));
+    socket.on('disconnect', () => setIsConnected(false));
+
+    return () => {
+      disconnectSocket();
+    };
+  }, []);
+
+  /**
+   * Fetch channels when teamId changes
+   */
+  useEffect(() => {
+    if (!teamId) {
+      // No team selected - stop loading and show empty state
+      setIsLoadingChannels(false);
+      setChannels([]);
+      return;
+    }
+
+    const loadChannels = async () => {
+      console.log('[ChatPage] Fetching channels for team:', teamId);
+      setIsLoadingChannels(true);
+      setChannelError(null);
+      try {
+        const data = await fetchTeamChannels(teamId);
+        console.log('[ChatPage] Received channels:', data);
+        setChannels(data);
+        // Auto-select first channel if none selected
+        if (data.length > 0 && !activeChannel) {
+          console.log('[ChatPage] Auto-selecting first channel:', data[0]);
+          setActiveChannel(data[0]);
+        }
+      } catch (err) {
+        console.error('[ChatPage] Failed to fetch channels:', err);
+        setChannelError(err.message || 'Failed to load channels');
+      } finally {
+        setIsLoadingChannels(false);
+      }
+    };
+
+    loadChannels();
+  }, [teamId]);
+
+  /**
+   * Handle channel switch: leave old room, join new room, fetch messages
+   */
+  useEffect(() => {
+    if (!activeChannel || !isConnected) return;
+
+    const switchChannel = async () => {
+      setIsLoading(true);
+      setMessages([]);
+      setTypingUsers([]);
+      setMessageError(null);
+
+      // Leave previous channel room
+      if (previousChannelRef.current && previousChannelRef.current !== activeChannel.id) {
+        await leaveChannel(previousChannelRef.current).catch(console.error);
+      }
+
+      try {
+        // Join new channel room for real-time updates
+        await joinChannel(activeChannel.id);
+        
+        // Fetch message history
+        const data = await fetchChannelMessages(teamId, activeChannel.id);
+        setMessages(data || []);
+        
+        previousChannelRef.current = activeChannel.id;
+      } catch (err) {
+        console.error('Failed to load channel:', err);
+        setMessageError('Failed to load messages');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    switchChannel();
+  }, [activeChannel?.id, isConnected, teamId]);
+
+  /**
+   * Subscribe to real-time message events
+   */
+  useEffect(() => {
+    const unsubMessage = onNewMessage((message) => {
+      // Only add if from current channel
+      if (message.channel_id === activeChannel?.id) {
+        setMessages(prev => [...prev, message]);
+      }
+    });
+
+    const unsubTyping = onUserTyping(({ userId, username }) => {
+      if (userId !== CURRENT_USER_ID) {
+        setTypingUsers(prev => {
+          if (!prev.find(u => u.userId === userId)) {
+            return [...prev, { userId, username }];
+          }
+          return prev;
+        });
+      }
+    });
+
+    const unsubStopTyping = onUserStoppedTyping(({ userId }) => {
+      setTypingUsers(prev => prev.filter(u => u.userId !== userId));
+    });
+
+    return () => {
+      unsubMessage();
+      unsubTyping();
+      unsubStopTyping();
+    };
+  }, [activeChannel?.id]);
+
+  // Auto scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Phân loại Channels
-  const generalChannels = MOCK_CHANNELS.filter(c => !c.project_id);
-  const projectChannels = MOCK_CHANNELS.filter(c => c.project_id);
+  // Categorize channels
+  const generalChannels = channels.filter(c => !c.project_id);
+  const projectChannels = channels.filter(c => c.project_id);
   
-  // Gom nhóm project channels theo Project Name (Logic hiển thị đẹp hơn)
+  // Group project channels by project name
   const groupedProjectChannels = projectChannels.reduce((acc, channel) => {
     const pName = channel.project_name;
     if (!acc[pName]) acc[pName] = [];
@@ -70,37 +191,42 @@ export default function ChatPage() {
     return acc;
   }, {});
 
-  const handleSendMessage = (e) => {
+  /**
+   * Send message via Socket.io
+   */
+  const handleSendMessage = useCallback(async (e) => {
     e.preventDefault();
     
-    // Input validation: Trim and check if empty
     const trimmedMessage = inputMessage.trim();
-    if (!trimmedMessage) return;
+    if (!trimmedMessage || !activeChannel || isSending) return;
     
-    // Validate message length to prevent exceeding DB constraint
     if (trimmedMessage.length > MAX_MESSAGE_LENGTH) {
       alert(`Message too long. Maximum ${MAX_MESSAGE_LENGTH} characters allowed.`);
       return;
     }
 
-    const newMsg = {
-      id: Date.now(),
-      user_id: CURRENT_USER_ID,
-      content: trimmedMessage, // Use trimmed content
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      user: { username: 'You', avatar_url: null }
-    };
+    setIsSending(true);
+    emitTypingStop(activeChannel.id);
 
-    setMessages([...messages, newMsg]);
-    setInputMessage('');
-    
-    // Reset textarea height
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
+    try {
+      // Send via socket (message will be broadcast back via 'new-message' event)
+      await socketSendMessage(activeChannel.id, trimmedMessage);
+      setInputMessage('');
+      
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      alert('Failed to send message. Please try again.');
+    } finally {
+      setIsSending(false);
     }
-  };
+  }, [inputMessage, activeChannel, isSending]);
 
-  // Auto-resize textarea as user types
+  /**
+   * Handle input change with typing indicator
+   */
   const handleInputChange = (e) => {
     const value = e.target.value;
     setInputMessage(value);
@@ -110,6 +236,29 @@ export default function ChatPage() {
       textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 128)}px`;
     }
+
+    // Emit typing indicator (debounced)
+    if (activeChannel && value.trim()) {
+      emitTypingStart(activeChannel.id);
+      
+      // Clear existing timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      
+      // Stop typing after 2 seconds of inactivity
+      typingTimeoutRef.current = setTimeout(() => {
+        emitTypingStop(activeChannel.id);
+      }, 2000);
+    }
+  };
+
+  /**
+   * Format timestamp for display
+   */
+  const formatTimestamp = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   // Styles dynamic theo Dark Mode
@@ -125,7 +274,7 @@ export default function ChatPage() {
    * Displays individual channel with active state and unread count
    */
   const ChannelItem = ({ channel }) => {
-    const isActive = activeChannel.id === channel.id;
+    const isActive = activeChannel?.id === channel.id;
     const activeClass = isActive 
       ? (isDarkMode ? 'bg-[#006239]/20 text-white' : 'bg-blue-50 text-blue-700') 
       : `${textSecondary} ${hoverBg}`;
@@ -186,7 +335,9 @@ export default function ChatPage() {
         {!isSequence && (
           <div className={`flex items-baseline gap-2 mb-1 ${isMe ? 'flex-row-reverse' : ''}`}>
             <span className={`text-sm font-bold ${textPrimary}`}>{msg.user.username}</span>
-            <span className={`text-[10px] ${textSecondary}`}>{msg.timestamp}</span>
+            <span className={`text-[10px] ${textSecondary}`}>
+              {msg.created_at ? formatTimestamp(msg.created_at) : msg.timestamp}
+            </span>
           </div>
         )}
         
@@ -235,8 +386,46 @@ export default function ChatPage() {
     </div>
   );
 
+  /**
+   * SUB-COMPONENT: No Team Selected State
+   */
+  const NoTeamState = () => (
+    <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+      <Hash size={64} className={`${textSecondary} mb-4`} />
+      <h3 className={`text-xl font-bold ${textPrimary} mb-2`}>
+        No Team Selected
+      </h3>
+      <p className={`${textSecondary} max-w-md mb-4`}>
+        Please select a team from the sidebar to start chatting.
+      </p>
+      <a 
+        href="/dashboard" 
+        className="px-4 py-2 bg-[#006239] text-white rounded-lg hover:bg-[#005230] transition-colors"
+      >
+        Go to Dashboard
+      </a>
+    </div>
+  );
+
+  // If no teamId, show no team selected state
+  if (!teamId) {
+    return (
+      <div className={`flex h-[calc(100vh-64px)] ${bgBase}`}>
+        <NoTeamState />
+      </div>
+    );
+  }
+
   return (
     <div className={`flex h-[calc(100vh-64px)] ${bgBase}`}>
+      
+      {/* Connection Status Indicator */}
+      {!isConnected && (
+        <div className="fixed top-16 left-0 right-0 z-50 bg-yellow-500 text-black text-center py-1 text-sm flex items-center justify-center gap-2">
+          <WifiOff size={16} />
+          <span>Reconnecting to chat server...</span>
+        </div>
+      )}
       
       {/* LEFT SIDEBAR (Channel List) */}
       <div className={`
@@ -259,17 +448,33 @@ export default function ChatPage() {
             
             {isLoadingChannels ? (
               <ChannelSkeleton />
+            ) : channelError ? (
+              <div className="px-3 py-4">
+                <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-200'}`}>
+                  <p className={`text-sm ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>
+                    {channelError}
+                  </p>
+                </div>
+              </div>
+            ) : channels.length === 0 ? (
+              <div className="px-3 py-4">
+                <p className={`text-sm ${textSecondary}`}>
+                  No channels found for this team.
+                </p>
+              </div>
             ) : (
               <>
                 {/* 1. TEAM CHANNELS */}
-                <div>
-                  <h3 className={`text-xs font-bold uppercase tracking-wider mb-2 px-3 ${textSecondary}`}>
-                    Team Channels
-                  </h3>
-                  {generalChannels.map(channel => (
-                    <ChannelItem key={channel.id} channel={channel} />
-                  ))}
-                </div>
+                {generalChannels.length > 0 && (
+                  <div>
+                    <h3 className={`text-xs font-bold uppercase tracking-wider mb-2 px-3 ${textSecondary}`}>
+                      Team Channels
+                    </h3>
+                    {generalChannels.map(channel => (
+                      <ChannelItem key={channel.id} channel={channel} />
+                    ))}
+                  </div>
+                )}
 
                 {/* 2. PROJECT CHANNELS (Grouped) */}
                 {Object.entries(groupedProjectChannels).map(([projectName, channels]) => (
@@ -309,17 +514,21 @@ export default function ChatPage() {
               <Menu size={24} className={textPrimary} />
             </button>
             
-            <div className="flex items-center gap-2">
-              {activeChannel.type === 'voice' ? <Volume2 size={24} className={textSecondary} /> : <Hash size={24} className={textSecondary} />}
-              <div>
-                <h3 className={`font-bold ${textPrimary}`}>
-                  {activeChannel.name}
-                </h3>
-                <p className={`text-xs ${textSecondary}`}>
-                  {activeChannel.project_name ? `Project: ${activeChannel.project_name}` : 'General Team Chat'}
-                </p>
+            {activeChannel ? (
+              <div className="flex items-center gap-2">
+                {activeChannel.type === 'voice' ? <Volume2 size={24} className={textSecondary} /> : <Hash size={24} className={textSecondary} />}
+                <div>
+                  <h3 className={`font-bold ${textPrimary}`}>
+                    {activeChannel.name}
+                  </h3>
+                  <p className={`text-xs ${textSecondary}`}>
+                    {activeChannel.project_name ? `Project: ${activeChannel.project_name}` : 'General Team Chat'}
+                  </p>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className={`${textSecondary}`}>Select a channel</div>
+            )}
           </div>
 
           {/* Header Actions */}
@@ -348,8 +557,35 @@ export default function ChatPage() {
 
         {/* Messages List Area */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6">
-          {isLoading ? (
+          {!activeChannel ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+              <Hash size={64} className={`${textSecondary} mb-4`} />
+              <h3 className={`text-xl font-bold ${textPrimary} mb-2`}>
+                Welcome to Chat
+              </h3>
+              <p className={`${textSecondary} max-w-md`}>
+                Select a channel from the sidebar to start chatting.
+              </p>
+            </div>
+          ) : isLoading ? (
             <MessageSkeleton />
+          ) : messageError ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
+              <div className={`p-4 rounded-lg ${isDarkMode ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-200'}`}>
+                <p className={`text-sm ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>
+                  {messageError}
+                </p>
+                <button 
+                  onClick={() => {
+                    setMessageError(null);
+                    setActiveChannel({ ...activeChannel }); // Trigger re-fetch
+                  }}
+                  className="mt-2 text-sm underline hover:no-underline"
+                >
+                  Try again
+                </button>
+              </div>
+            </div>
           ) : messages.length === 0 ? (
             <EmptyState />
           ) : (
@@ -370,15 +606,30 @@ export default function ChatPage() {
               <div ref={messagesEndRef} />
             </div>
           )}
+          
+          {/* Typing Indicator */}
+          {typingUsers.length > 0 && (
+            <div className={`flex items-center gap-2 mt-2 ${textSecondary} text-sm`}>
+              <div className="flex gap-1">
+                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+              <span>
+                {typingUsers.map(u => u.username).join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Input Area */}
         <div className={`p-4 border-t flex-shrink-0 ${isDarkMode ? 'bg-dark-secondary border-[#171717]' : 'bg-white border-gray-200'}`}>
-          <div className={`flex items-end gap-2 p-2 rounded-xl border ${inputBg} focus-within:ring-2 focus-within:ring-[#006239]/50 transition-all`}>
+          <div className={`flex items-end gap-2 p-2 rounded-xl border ${inputBg} focus-within:ring-2 focus-within:ring-[#006239]/50 transition-all ${!activeChannel ? 'opacity-50' : ''}`}>
             
             <button 
               className={`p-2 rounded-lg ${hoverBg} ${textSecondary} flex-shrink-0`}
               title="Attach file"
+              disabled={!activeChannel}
             >
               <Paperclip size={20} />
             </button>
@@ -393,24 +644,26 @@ export default function ChatPage() {
                   handleSendMessage(e);
                 }
               }}
-              placeholder={`Message #${activeChannel.name}`}
+              placeholder={activeChannel ? `Message #${activeChannel.name}` : 'Select a channel to start chatting'}
               className="flex-1 bg-transparent border-none focus:ring-0 max-h-32 min-h-[24px] py-2 resize-none text-sm scrollbar-hide"
               rows={1}
               maxLength={MAX_MESSAGE_LENGTH}
+              disabled={!activeChannel || isSending}
             />
 
             <div className="flex items-center gap-1 pb-1">
                <button 
                 className={`p-2 rounded-lg ${hoverBg} ${textSecondary}`}
                 title="Add emoji"
+                disabled={!activeChannel}
               >
                 <Smile size={20} />
               </button>
               <button 
                 onClick={handleSendMessage}
-                disabled={!inputMessage.trim()}
+                disabled={!inputMessage.trim() || !activeChannel || isSending}
                 className={`p-2 rounded-lg transition-all ${
-                  inputMessage.trim() 
+                  inputMessage.trim() && activeChannel && !isSending
                     ? 'bg-[#006239] text-white hover:bg-[#005230]' 
                     : `${isDarkMode ? 'bg-[#333]' : 'bg-gray-200'} ${textSecondary} cursor-not-allowed`
                 }`}

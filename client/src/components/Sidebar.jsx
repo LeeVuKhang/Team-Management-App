@@ -15,6 +15,11 @@ export default function Sidebar({ darkMode, activePage }) {
   });
 
   const teams = teamsData?.data || [];
+  
+  // Determine which team to use for chat link
+  // Priority: current teamId from route > first team from list
+  const chatTeamId = teamId || (teams.length > 0 ? 1 : null);
+  const chatLink = chatTeamId ? `/teams/${chatTeamId}/chat` : '/dashboard';
 
   return (
     <aside 
@@ -32,7 +37,7 @@ export default function Sidebar({ darkMode, activePage }) {
           <LayoutDashboard size={20} className="flex-shrink-0" />
           <span className="ml-3 font-medium text-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap overflow-hidden">Dashboard</span>
         </Link>
-        <Link to="/chat" className={`w-full flex items-center px-3 py-3 rounded-lg transition-all duration-200 group/item relative ${
+        <Link to={chatLink} className={`w-full flex items-center px-3 py-3 rounded-lg transition-all duration-200 group/item relative ${
           activePage === 'chat'
             ? darkMode
               ? 'bg-[#171717] text-white' 

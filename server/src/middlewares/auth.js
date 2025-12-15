@@ -1,3 +1,5 @@
+import db from '../utils/db.js';
+
 /**
  * Temporary Mock Authentication Middleware
  * FOR DEVELOPMENT/TESTING ONLY
@@ -8,14 +10,35 @@
  * Security: This MUST be removed and replaced with proper auth middleware
  */
 
-export const mockAuth = (req, res, next) => {
-  // Simulate authenticated user with ID 1
-  req.user = {
-    id: 1,
-  };
-  
-  console.warn('⚠️  Using MOCK AUTH - User ID 1 (Replace with real auth before production)');
-  next();
+export const mockAuth = async (req, res, next) => {
+  try {
+    // Simulate authenticated user with ID 1
+    const userId = 1;
+    
+    // Fetch user details from DB to include email (required by invitation routes)
+    const [user] = await db`
+      SELECT id, email, username FROM users WHERE id = ${userId}
+    `;
+    
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Mock user not found in database',
+      });
+    }
+    
+    req.user = {
+      id: user.id,
+      email: user.email,
+      username: user.username,
+    };
+    
+    console.warn('⚠️  Using MOCK AUTH - User ID 1 (Replace with real auth before production)');
+    next();
+  } catch (error) {
+    console.error('Mock auth error:', error);
+    next(error);
+  }
 };
 
 /**
