@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useOutletContext, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { 
@@ -188,10 +188,18 @@ export default function ChatPage() {
   // Team projects state (for dropdown in create channel modal)
   const [teamProjects, setTeamProjects] = useState([]);
   
+  // Pagination state
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const textareaRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const previousChannelRef = useRef(null);
+  const prevScrollHeightRef = useRef(null); // For maintaining scroll position during pagination
+  const isPaginatingRef = useRef(false); // Track if we're loading older messages
+  const isInitialLoadRef = useRef(true); // Track if this is the first message load
 
   /**
    * Initialize Socket connection on mount
@@ -266,6 +274,8 @@ export default function ChatPage() {
       setMessages([]);
       setTypingUsers([]);
       setMessageError(null);
+      setHasMoreMessages(true);
+      isInitialLoadRef.current = true; // Mark as initial load for new channel
 
       // Leave previous channel room
       if (previousChannelRef.current && previousChannelRef.current !== activeChannel.id) {
@@ -276,9 +286,12 @@ export default function ChatPage() {
         // Join new channel room for real-time updates
         await joinChannel(activeChannel.id);
         
-        // Fetch message history
-        const data = await fetchChannelMessages(teamId, activeChannel.id);
+        // Fetch initial message history (last 10 messages)
+        const data = await fetchChannelMessages(teamId, activeChannel.id, { limit: 10 });
         setMessages(data || []);
+        
+        // If we got less than 10 messages, there are no more to load
+        setHasMoreMessages(data && data.length === 10);
         
         previousChannelRef.current = activeChannel.id;
       } catch (err) {
@@ -291,6 +304,65 @@ export default function ChatPage() {
 
     switchChannel();
   }, [activeChannel?.id, isConnected, teamId]);
+
+  /**
+   * Load more messages (pagination)
+   */
+  const loadMoreMessages = useCallback(async () => {
+    if (!activeChannel || !hasMoreMessages || isLoadingMore || isLoading) return;
+
+    setIsLoadingMore(true);
+    isPaginatingRef.current = true; // Flag that we're paginating
+    
+    try {
+      // Get the oldest message ID as cursor
+      const oldestMessageId = messages[0]?.id;
+      
+      if (!oldestMessageId) {
+        setHasMoreMessages(false);
+        return;
+      }
+
+      // Fetch older messages
+      const olderMessages = await fetchChannelMessages(teamId, activeChannel.id, {
+        limit: 10,
+        before: oldestMessageId
+      });
+
+      if (olderMessages && olderMessages.length > 0) {
+        // Prepend older messages to the beginning
+        setMessages(prev => [...olderMessages, ...prev]);
+        
+        // If we got less than 10, there are no more messages
+        setHasMoreMessages(olderMessages.length === 10);
+      } else {
+        setHasMoreMessages(false);
+      }
+    } catch (err) {
+      console.error('Failed to load more messages:', err);
+      toast.error('Failed to load older messages');
+    } finally {
+      setIsLoadingMore(false);
+      // Reset pagination flag after a brief delay to ensure layout effect completes
+      setTimeout(() => {
+        isPaginatingRef.current = false;
+      }, 100);
+    }
+  }, [activeChannel, hasMoreMessages, isLoadingMore, isLoading, messages, teamId]);
+
+  /**
+   * Handle scroll to load more messages
+   */
+  const handleScroll = useCallback((e) => {
+    const container = e.target;
+    
+    // Check if scrolled to top (with small threshold)
+    if (container.scrollTop < 100 && hasMoreMessages && !isLoadingMore) {
+      // Capture scroll height BEFORE loading new messages
+      prevScrollHeightRef.current = container.scrollHeight;
+      loadMoreMessages();
+    }
+  }, [hasMoreMessages, isLoadingMore, loadMoreMessages]);
 
   /**
    * Subscribe to real-time message events
@@ -325,8 +397,49 @@ export default function ChatPage() {
     };
   }, [activeChannel?.id]);
 
-  // Auto scroll to bottom when new messages arrive
+  /**
+   * 1. HANDLE SCROLL POSITION (Layout Effect)
+   * Runs synchronously immediately after DOM updates but BEFORE browser paint.
+   * - Pagination: Restores previous position.
+   * - Initial Load: Snaps instantly to bottom (no animation).
+   */
+  useLayoutEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    // CASE A: Pagination (Restoring position when loading old messages)
+    if (prevScrollHeightRef.current) {
+      const heightDifference = container.scrollHeight - prevScrollHeightRef.current;
+      container.scrollTop = heightDifference;
+      prevScrollHeightRef.current = null;
+      return;
+    }
+
+    // CASE B: Initial Load (Snap to bottom instantly)
+    // We check isInitialLoadRef but DON'T flip it to false yet 
+    // (so useEffect knows to skip the animation)
+    if (isInitialLoadRef.current && messages.length > 0) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [messages]);
+
+  /**
+   * 2. HANDLE NEW MESSAGES (Effect)
+   * Runs after the screen has painted.
+   * - Initial Load: Does nothing (already handled above).
+   * - Chatting: Smooth scrolls to new messages.
+   */
   useEffect(() => {
+    // If paginating, do nothing
+    if (isPaginatingRef.current) return;
+
+    // If this was the initial load, mark it as done and SKIP the smooth scroll
+    if (isInitialLoadRef.current) {
+      isInitialLoadRef.current = false;
+      return;
+    }
+
+    // Only run smooth scroll for actual new messages while chatting
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
@@ -378,6 +491,8 @@ export default function ChatPage() {
       
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
+        // Keep focus on the input after sending
+        textareaRef.current.focus();
       }
     } catch (err) {
       console.error('Failed to send message:', err);
@@ -834,7 +949,11 @@ export default function ChatPage() {
         </div>
 
         {/* Messages List Area */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6">
+        <div 
+          ref={messagesContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto p-4 md:p-6"
+        >
           {!activeChannel ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
               <Hash size={64} className={`${textSecondary} mb-4`} />
@@ -867,22 +986,47 @@ export default function ChatPage() {
           ) : messages.length === 0 ? (
             <EmptyState />
           ) : (
-            <div className="space-y-1">
-              {messages.map((msg, index) => {
-                const isMe = msg.user_id === CURRENT_USER_ID;
-                const isSequence = index > 0 && messages[index-1].user_id === msg.user_id;
+            <>
+              {/* Load More Indicator */}
+              {isLoadingMore && (
+                <div className="flex justify-center py-4">
+                  <div className="flex items-center gap-2 text-sm text-gray-400">
+                    <div className="flex gap-1">
+                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                    <span>Loading older messages...</span>
+                  </div>
+                </div>
+              )}
+              
+              {/* No More Messages Indicator */}
+              {!hasMoreMessages && messages.length > 0 && (
+                <div className="flex justify-center py-4">
+                  <span className={`text-xs ${textSecondary}`}>
+                    Beginning of conversation
+                  </span>
+                </div>
+              )}
+              
+              <div className="space-y-1">
+                {messages.map((msg, index) => {
+                  const isMe = msg.user_id === CURRENT_USER_ID;
+                  const isSequence = index > 0 && messages[index-1].user_id === msg.user_id;
 
-                return (
-                  <MessageBubble 
-                    key={msg.id} 
-                    msg={msg} 
-                    isMe={isMe} 
-                    isSequence={isSequence} 
-                  />
-                );
-              })}
-              <div ref={messagesEndRef} />
-            </div>
+                  return (
+                    <MessageBubble 
+                      key={msg.id} 
+                      msg={msg} 
+                      isMe={isMe} 
+                      isSequence={isSequence} 
+                    />
+                  );
+                })}
+                <div ref={messagesEndRef} />
+              </div>
+            </>
           )}
           
           {/* Typing Indicator */}
@@ -919,7 +1063,12 @@ export default function ChatPage() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
-                  handleSendMessage(e);
+                  handleSendMessage(e).then(() => {
+                    // Refocus after message is sent
+                    setTimeout(() => {
+                      textareaRef.current?.focus();
+                    }, 0);
+                  });
                 }
               }}
               placeholder={activeChannel ? `Message #${activeChannel.name}` : 'Select a channel to start chatting'}
