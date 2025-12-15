@@ -20,6 +20,40 @@ import * as ChannelModel from '../models/channel.model.js';
  * 
  * Middleware: verifyTeamMember (ensures user is team member)
  */
+/**
+ * GET /teams/:teamId/channels/:channelId/messages/search
+ * Search messages in a channel
+ * 
+ * Middleware: verifyTeamMember (ensures user is team member)
+ */
+export const searchMessages = async (req, res, next) => {
+  try {
+    const { channelId } = req.validated?.params || req.params;
+    const { q: searchQuery } = req.validated?.query || req.query;
+    const userId = req.user.id;
+
+    console.log(`[searchMessages] User ${userId} searching in channel ${channelId} for: "${searchQuery}"`);
+
+    const messages = await ChannelModel.searchMessages(channelId, userId, searchQuery);
+
+    console.log(`[searchMessages] Found ${messages.length} matching messages`);
+
+    res.status(200).json({
+      success: true,
+      data: messages,
+    });
+  } catch (error) {
+    console.error('[searchMessages] Error:', error.message);
+    if (error.message.includes('Access denied') || error.message.includes('not found')) {
+      return res.status(403).json({
+        success: false,
+        message: error.message,
+      });
+    }
+    next(error);
+  }
+};
+
 export const getTeamChannels = async (req, res, next) => {
   try {
     // Use validated params for transformed (numeric) teamId

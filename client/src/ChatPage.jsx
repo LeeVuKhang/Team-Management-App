@@ -16,8 +16,9 @@ import {
   X,
   ChevronDown
 } from 'lucide-react';
-import { fetchTeamChannels, fetchChannelMessages, createChannel } from './services/channelApi.js';
+import { fetchTeamChannels, fetchChannelMessages, createChannel, searchMessages } from './services/channelApi.js';
 import { getTeamProjects } from './services/projectApi.js';
+import { useDebounce } from './hooks/useDebounce.js';
 import {
   initSocket,
   disconnectSocket,
@@ -184,6 +185,13 @@ export default function ChatPage() {
   const [newChannelName, setNewChannelName] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [isCreatingChannel, setIsCreatingChannel] = useState(false);
+  
+  // Search state
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
   
   // Team projects state (for dropdown in create channel modal)
   const [teamProjects, setTeamProjects] = useState([]);
@@ -363,6 +371,32 @@ export default function ChatPage() {
       loadMoreMessages();
     }
   }, [hasMoreMessages, isLoadingMore, loadMoreMessages]);
+
+  /**
+   * Search messages when debounced query changes
+   */
+  useEffect(() => {
+    if (!debouncedSearchQuery || !activeChannel || !isSearchOpen) {
+      setSearchResults([]);
+      return;
+    }
+
+    const performSearch = async () => {
+      setIsSearching(true);
+      try {
+        const results = await searchMessages(teamId, activeChannel.id, debouncedSearchQuery);
+        setSearchResults(results);
+      } catch (err) {
+        console.error('Search failed:', err);
+        toast.error('Failed to search messages');
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    };
+
+    performSearch();
+  }, [debouncedSearchQuery, activeChannel, teamId, isSearchOpen]);
 
   /**
    * Subscribe to real-time message events
@@ -567,6 +601,26 @@ export default function ChatPage() {
   };
 
   /**
+   * Open search modal
+   */
+  const openSearch = () => {
+    if (!activeChannel) {
+      toast.error('Please select a channel first');
+      return;
+    }
+    setIsSearchOpen(true);
+  };
+
+  /**
+   * Close search modal and reset
+   */
+  const closeSearch = () => {
+    setIsSearchOpen(false);
+    setSearchQuery('');
+    setSearchResults([]);
+  };
+
+  /**
    * Handle channel creation
    */
   const handleCreateChannel = async (e) => {
@@ -683,7 +737,10 @@ export default function ChatPage() {
    * Renders individual message with proper styling
    */
   const MessageBubble = ({ msg, isMe, isSequence }) => (
-    <div className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''} ${isSequence ? 'mt-1' : 'mt-4'}`}>
+    <div 
+      data-message-id={msg.id}
+      className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''} ${isSequence ? 'mt-1' : 'mt-4'} transition-all`}
+    >
       {/* Avatar */}
       <div className={`flex-shrink-0 w-8 h-8 ${isSequence ? 'invisible' : ''}`}>
         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-300 text-black'}`}>
@@ -794,6 +851,117 @@ export default function ChatPage() {
         handleCreateChannel={handleCreateChannel}
         isDarkMode={isDarkMode}
       />
+
+      {/* Search Messages Modal */}
+      {isSearchOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-black/50 backdrop-blur-sm pt-20">
+          <div className={`w-full max-w-2xl rounded-xl shadow-2xl ${isDarkMode ? 'bg-dark-secondary' : 'bg-white'} max-h-[80vh] flex flex-col`}>
+            {/* Search Header */}
+            <div className={`flex items-center gap-3 px-6 py-4 border-b ${isDarkMode ? 'border-[#171717]' : 'border-gray-200'}`}>
+              <Search size={20} className={textSecondary} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={`Search in #${activeChannel?.name}...`}
+                className={`flex-1 bg-transparent border-none focus:ring-0 focus:outline-none ${textPrimary}`}
+                autoFocus
+              />
+              <button
+                onClick={closeSearch}
+                className={`p-1 rounded-lg ${hoverBg} ${textSecondary}`}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Search Results */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {!searchQuery.trim() ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Search size={48} className={`${textSecondary} mb-4`} />
+                  <p className={`${textSecondary}`}>Type to search messages</p>
+                </div>
+              ) : isSearching ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="flex gap-3 animate-pulse">
+                      <div className={`w-8 h-8 rounded-full ${isDarkMode ? 'bg-gray-700' : 'bg-gray-300'}`} />
+                      <div className="flex-1 space-y-2">
+                        <div className={`h-4 w-32 rounded ${isDarkMode ? 'bg-gray-700' : 'bg-gray-300'}`} />
+                        <div className={`h-16 w-full rounded-xl ${isDarkMode ? 'bg-gray-700' : 'bg-gray-300'}`} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : searchResults.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <Search size={48} className={`${textSecondary} mb-4`} />
+                  <p className={`${textPrimary} font-semibold mb-1`}>No messages found</p>
+                  <p className={`${textSecondary} text-sm`}>Try a different search term</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className={`text-sm ${textSecondary} mb-3`}>
+                    Found {searchResults.length} {searchResults.length === 1 ? 'message' : 'messages'}
+                  </p>
+                  {searchResults.map(msg => {
+                    const highlightedContent = msg.content.replace(
+                      new RegExp(`(${searchQuery})`, 'gi'),
+                      '<mark class="bg-yellow-300 dark:bg-yellow-600">$1</mark>'
+                    );
+                    
+                    return (
+                      <div
+                        key={msg.id}
+                        className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                          isDarkMode 
+                            ? 'bg-[#1F1F1F] border-[#333] hover:bg-[#252525]' 
+                            : 'bg-white border-gray-200 hover:bg-gray-50'
+                        }`}
+                        onClick={() => {
+                          closeSearch();
+                          // Scroll to message if it's already loaded
+                          const messageElement = document.querySelector(`[data-message-id="${msg.id}"]`);
+                          if (messageElement) {
+                            messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            messageElement.classList.add('ring-2', 'ring-yellow-400');
+                            setTimeout(() => {
+                              messageElement.classList.remove('ring-2', 'ring-yellow-400');
+                            }, 2000);
+                          }
+                        }}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                            isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-300 text-black'
+                          }`}>
+                            {msg.user?.username?.substring(0,2).toUpperCase() || 'U'}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-baseline gap-2 mb-1">
+                              <span className={`text-sm font-bold ${textPrimary}`}>
+                                {msg.user?.username || 'Unknown User'}
+                              </span>
+                              <span className={`text-xs ${textSecondary}`}>
+                                {formatTimestamp(msg.created_at)}
+                              </span>
+                            </div>
+                            <div 
+                              className={`text-sm ${textPrimary} break-words`}
+                              dangerouslySetInnerHTML={{ __html: highlightedContent }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Connection Status Indicator */}
       {!isConnected && (
@@ -934,8 +1102,10 @@ export default function ChatPage() {
               ))}
             </div>
             <button 
-              className={`p-2 rounded-full ${hoverBg} ${textSecondary}`}
+              onClick={openSearch}
+              className={`p-2 rounded-full ${hoverBg} ${textSecondary} ${!activeChannel ? 'opacity-50 cursor-not-allowed' : ''}`}
               title="Search in channel"
+              disabled={!activeChannel}
             >
               <Search size={20} />
             </button>

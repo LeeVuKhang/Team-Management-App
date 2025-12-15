@@ -75,6 +75,54 @@ export const getTeamChannels = async (teamId, userId) => {
 };
 
 /**
+ * Search messages in a channel
+ * @param {number} channelId 
+ * @param {number} userId - For access verification
+ * @param {string} searchQuery - Search term
+ * @returns {Promise<Array>} Matching messages
+ */
+export const searchMessages = async (channelId, userId, searchQuery) => {
+  // SECURITY: Verify channel access first
+  const channel = await getChannelById(channelId, userId);
+  if (!channel) {
+    throw new Error('Channel not found or access denied');
+  }
+
+  // Search messages (case-insensitive, using ILIKE for partial matches)
+  // SECURITY: Parameterized query prevents SQL injection
+  const messages = await db`
+    SELECT 
+      m.id,
+      m.channel_id,
+      m.user_id,
+      m.content,
+      m.created_at,
+      u.username,
+      u.email
+    FROM messages m
+    JOIN users u ON m.user_id = u.id
+    WHERE m.channel_id = ${channelId}
+      AND m.content ILIKE ${`%${searchQuery}%`}
+    ORDER BY m.created_at DESC
+    LIMIT 50
+  `;
+
+  // Format response to match message structure
+  return messages.map(msg => ({
+    id: msg.id,
+    channel_id: msg.channel_id,
+    user_id: msg.user_id,
+    content: msg.content,
+    created_at: msg.created_at,
+    user: {
+      id: msg.user_id,
+      username: msg.username,
+      email: msg.email,
+    },
+  }));
+};
+
+/**
  * Get a single channel by ID with access verification
  * @param {number} channelId 
  * @param {number} userId 

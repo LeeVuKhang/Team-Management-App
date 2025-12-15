@@ -8,6 +8,7 @@ import {
   createChannelSchema,
   createMessageSchema,
   messagesQuerySchema,
+  searchMessagesQuerySchema,
 } from '../validations/channel.validation.js';
 
 /**
@@ -65,6 +66,22 @@ router.get(
   validate({ params: teamChannelParamsSchema }),
   verifyTeamMember,
   ChannelController.getChannel
+);
+
+/**
+ * GET /teams/:teamId/channels/:channelId/messages/search
+ * Search messages in a channel
+ * Access: Any team member (project membership checked in model)
+ * IMPORTANT: This route must come BEFORE /:channelId/messages to avoid route conflict
+ */
+router.get(
+  '/:channelId/messages/search',
+  validate({
+    params: teamChannelParamsSchema,
+    query: searchMessagesQuerySchema,
+  }),
+  verifyTeamMember,
+  ChannelController.searchMessages
 );
 
 /**

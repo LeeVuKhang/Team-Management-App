@@ -114,6 +114,19 @@ export const messagesQuerySchema = z.object({
     .optional(),
 });
 
+/**
+ * Validate search query parameters
+ * SECURITY: Prevent SQL injection through parameterized queries in model
+ */
+export const searchMessagesQuerySchema = z.object({
+  q: z
+    .string()
+    .min(1, 'Search query is required')
+    .max(200, 'Search query must be 200 characters or less')
+    .trim()
+    .refine((val) => val.length > 0, 'Search query cannot be empty'),
+});
+
 // === SOCKET EVENT VALIDATORS ===
 
 /**

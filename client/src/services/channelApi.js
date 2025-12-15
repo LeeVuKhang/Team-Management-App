@@ -127,3 +127,27 @@ export const sendMessageREST = async (teamId, channelId, messageData) => {
   const data = await response.json();
   return data.data;
 };
+
+/**
+ * Search messages in a channel
+ * @param {number} teamId 
+ * @param {number} channelId 
+ * @param {string} query - Search query
+ * @returns {Promise<Array>} Matching messages
+ */
+export const searchMessages = async (teamId, channelId, query) => {
+  const params = new URLSearchParams({ q: query });
+  const url = `${API_BASE}/teams/${teamId}/channels/${channelId}/messages/search?${params}`;
+
+  const response = await fetch(url, {
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to search messages');
+  }
+
+  const data = await response.json();
+  return data.data || [];
+};
