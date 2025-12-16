@@ -131,3 +131,36 @@ CREATE TABLE team_invitations (
 
 -- Index để tìm kiếm token nhanh khi user click link
 CREATE INDEX idx_invitations_token ON team_invitations(token);
+
+-- 10. Bảng PROJECT_RISK_REPORTS (AI Analysis Cache - Ollama/Llama 3.1)
+-- Lưu trữ kết quả phân tích rủi ro từ AI để tránh gọi API liên tục
+CREATE TABLE project_risk_reports (
+    id SERIAL PRIMARY KEY,
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    
+    -- Risk score: 0 (Safe) to 100 (Very Dangerous)
+    risk_score INTEGER CHECK (risk_score >= 0 AND risk_score <= 100),
+    
+    -- Risk levels: 'Low', 'Medium', 'High', 'Critical'
+    risk_level VARCHAR(20) NOT NULL CHECK (risk_level IN ('Low', 'Medium', 'High', 'Critical')),
+    
+    -- AI-generated summary (human-readable overview)
+    summary TEXT,
+    
+    -- Detailed risk factors from AI analysis (JSONB array)
+    -- e.g., [{"factor": "3 overdue tasks", "severity": "high"}, ...]
+    risk_factors JSONB DEFAULT '[]',
+    
+    -- AI-suggested actions (JSONB array)
+    -- e.g., ["Reassign task #12 to reduce workload", "Extend deadline by 3 days"]
+    suggested_actions JSONB DEFAULT '[]',
+    
+    -- Raw context sent to AI (for debugging/audit)
+    analysis_context JSONB DEFAULT '{}',
+    
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index for efficient retrieval: Get latest report for a project
+CREATE INDEX idx_project_risk_reports_project_id ON project_risk_reports(project_id);
+CREATE INDEX idx_project_risk_reports_created_at ON project_risk_reports(project_id, created_at DESC);
