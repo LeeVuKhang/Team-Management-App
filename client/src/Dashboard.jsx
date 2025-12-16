@@ -1,6 +1,7 @@
 import React from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
-import { Plus, Search, Users, FolderKanban } from 'lucide-react';
+import { Plus, Search, Users, FolderKanban, X } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 /**
  * MOCK DATA - Teams
@@ -56,8 +57,8 @@ const TEAMS = [
 const TeamCard = ({ team, darkMode, onClick }) => (
   <div 
     onClick={onClick}
-    className={`${darkMode ? 'bg-dark-secondary border-[#171717] hover:border-gray-700' : 'bg-white border-gray-200 hover:border-gray-400'} 
-      border rounded-xl p-3 cursor-pointer transition-all hover:shadow-lg group`}
+    className={`${darkMode ? 'bg-dark-secondary border-[#308f68]' : 'bg-white border-gray-200 hover:border-gray-400'} 
+      border rounded-xl p-3 cursor-pointer transition-all hover:shadow-lg hover:-translate-y-1 active:scale-[0.98] group`}
   >
     {/* Team Name */}
     <div className="mb-4">
@@ -112,14 +113,63 @@ export default function Dashboard() {
   const { isDarkMode } = useOutletContext();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = React.useState('');
+  
+  // Initialize teams from localStorage or use TEAMS as default
+  const [teams, setTeams] = React.useState(() => {
+    const savedTeams = localStorage.getItem('teams');
+    return savedTeams ? JSON.parse(savedTeams) : TEAMS;
+  });
+  
+  const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const [isAllTeamsModalOpen, setIsAllTeamsModalOpen] = React.useState(false);
+  const [newTeamData, setNewTeamData] = React.useState({
+    name: '',
+    description: ''
+  });
+
+  // Save teams to localStorage whenever it changes
+  React.useEffect(() => {
+    localStorage.setItem('teams', JSON.stringify(teams));
+  }, [teams]);
 
   // Filter teams based on search
-  const filteredTeams = TEAMS.filter(team =>
+  const filteredTeams = teams.filter(team =>
     team.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Limit to 7 teams for display, save the 8th slot for "+N" card
+  const displayedTeams = filteredTeams.slice(0, 8);
+  const remainingTeamsCount = filteredTeams.length - 8;
+
   const handleTeamClick = (teamId) => {
     navigate(`/teams/${teamId}`);
+  };
+
+  const handleCreateTeam = (e) => {
+    e.preventDefault();
+    
+    if (!newTeamData.name.trim()) {
+      toast.error('Team name is required');
+      return;
+    }
+
+    const newTeam = {
+      id: teams.length + 1,
+      name: newTeamData.name,
+      membersCount: 1, // Current user
+      activeProjects: 0,
+      members: ['YOU'] // Current user's initials 
+    };
+
+    setTeams([...teams, newTeam]);
+    toast.success(`Team "${newTeamData.name}" created successfully!`);
+    setIsModalOpen(false);
+    setNewTeamData({ name: '', description: '' });
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setNewTeamData({ name: '', description: '' });
   };
 
   return (
@@ -133,7 +183,10 @@ export default function Dashboard() {
               Your Teams
             </h1>
           </div>
-          <button className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg font-semibold transition-all bg-[#006239] hover:bg-[#005230] text-white border border-[#308f68] shadow-lg active:scale-95 whitespace-nowrap">
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg font-semibold transition-all bg-[#006239] hover:bg-[#005230] text-white border border-[#308f68] shadow-lg active:scale-95 whitespace-nowrap"
+          >
             <Plus size={18} className="text-[#308f68]" />
             New team
           </button>
@@ -164,7 +217,7 @@ export default function Dashboard() {
       {/* Teams Grid */}
       <div className="pb-12">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredTeams.map((team) => (
+          {displayedTeams.map((team) => (
             <TeamCard 
               key={team.id} 
               team={team} 
@@ -172,6 +225,24 @@ export default function Dashboard() {
               onClick={() => handleTeamClick(team.id)}
             />
           ))}
+          
+          {/* Show "+N more teams" card if there are more than 7 teams */}
+          {remainingTeamsCount > 0 && (
+            <div 
+              onClick={() => setIsAllTeamsModalOpen(true)}
+              className={`${isDarkMode ? 'bg-dark-secondary border-[#171717] hover:border-gray-700' : 'bg-white border-gray-200 hover:border-gray-400'} 
+                border rounded-xl p-3 cursor-pointer transition-all hover:shadow-lg hover:-translate-y-1 active:scale-[0.98] flex items-center justify-center min-h-[140px]`}
+            >
+              <div className="text-center">
+                <div className={`text-4xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-black'}`}>
+                  +{remainingTeamsCount}
+                </div>
+                <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  more {remainingTeamsCount === 1 ? 'team' : 'teams'}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Empty State */}
@@ -181,6 +252,210 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* New Team Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={handleCloseModal}
+          ></div>
+          
+          {/* Modal */}
+          <div className={`relative w-full max-w-md rounded-xl shadow-2xl ${
+            isDarkMode ? 'bg-dark-secondary' : 'bg-white'
+          }`}>
+            {/* Header */}
+            <div className={`flex items-center justify-between px-6 py-4 border-b ${
+              isDarkMode ? 'border-[#171717]' : 'border-gray-200'
+            }`}>
+              <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-black'}`}>
+                Create New Team
+              </h2>
+              <button
+                onClick={handleCloseModal}
+                className={`p-1 rounded-lg transition-colors ${
+                  isDarkMode ? 'hover:bg-[#171717] text-gray-400' : 'hover:bg-gray-100 text-gray-600'
+                }`}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleCreateTeam} className="px-6 py-5 space-y-4">
+              {/* Team Name */}
+              <div>
+                <label 
+                  htmlFor="teamName" 
+                  className={`block text-sm font-semibold mb-2 ${
+                    isDarkMode ? 'text-white' : 'text-gray-900'
+                  }`}
+                >
+                  Team Name *
+                </label>
+                <input
+                  type="text"
+                  id="teamName"
+                  value={newTeamData.name}
+                  onChange={(e) => setNewTeamData({ ...newTeamData, name: e.target.value })}
+                  placeholder="e.g., Engineering Team"
+                  className={`w-full px-4 py-3 rounded-lg border transition-all focus:outline-none focus:ring-1 ${
+                    isDarkMode
+                      ? 'bg-dark-primary border-[#171717] text-white placeholder-gray-500 focus:ring-gray-700 focus:border-gray-700'
+                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:ring-gray-900 focus:border-transparent'
+                  }`}
+                  autoFocus
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label 
+                  htmlFor="teamDescription" 
+                  className={`block text-sm font-semibold mb-2 ${
+                    isDarkMode ? 'text-white' : 'text-gray-900'
+                  }`}
+                >
+                  Description <span className="text-gray-500 font-normal">(optional)</span>
+                </label>
+                <textarea
+                  id="teamDescription"
+                  value={newTeamData.description}
+                  onChange={(e) => setNewTeamData({ ...newTeamData, description: e.target.value })}
+                  placeholder="What's this team about?"
+                  rows={3}
+                  className={`w-full px-4 py-3 rounded-lg border transition-all focus:outline-none focus:ring-1 resize-none ${
+                    isDarkMode
+                      ? 'bg-dark-primary border-[#171717] text-white placeholder-gray-500 focus:ring-gray-700 focus:border-gray-700'
+                      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:ring-gray-900 focus:border-transparent'
+                  }`}
+                />
+              </div>
+
+              {/* Buttons */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className={`flex-1 px-4 py-2.5 rounded-lg font-semibold transition-all ${
+                    isDarkMode
+                      ? 'bg-dark-primary text-white hover:bg-[#171717]'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2.5 rounded-lg font-semibold transition-all bg-[#006239] hover:bg-[#005230] text-white border border-[#308f68] shadow-lg active:scale-95"
+                >
+                  Create Team
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* All Teams Modal */}
+      {isAllTeamsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setIsAllTeamsModalOpen(false)}
+          ></div>
+          
+          {/* Modal */}
+          <div className={`relative w-full max-w-2xl max-h-[80vh] rounded-xl shadow-2xl overflow-hidden ${
+            isDarkMode ? 'bg-dark-secondary' : 'bg-white'
+          }`}>
+            {/* Header */}
+            <div className={`flex items-center justify-between px-6 py-4 border-b ${
+              isDarkMode ? 'border-[#171717]' : 'border-gray-200'
+            }`}>
+              <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-black'}`}>
+                All Teams ({filteredTeams.length})
+              </h2>
+              <button
+                onClick={() => setIsAllTeamsModalOpen(false)}
+                className={`p-1 rounded-lg transition-colors ${
+                  isDarkMode ? 'hover:bg-[#171717] text-gray-400' : 'hover:bg-gray-100 text-gray-600'
+                }`}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Teams List */}
+            <div className="overflow-y-auto max-h-[calc(80vh-80px)] p-4">
+              <div className="space-y-3">
+                {filteredTeams.map((team) => (
+                  <div
+                    key={team.id}
+                    onClick={() => {
+                      setIsAllTeamsModalOpen(false);
+                      handleTeamClick(team.id);
+                    }}
+                    className={`border rounded-lg p-4 cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] ${
+                      isDarkMode 
+                        ? 'bg-dark-primary border-[#308f68]' 
+                        : 'bg-white border-gray-200 hover:border-gray-400'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h3 className={`font-semibold text-base mb-1 ${
+                          isDarkMode ? 'text-white' : 'text-black'
+                        }`}>
+                          {team.name}
+                        </h3>
+                        <div className="flex gap-4 text-sm">
+                          <div className="flex items-center gap-1.5">
+                            <Users size={14} className={isDarkMode ? 'text-gray-400' : 'text-gray-600'} />
+                            <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>
+                              {team.membersCount} members
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <FolderKanban size={14} className={isDarkMode ? 'text-gray-400' : 'text-gray-600'} />
+                            <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>
+                              {team.activeProjects} projects
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Member Avatars */}
+                      <div className="flex -space-x-2 ml-4">
+                        {team.members.slice(0, 3).map((member, i) => (
+                          <div 
+                            key={i}
+                            className={`inline-block h-7 w-7 rounded-full ring-2 flex items-center justify-center text-xs font-medium
+                              ${isDarkMode ? 'ring-dark-secondary bg-[#1F1F1F] text-white' : 'ring-white bg-gray-300 text-black'}`}
+                          >
+                            {member}
+                          </div>
+                        ))}
+                        {team.members.length > 3 && (
+                          <div 
+                            className={`inline-block h-7 w-7 rounded-full ring-2 flex items-center justify-center text-xs font-medium
+                              ${isDarkMode ? 'ring-dark-secondary bg-[#171717] text-gray-400' : 'ring-white bg-gray-200 text-gray-600'}`}
+                          >
+                            +{team.members.length - 3}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
