@@ -107,11 +107,25 @@ export default function Signup() {
     setIsLoading(true);
     
     try {
-      // TODO: Replace with actual API call
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      console.log('Signup attempt:', formData);
+      const response = await fetch('http://localhost:5000/api/v1/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Include cookies in request
+        body: JSON.stringify({
+          username: formData.fullName,
+          email: formData.email,
+          password: formData.password
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Registration failed');
+      }
+
       toast.success('Account created successfully!');
       
       // Navigate after a short delay to show the success message
@@ -119,7 +133,7 @@ export default function Signup() {
         navigate('/dashboard');
       }, 500);
     } catch (error) {
-      toast.error('Something went wrong. Please try again.');
+      toast.error(error.message || 'Something went wrong. Please try again.');
       setIsLoading(false);
     }
   };
