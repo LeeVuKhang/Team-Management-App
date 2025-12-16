@@ -10,6 +10,7 @@ export default function Header({ isDarkMode, toggleDarkMode }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const notificationRef = useRef(null);
+  const avatarRef = useRef(null);
 
   // Fetch pending invitations
   const { data: invitationsData } = useQuery({
@@ -55,6 +56,23 @@ export default function Header({ isDarkMode, toggleDarkMode }) {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isNotificationOpen]);
+
+  // Close avatar dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (avatarRef.current && !avatarRef.current.contains(event.target)) {
+        setDropdownOpen(false);
+      }
+    };
+
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDropdownOpen]);
 
   const handleLogout = () => {
     localStorage.removeItem('authToken');
@@ -215,7 +233,7 @@ export default function Header({ isDarkMode, toggleDarkMode }) {
         
         <div className={`h-8 w-[1px] mx-2 ${isDarkMode ? 'bg-[#1F1F1F]' : 'bg-gray-200'}`}></div>
 
-        <div className="relative">
+        <div className="relative" ref={avatarRef}>
           <button 
             onClick={() => setDropdownOpen(!isDropdownOpen)}
             className={`h-10 w-10 rounded-full border-2 flex items-center justify-center overflow-hidden transition-all hover:ring-2 ${isDarkMode ? 'bg-dark-secondary border-[#171717] hover:ring-[#1F1F1F]' : 'bg-gray-100 border-gray-300 hover:ring-gray-400 shadow-sm'}`}
