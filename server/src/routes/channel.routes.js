@@ -1,7 +1,7 @@
 import express from 'express';
 import * as ChannelController from '../controllers/channel.controller.js';
 import { validate } from '../middlewares/validate.js';
-import { mockAuth, verifyTeamMember, verifyTeamRole } from '../middlewares/auth.js';
+import { verifyToken, verifyTeamMember, verifyTeamRole } from '../middlewares/auth.js';
 import {
   teamIdParamSchema,
   teamChannelParamsSchema,
@@ -25,8 +25,7 @@ import {
 const router = express.Router({ mergeParams: true }); // mergeParams to access :teamId
 
 // Apply auth middleware to all channel routes
-// TODO: Replace mockAuth with verifyToken for production
-router.use(mockAuth);
+router.use(verifyToken);
 
 /**
  * GET /teams/:teamId/channels
