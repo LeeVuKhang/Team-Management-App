@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import db from '../utils/db.js';
 
 /**
  * JWT Authentication Middleware
@@ -77,4 +78,83 @@ export const mockAuth = (req, res, next) => {
   req.user = { id: 1 };
   console.warn('⚠️  Using MOCK AUTH - User ID 1 (Replace with verifyToken in production)');
   next();
+};
+
+/**
+ * Team Membership Verification Middleware
+ * Verifies that authenticated user is a member of the team specified in :teamId param
+ * Prevents IDOR attacks by checking team_members table
+ * 
+ * Prerequisites: Must be called AFTER verifyToken (requires req.user.id)
+ * Usage: Apply to all team-scoped routes
+ */
+export const verifyTeamMember = async (req, res, next) => {
+  try {
+    const { teamId } = req.params;
+    const userId = req.user.id;
+    
+    // Validate teamId is a number (prevent injection)
+    if (!teamId || isNaN(parseInt(teamId))) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid team ID',
+      });
+    }
+    
+    // Query team_members table to verify membership
+    const membership = await db`
+      SELECT role 
+      FROM team_members 
+      WHERE team_id = ${parseInt(teamId)} AND user_id = ${userId}
+    `;
+    
+    if (membership.length === 0) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You are not a member of this team',
+      });
+    }
+    
+    // Attach team role to request for downstream middleware
+    req.teamRole = membership[0].role;
+    
+    next();
+  } catch (error) {
+    console.error('verifyTeamMember error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to verify team membership',
+    });
+  }
+};
+
+/**
+ * Team Role Authorization Middleware
+ * Verifies that user has one of the required roles in the team
+ * 
+ * Prerequisites: Must be called AFTER verifyTeamMember (requires req.teamRole)
+ * 
+ * @param {string[]} allowedRoles - Array of allowed roles (e.g., ['owner', 'admin'])
+ * @returns {Function} Express middleware function
+ * 
+ * Example: verifyTeamRole(['owner', 'admin'])
+ */
+export const verifyTeamRole = (allowedRoles) => {
+  return (req, res, next) => {
+    if (!req.teamRole) {
+      return res.status(500).json({
+        success: false,
+        message: 'Team role not found. Ensure verifyTeamMember is called first.',
+      });
+    }
+    
+    if (!allowedRoles.includes(req.teamRole)) {
+      return res.status(403).json({
+        success: false,
+        message: `Access denied: This action requires one of the following roles: ${allowedRoles.join(', ')}`,
+      });
+    }
+    
+    next();
+  };
 };

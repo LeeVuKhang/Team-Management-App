@@ -15,6 +15,11 @@ export default function Sidebar({ darkMode, activePage }) {
   });
 
   const teams = teamsData?.data || [];
+  
+  // Determine which team to use for chat link
+  // Priority: current teamId from route > first team from list
+  const chatTeamId = teamId || (teams.length > 0 ? 1 : null);
+  const chatLink = chatTeamId ? `/teams/${chatTeamId}/chat` : '/dashboard';
 
   return (
     <aside 
@@ -32,7 +37,17 @@ export default function Sidebar({ darkMode, activePage }) {
           <LayoutDashboard size={20} className="flex-shrink-0" />
           <span className="ml-3 font-medium text-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap overflow-hidden">Dashboard</span>
         </Link>
-        <SidebarItem icon={MessageSquare} label="Messages" darkMode={darkMode} badgeCount={3} />
+        <Link to={chatLink} className={`w-full flex items-center px-3 py-3 rounded-lg transition-all duration-200 group/item relative ${
+          activePage === 'chat'
+            ? darkMode
+              ? 'bg-[#171717] text-white' 
+              : 'bg-gray-200 text-gray-900'
+            : `${darkMode ? 'text-gray-400 hover:bg-[#1F1F1F] hover:text-gray-200' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`
+        }`}>
+          <MessageSquare size={20} className="flex-shrink-0" />
+          <span className="ml-3 font-medium text-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap overflow-hidden">Messages</span>
+          <span className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">3</span>
+        </Link>
         <SidebarItem icon={FolderKanban} label="Projects" active={activePage === 'projects'} darkMode={darkMode} />
         <SidebarItem icon={Users} label="Team Members" darkMode={darkMode} />
         <SidebarItem icon={Settings} label="Settings" darkMode={darkMode} />

@@ -9,6 +9,7 @@ import Dashboard from './Dashboard.jsx';
 import TeamPage from './TeamPage.jsx';
 import ProjectPage from './ProjectPage.jsx';
 import AcceptInvitePage from './AcceptInvitePage.jsx';
+import ChatPage from './ChatPage.jsx';
 
 function App() {
   return (
@@ -42,6 +43,8 @@ function App() {
         <Route path="/accept-invite" element={<AcceptInvitePage />} />
         <Route element={<Layout />}>
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/chat" element={<ChatPage />} />
+          <Route path="/teams/:teamId/chat" element={<ChatPage />} />
           <Route path="/teams/:teamId" element={<TeamPage />} />
           <Route path="/teams/:teamId/projects/:projectId" element={<ProjectPage />} />
         </Route>
