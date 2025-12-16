@@ -2,7 +2,7 @@ import express from 'express';
 import { z } from 'zod';
 import * as projectController from '../controllers/project.controller.js';
 import { validate } from '../middlewares/validate.js';
-import { mockAuth } from '../middlewares/auth.js'; // Temporary mock auth
+import { mockAuth } from '../middlewares/auth.js';
 import {
   projectIdSchema,
   teamIdParamSchema,

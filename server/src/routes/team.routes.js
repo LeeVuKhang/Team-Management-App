@@ -1,7 +1,7 @@
 import express from 'express';
 import * as TeamController from '../controllers/team.controller.js';
 import { validate } from '../middlewares/validate.js';
-import { mockAuth } from '../middlewares/auth.js'; // Temporary mock auth
+import { mockAuth } from '../middlewares/auth.js';
 import { 
   teamIdParamSchema, 
   createTeamSchema, 
