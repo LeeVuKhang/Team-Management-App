@@ -6,6 +6,7 @@ import teamRoutes from './team.routes.js';
 import invitationRoutes from './invitation.routes.js';
 import channelRoutes from './channel.routes.js';
 import riskReportRoutes from './riskReport.routes.js';
+import notificationRoutes from './notification.routes.js';
 import { verifyToken } from '../middlewares/auth.js';
 import * as RiskReportController from '../controllers/riskReport.controller.js';
 import { validate } from '../middlewares/validate.js';
@@ -22,6 +23,7 @@ router.use('/teams/:teamId/projects', verifyToken, teamProjectRouter); // Protec
 router.use('/teams/:teamId/channels', channelRoutes); // Channel/Message routes (real-time chat)
 router.use('/projects', verifyToken, projectRoutes); // Protected routes
 router.use('/projects/:projectId/risk-report', riskReportRoutes); // AI Risk Analysis routes
+router.use('/notifications', notificationRoutes); // User notification routes (JWT protected internally)
 router.use('/', verifyToken, invitationRoutes); // Protected routes (user invitations + accept/decline)
 
 // Team-level risk overview

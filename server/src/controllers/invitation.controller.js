@@ -7,6 +7,45 @@ import * as InvitationModel from '../models/invitation.model.js';
  */
 
 /**
+ * Trigger n8n webhook for onboarding notifications
+ * Called when a user successfully joins a team
+ * 
+ * @param {Object} data - Onboarding event data
+ */
+const triggerOnboardingWebhook = async (data) => {
+  const webhookUrl = process.env.N8N_ONBOARDING_WEBHOOK_URL;
+  
+  if (!webhookUrl) {
+    console.log('ℹ️ N8N_ONBOARDING_WEBHOOK_URL not configured, skipping webhook');
+    return;
+  }
+
+  try {
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-system-key': process.env.N8N_SECRET_KEY || '',
+      },
+      body: JSON.stringify({
+        event: 'member.joined',
+        data,
+        timestamp: new Date().toISOString(),
+      }),
+    });
+
+    if (!response.ok) {
+      console.warn(`⚠️ n8n webhook returned ${response.status}: ${await response.text()}`);
+    } else {
+      console.log(`✅ Onboarding webhook triggered for user ${data.username} in team ${data.teamName}`);
+    }
+  } catch (error) {
+    // Don't fail the invitation accept if webhook fails
+    console.error('❌ Failed to trigger onboarding webhook:', error.message);
+  }
+};
+
+/**
  * Get all pending invitations for the current user
  * @route GET /api/v1/user/invitations
  */
@@ -46,6 +85,20 @@ export const acceptInvitation = async (req, res, next) => {
     }
 
     const result = await InvitationModel.acceptInvitation(token, userId, userEmail);
+
+    // Trigger n8n onboarding webhook for new members (non-blocking)
+    // This allows n8n to send a welcome message to the team channel
+    if (!result.alreadyMember) {
+      triggerOnboardingWebhook({
+        userId: req.user.id,
+        username: req.user.username,
+        email: userEmail,
+        teamId: result.teamId,
+        teamName: result.teamName,
+        role: result.role || 'member',
+        joinedAt: new Date().toISOString(),
+      }).catch(err => console.error('Onboarding webhook error:', err));
+    }
 
     res.status(200).json({
       success: true,

@@ -1,12 +1,24 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, Bell, Plus, Menu, Sun, Moon, FileText, LogOut, User, HelpCircle, Check, X, Clock } from 'lucide-react';
+import { Search, Bell, Plus, Menu, Sun, Moon, FileText, LogOut, User, HelpCircle, Check, X, Clock, AlertTriangle, CheckCircle, Info, AlertCircle } from 'lucide-react';
 import { getUserInvitations, acceptInvitation, declineInvitation } from '../services/projectApi';
+import { getSocket } from '../services/socketService';
+
+// Notification type icons and colors
+const NOTIFICATION_STYLES = {
+  info: { icon: Info, color: 'blue' },
+  warning: { icon: AlertTriangle, color: 'yellow' },
+  success: { icon: CheckCircle, color: 'green' },
+  error: { icon: AlertCircle, color: 'red' },
+  reminder: { icon: Clock, color: 'purple' },
+};
 
 export default function Header({ isDarkMode, toggleDarkMode }) {
   const [isDropdownOpen, setDropdownOpen] = useState(false);
   const [isNotificationOpen, setNotificationOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('all'); // 'all', 'invitations', 'notifications'
+  const [notifications, setNotifications] = useState([]);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const notificationRef = useRef(null);
@@ -20,6 +32,39 @@ export default function Header({ isDarkMode, toggleDarkMode }) {
   });
 
   const invitations = invitationsData?.data || [];
+
+  // Listen for real-time notifications from n8n via Socket.io
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleNotification = (notification) => {
+      console.log('📬 New notification:', notification);
+      setNotifications(prev => [notification, ...prev].slice(0, 50)); // Keep last 50
+    };
+
+    socket.on('notification', handleNotification);
+
+    return () => {
+      socket.off('notification', handleNotification);
+    };
+  }, []);
+
+  // Calculate total unread count
+  const unreadNotifications = notifications.filter(n => !n.isRead).length;
+  const totalUnread = invitations.length + unreadNotifications;
+
+  // Mark notification as read
+  const markAsRead = useCallback((notificationId) => {
+    setNotifications(prev => 
+      prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n)
+    );
+  }, []);
+
+  // Mark all as read
+  const markAllAsRead = useCallback(() => {
+    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+  }, []);
 
   // Accept invitation mutation
   const acceptMutation = useMutation({
@@ -123,8 +168,10 @@ export default function Header({ isDarkMode, toggleDarkMode }) {
             className={`relative p-2 transition-colors ${isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'}`}
           >
             <Bell size={20} />
-            {invitations.length > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-inherit"></span>
+            {totalUnread > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center text-xs font-bold text-white bg-red-500 rounded-full px-1">
+                {totalUnread > 99 ? '99+' : totalUnread}
+              </span>
             )}
           </button>
 
@@ -133,23 +180,107 @@ export default function Header({ isDarkMode, toggleDarkMode }) {
             <div className={`absolute right-0 mt-2 w-96 rounded-xl shadow-lg border overflow-hidden z-50 ${
               isDarkMode ? 'bg-dark-secondary border-[#171717]' : 'bg-white border-gray-200'
             }`}>
+              {/* Header with Tabs */}
               <div className={`px-4 py-3 border-b ${isDarkMode ? 'border-[#171717]' : 'border-gray-200'}`}>
-                <h3 className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                  Team Invitations
-                </h3>
-                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  {invitations.length} pending {invitations.length === 1 ? 'invitation' : 'invitations'}
-                </p>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    Notifications
+                  </h3>
+                  {notifications.length > 0 && (
+                    <button 
+                      onClick={markAllAsRead}
+                      className={`text-xs ${isDarkMode ? 'text-blue-400 hover:text-blue-300' : 'text-blue-600 hover:text-blue-800'}`}
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+                {/* Tabs */}
+                <div className="flex gap-1">
+                  {[
+                    { key: 'all', label: 'All', count: totalUnread },
+                    { key: 'invitations', label: 'Invitations', count: invitations.length },
+                    { key: 'notifications', label: 'Alerts', count: unreadNotifications },
+                  ].map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveTab(tab.key)}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                        activeTab === tab.key
+                          ? isDarkMode ? 'bg-[#171717] text-white' : 'bg-gray-200 text-gray-900'
+                          : isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-900'
+                      }`}
+                    >
+                      {tab.label}
+                      {tab.count > 0 && (
+                        <span className={`ml-1.5 px-1.5 py-0.5 text-xs rounded-full ${
+                          isDarkMode ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-600'
+                        }`}>
+                          {tab.count}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="max-h-96 overflow-y-auto">
-                {invitations.length === 0 ? (
+                {/* Empty State */}
+                {((activeTab === 'all' && invitations.length === 0 && notifications.length === 0) ||
+                  (activeTab === 'invitations' && invitations.length === 0) ||
+                  (activeTab === 'notifications' && notifications.length === 0)) && (
                   <div className={`p-6 text-center ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                     <Bell size={32} className="mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No pending invitations</p>
+                    <p className="text-sm">No {activeTab === 'all' ? 'notifications' : activeTab}</p>
                   </div>
-                ) : (
-                  invitations.map((invite) => (
+                )}
+
+                {/* System Notifications (from n8n) */}
+                {(activeTab === 'all' || activeTab === 'notifications') && notifications.map((notif) => {
+                  const style = NOTIFICATION_STYLES[notif.type] || NOTIFICATION_STYLES.info;
+                  const IconComponent = style.icon;
+                  return (
+                    <div 
+                      key={notif.id}
+                      onClick={() => markAsRead(notif.id)}
+                      className={`p-4 border-b cursor-pointer transition-colors ${
+                        isDarkMode ? 'border-[#171717] hover:bg-gray-800' : 'border-gray-100 hover:bg-gray-50'
+                      } ${!notif.isRead ? (isDarkMode ? 'bg-blue-500/5' : 'bg-blue-50/50') : ''}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                          isDarkMode ? `bg-${style.color}-500/20` : `bg-${style.color}-100`
+                        }`}>
+                          <IconComponent size={16} className={`text-${style.color}-500`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className={`text-sm font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                              {notif.title}
+                            </p>
+                            {!notif.isRead && (
+                              <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                            )}
+                          </div>
+                          <p className={`text-sm mt-0.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                            {notif.message}
+                          </p>
+                          <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                            {notif.timestamp ? new Date(notif.timestamp).toLocaleString('vi-VN', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              day: '2-digit',
+                              month: '2-digit',
+                            }) : 'Just now'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Team Invitations */}
+                {(activeTab === 'all' || activeTab === 'invitations') && invitations.map((invite) => (
                     <div 
                       key={invite.id}
                       className={`p-4 border-b transition-colors ${
@@ -224,8 +355,7 @@ export default function Header({ isDarkMode, toggleDarkMode }) {
                         </div>
                       </div>
                     </div>
-                  ))
-                )}
+                  ))}
               </div>
             </div>
           )}

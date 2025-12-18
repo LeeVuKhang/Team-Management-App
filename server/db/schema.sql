@@ -164,3 +164,57 @@ CREATE TABLE project_risk_reports (
 -- Index for efficient retrieval: Get latest report for a project
 CREATE INDEX idx_project_risk_reports_project_id ON project_risk_reports(project_id);
 CREATE INDEX idx_project_risk_reports_created_at ON project_risk_reports(project_id, created_at DESC);
+
+-- 11. Bảng NOTIFICATIONS (For n8n Integration & User Notification History)
+-- Stores notifications sent to users (from n8n agents, system events, etc.)
+CREATE TABLE notifications (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    
+    -- Notification content
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    
+    -- Type for UI styling: 'info', 'warning', 'success', 'error', 'reminder'
+    type VARCHAR(20) DEFAULT 'info' CHECK (type IN ('info', 'warning', 'success', 'error', 'reminder')),
+    
+    -- Source tracking: 'system', 'n8n', 'user', 'bot'
+    source VARCHAR(20) DEFAULT 'system' CHECK (source IN ('system', 'n8n', 'user', 'bot')),
+    
+    -- Optional link to related resource (e.g., task, project)
+    resource_type VARCHAR(50), -- 'task', 'project', 'team', 'channel', etc.
+    resource_id INTEGER,
+    
+    -- Read status for notification center
+    is_read BOOLEAN DEFAULT FALSE,
+    read_at TIMESTAMP WITH TIME ZONE,
+    
+    -- Metadata for n8n workflow tracking
+    metadata JSONB DEFAULT '{}',
+    
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for efficient notification queries
+CREATE INDEX idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX idx_notifications_user_unread ON notifications(user_id, is_read) WHERE is_read = FALSE;
+CREATE INDEX idx_notifications_created_at ON notifications(user_id, created_at DESC);
+
+-- 12. Bảng BOT_USERS (System Bot Accounts for n8n)
+-- Virtual bot users for posting automated messages to channels
+CREATE TABLE bot_users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    display_name VARCHAR(100) NOT NULL,
+    avatar_url TEXT,
+    description TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Insert default system bot
+INSERT INTO bot_users (username, display_name, description) VALUES 
+    ('system-bot', 'System Bot', 'Automated system notifications and updates'),
+    ('reminder-bot', 'Reminder Bot', 'Deadline reminders and task notifications'),
+    ('onboarding-bot', 'Onboarding Bot', 'Welcome messages for new team members'),
+    ('health-bot', 'Health Monitor', 'Project health reports and analytics');
