@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Mail, Lock, Eye, EyeOff, User, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function Signup() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -127,6 +129,9 @@ export default function Signup() {
       }
 
       toast.success('Account created successfully!');
+      
+      // Clear all React Query cache for fresh start
+      queryClient.clear();
       
       // Navigate after a short delay to show the success message
       setTimeout(() => {

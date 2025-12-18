@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Bell, Plus, Menu, Sun, Moon, FileText, LogOut, User, HelpCircle, Check, X, Clock, AlertTriangle, CheckCircle, Info, AlertCircle } from 'lucide-react';
 import { getUserInvitations, acceptInvitation, declineInvitation } from '../services/projectApi';
-import { getSocket } from '../services/socketService';
+import { getSocket, disconnectSocket } from '../services/socketService';
+import { notificationApi } from '../services/notificationApi';
 
 // Notification type icons and colors
 const NOTIFICATION_STYLES = {
@@ -33,6 +34,20 @@ export default function Header({ isDarkMode, toggleDarkMode }) {
 
   const invitations = invitationsData?.data || [];
 
+  // Fetch existing notifications from backend
+  const { data: notificationsData } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: () => notificationApi.getNotifications({ limit: 50 }),
+    refetchInterval: 60000, // Refresh every 60 seconds
+  });
+
+  // Initialize notifications from fetched data
+  useEffect(() => {
+    if (notificationsData?.data?.notifications) {
+      setNotifications(notificationsData.data.notifications);
+    }
+  }, [notificationsData]);
+
   // Listen for real-time notifications from n8n via Socket.io
   useEffect(() => {
     const socket = getSocket();
@@ -40,7 +55,12 @@ export default function Header({ isDarkMode, toggleDarkMode }) {
 
     const handleNotification = (notification) => {
       console.log('📬 New notification:', notification);
-      setNotifications(prev => [notification, ...prev].slice(0, 50)); // Keep last 50
+      // Add new notification to the top, avoid duplicates
+      setNotifications(prev => {
+        const exists = prev.some(n => n.id === notification.id);
+        if (exists) return prev;
+        return [notification, ...prev].slice(0, 50); // Keep last 50
+      });
     };
 
     socket.on('notification', handleNotification);
@@ -51,20 +71,42 @@ export default function Header({ isDarkMode, toggleDarkMode }) {
   }, []);
 
   // Calculate total unread count
-  const unreadNotifications = notifications.filter(n => !n.isRead).length;
+  const unreadNotifications = notifications.filter(n => !n.is_read).length;
   const totalUnread = invitations.length + unreadNotifications;
 
-  // Mark notification as read
-  const markAsRead = useCallback((notificationId) => {
-    setNotifications(prev => 
-      prev.map(n => n.id === notificationId ? { ...n, isRead: true } : n)
-    );
+  // Mark notification as read (call backend API)
+  const markAsRead = useCallback(async (notificationId) => {
+    try {
+      // Optimistic update
+      setNotifications(prev => 
+        prev.map(n => n.id === notificationId ? { ...n, is_read: true, read_at: new Date().toISOString() } : n)
+      );
+      // Call API
+      await notificationApi.markAsRead({ notificationIds: [notificationId] });
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+      // Revert on error
+      setNotifications(prev => 
+        prev.map(n => n.id === notificationId ? { ...n, is_read: false, read_at: null } : n)
+      );
+    }
   }, []);
 
-  // Mark all as read
-  const markAllAsRead = useCallback(() => {
-    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-  }, []);
+  // Mark all as read (call backend API)
+  const markAllAsRead = useCallback(async () => {
+    try {
+      const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
+      if (unreadIds.length === 0) return;
+      
+      // Optimistic update
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true, read_at: new Date().toISOString() })));
+      // Call API (null = mark all as read)
+      await notificationApi.markAsRead({ notificationIds: null });
+    } catch (error) {
+      console.error('Failed to mark all as read:', error);
+      // Could revert here, but for simplicity we'll let next refetch handle it
+    }
+  }, [notifications]);
 
   // Accept invitation mutation
   const acceptMutation = useMutation({
@@ -120,8 +162,20 @@ export default function Header({ isDarkMode, toggleDarkMode }) {
   }, [isDropdownOpen]);
 
   const handleLogout = () => {
+    // Disconnect socket
+    disconnectSocket();
+    
+    // Clear notifications state
+    setNotifications([]);
+    
+    // Invalidate all queries
+    queryClient.clear();
+    
+    // Clear local storage
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
+    
+    // Navigate to login
     navigate('/');
   };
 
@@ -245,7 +299,7 @@ export default function Header({ isDarkMode, toggleDarkMode }) {
                       onClick={() => markAsRead(notif.id)}
                       className={`p-4 border-b cursor-pointer transition-colors ${
                         isDarkMode ? 'border-[#171717] hover:bg-gray-800' : 'border-gray-100 hover:bg-gray-50'
-                      } ${!notif.isRead ? (isDarkMode ? 'bg-blue-500/5' : 'bg-blue-50/50') : ''}`}
+                      } ${!notif.is_read ? (isDarkMode ? 'bg-blue-500/5' : 'bg-blue-50/50') : ''}`}
                     >
                       <div className="flex items-start gap-3">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
@@ -258,7 +312,7 @@ export default function Header({ isDarkMode, toggleDarkMode }) {
                             <p className={`text-sm font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                               {notif.title}
                             </p>
-                            {!notif.isRead && (
+                            {!notif.is_read && (
                               <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                             )}
                           </div>
@@ -266,7 +320,7 @@ export default function Header({ isDarkMode, toggleDarkMode }) {
                             {notif.message}
                           </p>
                           <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                            {notif.timestamp ? new Date(notif.timestamp).toLocaleString('vi-VN', {
+                            {notif.created_at ? new Date(notif.created_at).toLocaleString('vi-VN', {
                               hour: '2-digit',
                               minute: '2-digit',
                               day: '2-digit',

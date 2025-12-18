@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function Login() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -33,6 +35,9 @@ export default function Login() {
       }
 
       toast.success('Login successful!');
+      
+      // Clear all React Query cache to force fresh fetch for new user
+      queryClient.clear();
       
       // Navigate after showing success message
       setTimeout(() => {
