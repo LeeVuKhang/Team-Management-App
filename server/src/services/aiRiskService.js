@@ -311,7 +311,7 @@ const parseAIResponse = (responseText) => {
 };
 
 // ============================================================================
-// FALLBACK: Rule-Based Risk Calculation (when Ollama unavailable)
+// FALLBACK: Rule-Based Risk Calculation (when AI provider (Gemini) is unavailable)
 // ============================================================================
 
 /**
