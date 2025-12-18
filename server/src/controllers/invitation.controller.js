@@ -18,7 +18,7 @@ const triggerOnboardingWebhook = async (data) => {
   const webhookUrl = process.env.N8N_ONBOARDING_WEBHOOK_URL;
   
   if (!webhookUrl) {
-    console.log('ℹ️ N8N_ONBOARDING_WEBHOOK_URL not configured, skipping webhook');
+    console.log('N8N_ONBOARDING_WEBHOOK_URL not configured, skipping webhook');
     return;
   }
 
@@ -278,7 +278,7 @@ export const createInvitation = async (req, res, next) => {
         const io = req.app.get('io');
         if (io) {
           io.to(`user:${invitedUser.id}`).emit('notification', notification);
-          console.log(`📬 Invitation notification sent to user ${invitedUser.id}`);
+          console.log(`Invitation notification sent to user ${invitedUser.id}`);
         }
       } catch (notifError) {
         console.error('Failed to create invitation notification:', notifError);
