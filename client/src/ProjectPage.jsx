@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, useParams, useNavigate } from 'react-router-dom';
 import * as projectApi from './services/projectApi';
+import * as riskReportApi from './services/riskReportApi';
+import { RiskReportCard } from './components/RiskReportCard';
 import { 
   CheckCircle2,
   Clock,
@@ -19,7 +21,8 @@ import {
   FolderKanban,
   Search,
   User,
-  MessageSquare
+  MessageSquare,
+  Brain
 } from 'lucide-react';
 
 /**
@@ -852,6 +855,11 @@ export default function ProjectPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
+  
+  // AI Risk Analysis state
+  const [riskReport, setRiskReport] = useState(null);
+  const [riskLoading, setRiskLoading] = useState(false);
+  const [showRiskCard, setShowRiskCard] = useState(true);
 
   const userRole = projectData?.user_role || 'viewer'; // Get role from API response
 
@@ -881,6 +889,9 @@ export default function ProjectPage() {
           setProjectMembers(membersRes.data);
         }
 
+        // Fetch latest risk report (non-blocking)
+        fetchRiskReport();
+
         setLoading(false);
       } catch (err) {
         console.error('Failed to fetch project data:', err);
@@ -891,6 +902,37 @@ export default function ProjectPage() {
 
     fetchProjectData();
   }, [projectId]);
+
+  // Fetch AI risk report
+  const fetchRiskReport = async () => {
+    try {
+      setRiskLoading(true);
+      const response = await riskReportApi.getLatestRiskReport(projectId);
+      if (response.success) {
+        setRiskReport(response.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch risk report:', err);
+      // Don't show error - risk analysis is optional
+    } finally {
+      setRiskLoading(false);
+    }
+  };
+
+  // Force new AI analysis
+  const handleRefreshRisk = async () => {
+    try {
+      setRiskLoading(true);
+      const response = await riskReportApi.analyzeProjectRisk(projectId);
+      if (response.success) {
+        setRiskReport(response.data);
+      }
+    } catch (err) {
+      console.error('Failed to analyze risk:', err);
+    } finally {
+      setRiskLoading(false);
+    }
+  };
 
   // Helper function to refetch tasks after mutations
   const refetchTasks = async () => {
@@ -1122,6 +1164,19 @@ export default function ProjectPage() {
                   </div>
                 ))}
               </div>
+
+              {/* AI Risk Analysis Card */}
+              {showRiskCard && (
+                <div className="mb-8">
+                  <RiskReportCard
+                    report={riskReport}
+                    loading={riskLoading}
+                    onRefresh={handleRefreshRisk}
+                    onClose={() => setShowRiskCard(false)}
+                    darkMode={isDarkMode}
+                  />
+                </div>
+              )}
 
               {/* Filters */}
               <div className={`${cardBg} border rounded-xl p-6 mb-6`}>

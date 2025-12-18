@@ -75,6 +75,13 @@ export const initializeSocket = (httpServer) => {
   io.on('connection', (socket) => {
     console.log(`🔌 User connected: ${socket.user.username} (Socket: ${socket.id})`);
 
+    // AUTO-JOIN: User-specific room for direct notifications from n8n
+    // This allows the backend/n8n to send notifications directly to a user
+    // regardless of which channel they're viewing
+    const userRoom = `user:${socket.user.id}`;
+    socket.join(userRoom);
+    console.log(`📬 ${socket.user.username} joined personal notification room: ${userRoom}`);
+
     /**
      * JOIN CHANNEL
      * User requests to join a channel room for real-time updates

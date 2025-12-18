@@ -1,10 +1,51 @@
 import * as InvitationModel from '../models/invitation.model.js';
+import { createNotification } from '../models/internal.model.js';
+import db from '../utils/db.js';
 
 /**
  * Invitation Controller
  * Handles business logic and HTTP responses for invitation-related operations
  * Security: Enforces email ownership verification for all operations
  */
+
+/**
+ * Trigger n8n webhook for onboarding notifications
+ * Called when a user successfully joins a team
+ * 
+ * @param {Object} data - Onboarding event data
+ */
+const triggerOnboardingWebhook = async (data) => {
+  const webhookUrl = process.env.N8N_ONBOARDING_WEBHOOK_URL;
+  
+  if (!webhookUrl) {
+    console.log('N8N_ONBOARDING_WEBHOOK_URL not configured, skipping webhook');
+    return;
+  }
+
+  try {
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-system-key': process.env.N8N_SECRET_KEY || '',
+      },
+      body: JSON.stringify({
+        event: 'member.joined',
+        data,
+        timestamp: new Date().toISOString(),
+      }),
+    });
+
+    if (!response.ok) {
+      console.warn(`⚠️ n8n webhook returned ${response.status}: ${await response.text()}`);
+    } else {
+      console.log(`✅ Onboarding webhook triggered for user ${data.username} in team ${data.teamName}`);
+    }
+  } catch (error) {
+    // Don't fail the invitation accept if webhook fails
+    console.error('❌ Failed to trigger onboarding webhook:', error.message);
+  }
+};
 
 /**
  * Get all pending invitations for the current user
@@ -46,6 +87,41 @@ export const acceptInvitation = async (req, res, next) => {
     }
 
     const result = await InvitationModel.acceptInvitation(token, userId, userEmail);
+
+    // Trigger n8n onboarding webhook for new members (non-blocking)
+    // This allows n8n to send a welcome message to the team channel
+    if (!result.alreadyMember) {
+      triggerOnboardingWebhook({
+        userId: req.user.id,
+        username: req.user.username,
+        email: userEmail,
+        teamId: result.teamId,
+        teamName: result.teamName,
+        role: result.role || 'member',
+        joinedAt: new Date().toISOString(),
+      }).catch(err => console.error('Onboarding webhook error:', err));
+
+      // Create success notification
+      try {
+        const notification = await createNotification({
+          userId: userId,
+          title: 'Welcome to the team!',
+          message: `You have successfully joined ${result.teamName}`,
+          type: 'success',
+          source: 'system',
+          resourceType: 'team',
+          resourceId: result.teamId,
+        });
+
+        // Emit via Socket.io
+        const io = req.app.get('io');
+        if (io) {
+          io.to(`user:${userId}`).emit('notification', notification);
+        }
+      } catch (notifError) {
+        console.error('Failed to create acceptance notification:', notifError);
+      }
+    }
 
     res.status(200).json({
       success: true,
@@ -166,6 +242,49 @@ export const createInvitation = async (req, res, next) => {
       email,
       role || 'member'
     );
+
+    // Get team and inviter details for notification
+    const [teamInfo] = await db`
+      SELECT t.name as team_name, u.username as inviter_name
+      FROM teams t
+      JOIN users u ON u.id = ${inviterId}
+      WHERE t.id = ${teamId}
+    `;
+
+    // Check if invited user already has an account
+    const [invitedUser] = await db`
+      SELECT id FROM users WHERE email = ${email}
+    `;
+
+    // If user exists, create notification and emit via Socket.io
+    if (invitedUser) {
+      try {
+        const notification = await createNotification({
+          userId: invitedUser.id,
+          title: `Team Invitation`,
+          message: `${teamInfo.inviter_name} invited you to join ${teamInfo.team_name}`,
+          type: 'info',
+          source: 'system',
+          resourceType: 'team',
+          resourceId: parseInt(teamId),
+          metadata: {
+            invitationId: invitation.id,
+            token: invitation.token,
+            role: role || 'member',
+          },
+        });
+
+        // Emit real-time notification via Socket.io
+        const io = req.app.get('io');
+        if (io) {
+          io.to(`user:${invitedUser.id}`).emit('notification', notification);
+          console.log(`Invitation notification sent to user ${invitedUser.id}`);
+        }
+      } catch (notifError) {
+        console.error('Failed to create invitation notification:', notifError);
+        // Don't fail the invitation creation if notification fails
+      }
+    }
 
     // TODO: Send invitation email here
     // await sendInvitationEmail(email, invitation.token, teamName);

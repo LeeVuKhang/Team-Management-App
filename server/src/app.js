@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import routes from './routes/index.js';
+import internalRoutes from './routes/internal.routes.js';
 import { errorHandler } from './middlewares/error.js';
 
 const app = express();
@@ -23,6 +24,11 @@ app.use(cookieParser()); // Essential for HTTP-only JWTs
 
 // Routes
 app.use('/api/v1', routes);
+
+// Internal API Routes for n8n Integration
+// SECURITY: Protected by system key authentication (x-system-key header)
+// These endpoints are for server-to-server communication only
+app.use('/api/internal', internalRoutes);
 
 // Centralized Error Handling
 app.use(errorHandler);
