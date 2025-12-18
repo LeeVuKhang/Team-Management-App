@@ -235,7 +235,7 @@ export const RiskReportCard = ({
                 AI Risk Analysis
               </h3>
               <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                Powered by Llama 3.1
+                Powered by Gemini 2.5 Flash
               </p>
             </div>
           </div>
