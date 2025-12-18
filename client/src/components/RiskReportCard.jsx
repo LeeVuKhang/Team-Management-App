@@ -280,9 +280,9 @@ export const RiskReportCard = ({
           }`}
         >
           {isExpanded ? (
-            <>Thu gọn <ChevronUp size={16} /></>
+            <>Collapse <ChevronUp size={16} /></>
           ) : (
-            <>Xem chi tiết <ChevronDown size={16} /></>
+            <>View details <ChevronDown size={16} /></>
           )}
         </button>
       )}
