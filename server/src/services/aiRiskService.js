@@ -5,20 +5,21 @@ import db from '../utils/db.js';
  * 
  * Architecture: Microservice-style layer within PERN monolith
  * - Isolates ALL AI logic from controllers (clean separation)
- * - Handles data aggregation, Ollama inference, and response parsing
+ * - Handles data aggregation, AI inference, and response parsing
  * - Supports caching to minimize redundant AI calls
  * 
- * AI Provider: Ollama with Llama 3.1 (local inference)
+ * AI Provider: Google Gemini API (Free Tier)
  */
 
 // ============================================================================
 // CONFIGURATION
 // ============================================================================
 
-const OLLAMA_CONFIG = {
-  baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
-  model: process.env.OLLAMA_MODEL || 'llama3.1',
-  timeout: 120000, // 2 minutes for inference
+const GEMINI_CONFIG = {
+  apiKey: process.env.GEMINI_API_KEY,
+  model: process.env.GEMINI_MODEL || 'gemini-2.5-flash', 
+  baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models',
+  timeout: 60000, // 60 seconds for API call
 };
 
 const CACHE_DURATION_HOURS = 24;
@@ -157,34 +158,48 @@ export const gatherProjectContext = async (projectId) => {
 };
 
 // ============================================================================
-// OLLAMA API INTEGRATION (Llama 3.1)
+// GOOGLE GEMINI API INTEGRATION
 // ============================================================================
 
 /**
- * Calls Ollama API with the project context for inference
+ * Calls Google Gemini API with the project context for inference
+ * Uses gemini-1.5-flash (free tier) for cost-effective analysis
  * 
  * @param {Object} context - Aggregated project context
  * @returns {Promise<Object>} Parsed AI response
  */
-export const callOllamaAPI = async (context) => {
+export const callGeminiAPI = async (context) => {
+  if (!GEMINI_CONFIG.apiKey) {
+    throw new Error('GEMINI_API_KEY is not configured');
+  }
+
   const prompt = formatContextForPrompt(context);
+  const fullPrompt = `${SYSTEM_PROMPT}\n\n${prompt}`;
 
   const requestBody = {
-    model: OLLAMA_CONFIG.model,
-    prompt: prompt,
-    system: SYSTEM_PROMPT,
-    stream: false,
-    options: {
-      temperature: 0.3, // Lower temperature for more consistent JSON output
-      num_predict: 1024, // Limit response length
+    contents: [{
+      parts: [{ text: fullPrompt }]
+    }],
+    generationConfig: {
+      temperature: 0.3, // Lower temperature for consistent JSON output
+      maxOutputTokens: 1024,
+      responseMimeType: 'application/json', // Request JSON response
     },
+    safetySettings: [
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
+    ],
   };
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), OLLAMA_CONFIG.timeout);
+    const timeoutId = setTimeout(() => controller.abort(), GEMINI_CONFIG.timeout);
 
-    const response = await fetch(`${OLLAMA_CONFIG.baseUrl}/api/generate`, {
+    const url = `${GEMINI_CONFIG.baseUrl}/${GEMINI_CONFIG.model}:generateContent?key=${GEMINI_CONFIG.apiKey}`;
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestBody),
@@ -194,17 +209,26 @@ export const callOllamaAPI = async (context) => {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`Gemini API error: ${response.status} - ${errorData.error?.message || response.statusText}`);
     }
 
     const data = await response.json();
-    return parseAIResponse(data.response);
+    
+    // Extract text from Gemini response structure
+    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    if (!responseText) {
+      throw new Error('Empty response from Gemini API');
+    }
+
+    return parseAIResponse(responseText);
 
   } catch (error) {
     if (error.name === 'AbortError') {
-      throw new Error('Ollama API timeout - inference took too long');
+      throw new Error('Gemini API timeout - request took too long');
     }
-    throw new Error(`Ollama API failed: ${error.message}`);
+    throw new Error(`Gemini API failed: ${error.message}`);
   }
 };
 
@@ -380,7 +404,7 @@ export const calculateRiskFallback = (context) => {
 // ============================================================================
 
 /**
- * Main function to analyze project risk using Ollama/Llama 3.1
+ * Main function to analyze project risk using Google Gemini API
  * Falls back to rule-based calculation if AI is unavailable
  * 
  * @param {number} projectId - Project to analyze
@@ -396,10 +420,10 @@ export const analyzeProjectRisk = async (projectId, useAI = true) => {
 
   if (useAI) {
     try {
-      analysis = await callOllamaAPI(context);
-      console.log(`✅ Ollama inference successful for project ${projectId}`);
+      analysis = await callGeminiAPI(context);
+      console.log(`✅ Gemini AI inference successful for project ${projectId}`);
     } catch (error) {
-      console.warn(`⚠️ Ollama failed, using fallback: ${error.message}`);
+      console.warn(`⚠️ Gemini API failed, using fallback: ${error.message}`);
       analysis = calculateRiskFallback(context);
     }
   } else {
@@ -429,7 +453,7 @@ export const isCacheValid = (report) => {
 
 export default {
   gatherProjectContext,
-  callOllamaAPI,
+  callGeminiAPI,
   calculateRiskFallback,
   analyzeProjectRisk,
   isCacheValid,
