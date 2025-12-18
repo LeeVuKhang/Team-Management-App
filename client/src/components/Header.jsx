@@ -70,9 +70,14 @@ export default function Header({ isDarkMode, toggleDarkMode }) {
     };
   }, []);
 
+  // Split notifications: invitation notifications vs alert notifications
+  const invitationNotifications = notifications.filter(n => n.resource_type === 'team' && n.title === 'Team Invitation');
+  const alertNotifications = notifications.filter(n => !(n.resource_type === 'team' && n.title === 'Team Invitation'));
+  
   // Calculate total unread count
-  const unreadNotifications = notifications.filter(n => !n.is_read).length;
-  const totalUnread = invitations.length + unreadNotifications;
+  const unreadInvitationNotifs = invitationNotifications.filter(n => !n.is_read).length;
+  const unreadAlertNotifs = alertNotifications.filter(n => !n.is_read).length;
+  const totalUnread = invitations.length + unreadInvitationNotifs + unreadAlertNotifs;
 
   // Mark notification as read (call backend API)
   const markAsRead = useCallback(async (notificationId) => {
@@ -253,8 +258,8 @@ export default function Header({ isDarkMode, toggleDarkMode }) {
                 <div className="flex gap-1">
                   {[
                     { key: 'all', label: 'All', count: totalUnread },
-                    { key: 'invitations', label: 'Invitations', count: invitations.length },
-                    { key: 'notifications', label: 'Alerts', count: unreadNotifications },
+                    { key: 'invitations', label: 'Invitations', count: invitations.length + unreadInvitationNotifs },
+                    { key: 'notifications', label: 'Alerts', count: unreadAlertNotifs },
                   ].map(tab => (
                     <button
                       key={tab.key}
@@ -281,16 +286,60 @@ export default function Header({ isDarkMode, toggleDarkMode }) {
               <div className="max-h-96 overflow-y-auto">
                 {/* Empty State */}
                 {((activeTab === 'all' && invitations.length === 0 && notifications.length === 0) ||
-                  (activeTab === 'invitations' && invitations.length === 0) ||
-                  (activeTab === 'notifications' && notifications.length === 0)) && (
+                  (activeTab === 'invitations' && invitations.length === 0 && invitationNotifications.length === 0) ||
+                  (activeTab === 'notifications' && alertNotifications.length === 0)) && (
                   <div className={`p-6 text-center ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                     <Bell size={32} className="mx-auto mb-2 opacity-50" />
                     <p className="text-sm">No {activeTab === 'all' ? 'notifications' : activeTab}</p>
                   </div>
                 )}
 
-                {/* System Notifications (from n8n) */}
-                {(activeTab === 'all' || activeTab === 'notifications') && notifications.map((notif) => {
+                {/* Invitation Notifications */}
+                {(activeTab === 'all' || activeTab === 'invitations') && invitationNotifications.map((notif) => {
+                  const style = NOTIFICATION_STYLES[notif.type] || NOTIFICATION_STYLES.info;
+                  const IconComponent = style.icon;
+                  return (
+                    <div 
+                      key={`notif-${notif.id}`}
+                      onClick={() => markAsRead(notif.id)}
+                      className={`p-4 border-b cursor-pointer transition-colors ${
+                        isDarkMode ? 'border-[#171717] hover:bg-gray-800' : 'border-gray-100 hover:bg-gray-50'
+                      } ${!notif.is_read ? (isDarkMode ? 'bg-blue-500/5' : 'bg-blue-50/50') : ''}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                          isDarkMode ? `bg-${style.color}-500/20` : `bg-${style.color}-100`
+                        }`}>
+                          <IconComponent size={16} className={`text-${style.color}-500`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className={`text-sm font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                              {notif.title}
+                            </p>
+                            {!notif.is_read && (
+                              <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                            )}
+                          </div>
+                          <p className={`text-sm mt-0.5 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                            {notif.message}
+                          </p>
+                          <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                            {notif.created_at ? new Date(notif.created_at).toLocaleString('vi-VN', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              day: '2-digit',
+                              month: '2-digit',
+                            }) : 'Just now'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Alert Notifications (from n8n) */}
+                {(activeTab === 'all' || activeTab === 'notifications') && alertNotifications.map((notif) => {
                   const style = NOTIFICATION_STYLES[notif.type] || NOTIFICATION_STYLES.info;
                   const IconComponent = style.icon;
                   return (
