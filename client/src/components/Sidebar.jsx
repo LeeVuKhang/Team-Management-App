@@ -17,9 +17,9 @@ export default function Sidebar({ darkMode, activePage }) {
   const teams = teamsData?.data || [];
   
   // Determine which team to use for chat link
-  // Priority: current teamId from route > first team from list
-  const chatTeamId = teamId || (teams.length > 0 ? 1 : null);
-  const chatLink = chatTeamId ? `/teams/${chatTeamId}/chat` : '/dashboard';
+  // Priority: current teamId from route > first team from list > no team route
+  const chatTeamId = teamId || (teams.length > 0 ? teams[0].id : null);
+  const chatLink = chatTeamId ? `/teams/${chatTeamId}/chat` : '/chat';
 
   return (
     <aside 

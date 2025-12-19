@@ -20,7 +20,8 @@ import {
   FileText,
   Link as LinkIcon,
   Download,
-  ExternalLink
+  ExternalLink,
+  Users
 } from 'lucide-react';
 import { fetchTeamChannels, fetchChannelMessages, createChannel, searchMessages } from './services/channelApi.js';
 import { getTeamProjects, getTeam } from './services/projectApi.js';
@@ -1013,19 +1014,27 @@ export default function ChatPage() {
    */
   const NoTeamState = () => (
     <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-      <Hash size={64} className={`${textSecondary} mb-4`} />
-      <h3 className={`text-xl font-bold ${textPrimary} mb-2`}>
-        No Team Selected
+      <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 ${
+        isDarkMode ? 'bg-blue-500/10' : 'bg-blue-50'
+      }`}>
+        <Users size={32} className="text-blue-500" />
+      </div>
+      <h3 className={`text-2xl font-bold ${textPrimary} mb-3`}>
+        You're Not in Any Team Yet
       </h3>
-      <p className={`${textSecondary} max-w-md mb-4`}>
-        Please select a team from the sidebar to start chatting.
+      <p className={`text-sm ${textSecondary} max-w-md mb-6`}>
+        To start chatting, you need to create your first team or wait for an invitation to join an existing team.
       </p>
-      <a 
-        href="/dashboard" 
-        className="px-4 py-2 bg-[#006239] text-white rounded-lg hover:bg-[#005230] transition-colors"
+      <button
+        onClick={() => navigate('/dashboard')}
+        className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+          isDarkMode 
+            ? 'bg-[#006239] hover:bg-[#005230] text-white' 
+            : 'bg-[#006239] hover:bg-[#005230] text-white'
+        }`}
       >
         Go to Dashboard
-      </a>
+      </button>
     </div>
   );
 
