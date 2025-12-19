@@ -35,37 +35,59 @@ export const initializeSocket = (httpServer) => {
 
   /**
    * Authentication Middleware
-   * SECURITY: Verify user identity before allowing socket connection
-   * 
-   * TODO: Replace mock auth with JWT verification:
-   * - Parse JWT from socket.handshake.auth.token or cookies
-   * - Verify token signature with JWT_SECRET
-   * - Attach decoded user to socket.user
+   * SECURITY: Verify JWT token from cookies before allowing socket connection
    */
   io.use(async (socket, next) => {
     try {
-      // MOCK AUTH: For development, accept userId from handshake
-      // SECURITY WARNING: Replace this with proper JWT auth before production!
-      const userId = socket.handshake.auth?.userId;
+      // Extract JWT from multiple sources
+      let token = socket.handshake.auth?.token;
       
-      if (!userId || typeof userId !== 'number') {
-        console.warn('⚠️  Socket connection rejected: Missing or invalid userId');
+      // If not in auth, try to parse from cookie header
+      if (!token && socket.handshake.headers.cookie) {
+        const cookies = socket.handshake.headers.cookie.split(';');
+        for (const cookie of cookies) {
+          const [name, value] = cookie.trim().split('=');
+          if (name === 'token') {
+            token = value;
+            break;
+          }
+        }
+      }
+      
+      if (!token) {
+        console.warn('Socket connection rejected: Missing authentication token');
+        console.log('Auth token:', socket.handshake.auth?.token);
+        console.log('Cookie header:', socket.handshake.headers.cookie);
         return next(new Error('Authentication required'));
       }
 
+      // Verify JWT token
+      const jwt = await import('jsonwebtoken');
+      const decoded = jwt.default.verify(token, process.env.JWT_SECRET);
+      
+      if (!decoded.userId) {
+        return next(new Error('Invalid token payload'));
+      }
+
       // Verify user exists in database
-      const user = await ChannelModel.getUserById(userId);
+      const user = await ChannelModel.getUserById(decoded.userId);
       if (!user) {
         return next(new Error('User not found'));
       }
 
       // Attach user info to socket for later use
       socket.user = user;
-      console.log(`✅ Socket authenticated: User ${user.username} (ID: ${user.id})`);
+      console.log(`Socket authenticated: User ${user.username} (ID: ${user.id})`);
       next();
     } catch (error) {
       console.error('Socket auth error:', error.message);
-      next(new Error('Authentication failed'));
+      if (error.name === 'TokenExpiredError') {
+        next(new Error('Token expired'));
+      } else if (error.name === 'JsonWebTokenError') {
+        next(new Error('Invalid token'));
+      } else {
+        next(new Error('Authentication failed'));
+      }
     }
   });
 
@@ -73,7 +95,7 @@ export const initializeSocket = (httpServer) => {
    * Connection Handler
    */
   io.on('connection', (socket) => {
-    console.log(`🔌 User connected: ${socket.user.username} (Socket: ${socket.id})`);
+    console.log(`User connected: ${socket.user.username} (Socket: ${socket.id})`);
 
     // AUTO-JOIN: User-specific room for direct notifications from n8n
     // This allows the backend/n8n to send notifications directly to a user
@@ -124,7 +146,7 @@ export const initializeSocket = (httpServer) => {
           username: socket.user.username,
         });
 
-        console.log(`📺 ${socket.user.username} joined channel:${channelId}`);
+        console.log(`${socket.user.username} joined channel:${channelId}`);
         callback?.({ success: true, channel });
       } catch (error) {
         console.error('Join channel error:', error.message);
@@ -162,7 +184,7 @@ export const initializeSocket = (httpServer) => {
           username: socket.user.username,
         });
 
-        console.log(`📴 ${socket.user.username} left channel:${channelId}`);
+        console.log(`${socket.user.username} left channel:${channelId}`);
         callback?.({ success: true });
       } catch (error) {
         callback?.({ success: false, error: 'Failed to leave channel' });
@@ -196,7 +218,7 @@ export const initializeSocket = (httpServer) => {
         const roomName = `channel:${channelId}`;
         io.to(roomName).emit('new-message', message);
 
-        console.log(`💬 Message in channel:${channelId} from ${socket.user.username}`);
+        console.log(`Message in channel:${channelId} from ${socket.user.username}`);
         callback?.({ success: true, message });
       } catch (error) {
         console.error('Send message error:', error.message);
@@ -243,7 +265,7 @@ export const initializeSocket = (httpServer) => {
      * Clean up when user disconnects
      */
     socket.on('disconnect', (reason) => {
-      console.log(`🔌 User disconnected: ${socket.user.username} (${reason})`);
+      console.log(`User disconnected: ${socket.user.username} (${reason})`);
 
       // Remove user from all channel presence tracking
       channelUsers.forEach((users, channelId) => {

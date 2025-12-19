@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
-import { useOutletContext, useParams } from 'react-router-dom';
+import { useOutletContext, useParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   Hash,
@@ -25,6 +25,7 @@ import {
 import { fetchTeamChannels, fetchChannelMessages, createChannel, searchMessages } from './services/channelApi.js';
 import { getTeamProjects } from './services/projectApi.js';
 import { useDebounce } from './hooks/useDebounce.js';
+import { useAuth } from './hooks/useAuth.js';
 import {
   initSocket,
   disconnectSocket,
@@ -38,9 +39,6 @@ import {
   emitTypingStop,
   getSocket,
 } from './services/socketService.js';
-
-// TODO: Replace with actual user from auth context
-const CURRENT_USER_ID = 1; // Mock user ID for development
 const MAX_MESSAGE_LENGTH = 2000; // Character limit for messages (matches DB constraint)
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB per file
 const MAX_FILES = 5; // Maximum files per message
@@ -190,6 +188,18 @@ const CreateChannelModal = ({
 export default function ChatPage() {
   const { isDarkMode } = useOutletContext();
   const { teamId } = useParams();
+  const navigate = useNavigate();
+  
+  // Get current authenticated user
+  const { user: currentUser, isLoading: isLoadingUser, isError: isAuthError } = useAuth();
+  
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (isAuthError) {
+      toast.error('Please log in to access chat');
+      navigate('/login');
+    }
+  }, [isAuthError, navigate]);
   
   // State
   const [channels, setChannels] = useState([]);
@@ -256,10 +266,22 @@ export default function ChatPage() {
    * Initialize Socket connection on mount
    */
   useEffect(() => {
-    const socket = initSocket(CURRENT_USER_ID);
+    console.log('[ChatPage] Initializing Socket connection...');
+    const socket = initSocket();
     
-    socket.on('connect', () => setIsConnected(true));
-    socket.on('disconnect', () => setIsConnected(false));
+    socket.on('connect', () => {
+      console.log('[ChatPage] Socket connected successfully!');
+      setIsConnected(true);
+    });
+    
+    socket.on('disconnect', () => {
+      console.log('[ChatPage] Socket disconnected');
+      setIsConnected(false);
+    });
+    
+    socket.on('connect_error', (error) => {
+      console.error('[ChatPage] Socket connection error:', error.message);
+    });
 
     return () => {
       disconnectSocket();
@@ -337,12 +359,12 @@ export default function ChatPage() {
         // Join new channel room for real-time updates
         await joinChannel(activeChannel.id);
         
-        // Fetch initial message history (last 10 messages)
-        const data = await fetchChannelMessages(teamId, activeChannel.id, { limit: 10 });
+        // Fetch initial message history (last 20 messages for better scrolling)
+        const data = await fetchChannelMessages(teamId, activeChannel.id, { limit: 20 });
         setMessages(data || []);
         
-        // If we got less than 10 messages, there are no more to load
-        setHasMoreMessages(data && data.length === 10);
+        // If we got less than 20 messages, there are no more to load
+        setHasMoreMessages(data && data.length === 20);
         
         previousChannelRef.current = activeChannel.id;
       } catch (err) {
@@ -539,7 +561,7 @@ export default function ChatPage() {
     });
 
     const unsubTyping = onUserTyping(({ userId, username }) => {
-      if (userId !== CURRENT_USER_ID) {
+      if (currentUser && userId !== currentUser.id) {
         setTypingUsers(prev => {
           if (!prev.find(u => u.userId === userId)) {
             return [...prev, { userId, username }];
@@ -558,7 +580,7 @@ export default function ChatPage() {
       unsubTyping();
       unsubStopTyping();
     };
-  }, [activeChannel?.id]);
+  }, [activeChannel?.id, currentUser]);
 
   /**
    * 1. HANDLE SCROLL POSITION (Layout Effect)
@@ -605,6 +627,24 @@ export default function ChatPage() {
     // Only run smooth scroll for actual new messages while chatting
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  /**
+   * 3. AUTO-LOAD MORE MESSAGES IF CONTAINER ISN'T SCROLLABLE
+   * Ensures users can always access pagination by making content scrollable
+   */
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container || isLoadingMore || !hasMoreMessages || messages.length === 0) return;
+
+    // Check if container has scrollable content
+    const hasScrollbar = container.scrollHeight > container.clientHeight;
+    
+    if (!hasScrollbar) {
+      // Container isn't scrollable, auto-load more messages
+      loadMoreMessages();
+    }
+  }, [messages, hasMoreMessages, isLoadingMore, loadMoreMessages]);
+
 
   // Categorize channels
   const generalChannels = channels.filter(c => !c.project_id);
@@ -989,6 +1029,18 @@ export default function ChatPage() {
     );
   }
 
+  // Show loading state while fetching user
+  if (isLoadingUser) {
+    return (
+      <div className={`flex h-[calc(100vh-64px)] items-center justify-center ${bgBase}`}>
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-12 h-12 border-4 border-[#006239] border-t-transparent rounded-full animate-spin" />
+          <p className={textSecondary}>Loading user information...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`flex h-[calc(100vh-64px)] ${bgBase}`}>
       
@@ -1318,6 +1370,22 @@ export default function ChatPage() {
             <EmptyState />
           ) : (
             <>
+              {/* Load More Button (when messages don't fill the container) */}
+              {hasMoreMessages && !isLoadingMore && (
+                <div className="flex justify-center py-4">
+                  <button
+                    onClick={loadMoreMessages}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      isDarkMode 
+                        ? 'bg-[#1F1F1F] hover:bg-[#2A2A2A] text-gray-300 border border-[#333]' 
+                        : 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 shadow-sm'
+                    }`}
+                  >
+                    Load older messages
+                  </button>
+                </div>
+              )}
+              
               {/* Load More Indicator */}
               {isLoadingMore && (
                 <div className="flex justify-center py-4">
@@ -1343,7 +1411,7 @@ export default function ChatPage() {
               
               <div className="space-y-1">
                 {messages.map((msg, index) => {
-                  const isMe = msg.user_id === CURRENT_USER_ID;
+                  const isMe = currentUser && msg.user_id === currentUser.id;
                   const isSequence = index > 0 && messages[index-1].user_id === msg.user_id;
 
                   return (

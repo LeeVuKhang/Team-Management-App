@@ -1,19 +1,18 @@
 import express from 'express';
 import * as InvitationController from '../controllers/invitation.controller.js';
 import { validate } from '../middlewares/validate.js';
-import { mockAuth } from '../middlewares/auth.js';
+import { verifyToken } from '../middlewares/auth.js';
 import { invitationTokenSchema, createInvitationSchema } from '../validations/invitation.validation.js';
 
 const router = express.Router();
 
 /**
  * Invitation Routes
- * All routes require authentication
- * TODO: Replace mockAuth with verifyToken for production
+ * All routes require JWT authentication
  */
 
-// Apply auth middleware to all invitation routes
-router.use(mockAuth);
+// Apply JWT authentication to all invitation routes
+router.use(verifyToken);
 
 /**
  * @route   GET /api/v1/user/invitations

@@ -5,7 +5,7 @@ import * as ChannelModel from '../models/channel.model.js';
  * Handles HTTP requests for channel and message operations
  * 
  * Security Notes:
- * - Authentication: Handled by auth middleware (mockAuth/verifyToken)
+ * - Authentication: Handled by auth middleware (verifyToken)
  * - Team Membership: Verified by verifyTeamMember middleware
  * - Role-based Access: Enforced by verifyTeamRole middleware for create/delete operations
  * - Project Membership: Checked at model layer for project-specific channels
