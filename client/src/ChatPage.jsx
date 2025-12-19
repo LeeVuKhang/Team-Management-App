@@ -108,15 +108,15 @@ const CreateChannelModal = ({
         {/* Modal Body */}
         <form onSubmit={handleCreateChannel} className="p-6 space-y-5">
           
-          {/* Project Selector */}
+          {/* Belongs To Selector */}
           <div>
             <label className={`block text-sm font-semibold mb-2 ${textPrimary}`}>
-              Project {isProjectLocked && <span className={`text-xs font-normal ${textSecondary}`}>(locked)</span>}
+              Belongs to {isProjectLocked && <span className={`text-xs font-normal ${textSecondary}`}>(locked)</span>}
             </label>
             
             {isProjectLocked ? (
               <div className={`w-full px-4 py-3 rounded-lg border ${isDarkMode ? 'bg-[#171717] border-[#333] text-gray-400' : 'bg-gray-100 border-gray-300 text-gray-600'} cursor-not-allowed`}>
-                {modalContext.projectName}
+                {modalContext.projectName ? `Project: ${modalContext.projectName}` : 'Entire Team'}
               </div>
             ) : (
               <div className="relative">
@@ -127,10 +127,11 @@ const CreateChannelModal = ({
                   disabled={isCreatingChannel}
                   required
                 >
-                  <option value="">-- Select a Project --</option>
+                  <option value="">-- Select --</option>
+                  <option value="null">Entire Team</option>
                   {availableProjects.map(project => (
                     <option key={project.id} value={project.id}>
-                      {project.name}
+                      Project: {project.name}
                     </option>
                   ))}
                 </select>
@@ -788,6 +789,9 @@ export default function ChatPage() {
     
     if (context.type === 'project') {
       setSelectedProjectId(context.projectId);
+    } else if (context.type === 'team') {
+      // Pre-select "Entire Team" option for team-level channels
+      setSelectedProjectId('null');
     } else {
       setSelectedProjectId('');
     }
@@ -837,17 +841,21 @@ export default function ChatPage() {
       return;
     }
     
+    // Validate selection (accept "null" string for team-level channels)
     if (!selectedProjectId && modalContext?.type === 'global') {
-      toast.error('Please select a project');
+      toast.error('Please select where this channel belongs to');
       return;
     }
     
     setIsCreatingChannel(true);
     
     try {
+      // Convert "null" string to actual null, otherwise convert to number
+      const projectIdValue = selectedProjectId === "null" ? null : (selectedProjectId ? Number(selectedProjectId) : null);
+      
       const channelData = {
         name: trimmedName,
-        projectId: selectedProjectId ? Number(selectedProjectId) : null,
+        projectId: projectIdValue,
         type: 'text',
         isPrivate: false,
       };
@@ -1240,9 +1248,22 @@ export default function ChatPage() {
                 {/* 1. TEAM CHANNELS */}
                 {generalChannels.length > 0 && (
                   <div>
-                    <h3 className={`text-xs font-bold uppercase tracking-wider mb-2 px-3 ${textSecondary}`}>
-                      Team Channels
-                    </h3>
+                    <div className={`flex items-center justify-between px-3 mb-2 group`}>
+                      <h3 className={`text-xs font-bold uppercase tracking-wider ${textSecondary}`}>
+                        Team Channels
+                      </h3>
+                      <button
+                        onClick={() => openCreateChannelModal({ 
+                          type: 'team', 
+                          projectId: null, 
+                          projectName: null 
+                        })}
+                        className={`p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity ${hoverBg}`}
+                        title="Add team channel"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
                     {generalChannels.map(channel => (
                       <ChannelItem key={channel.id} channel={channel} />
                     ))}
