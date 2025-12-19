@@ -20,7 +20,9 @@ import {
   searchUsers,
   createInvitation,
   removeTeamMember,
-  updateTeamMemberRole
+  updateTeamMemberRole,
+  getTeamPendingInvitations,
+  revokeInvitation
 } from './services/projectApi';
 import { useDebounce } from './hooks/useDebounce';
 import { 
@@ -487,6 +489,7 @@ const InviteMemberModal = ({ isOpen, onClose, teamId, darkMode }) => {
     onSuccess: (data) => {
       toast.success(data.message || 'Invitation sent successfully!');
       queryClient.invalidateQueries(['teamMembers', teamId]);
+      queryClient.invalidateQueries(['teamPendingInvitations', teamId]);
       onClose();
     },
     onError: (error) => {
@@ -791,7 +794,7 @@ const PendingInvitationsList = ({ invitations, onRevoke, darkMode }) => {
                 <td className={`py-3 px-3 text-sm ${
                   darkMode ? 'text-gray-400' : 'text-gray-600'
                 }`}>
-                  {new Date(invite.sentDate).toLocaleDateString('en-US', { 
+                  {new Date(invite.sent_date).toLocaleDateString('en-US', { 
                     month: 'short', 
                     day: 'numeric', 
                     year: 'numeric' 
@@ -2356,38 +2359,6 @@ export default function TeamPage() {
   const [selectedProject, setSelectedProject] = useState(null);
   const [projectMenuOpen, setProjectMenuOpen] = useState(null);
 
-  // MOCK DATA: Pending invitations (replace with real API call later)
-  const [mockPendingInvites] = useState([
-    {
-      id: 1,
-      email: 'john.doe@example.com',
-      role: 'member',
-      sentDate: '2024-12-10T10:30:00Z',
-      status: 'pending'
-    },
-    {
-      id: 2,
-      email: 'jane.smith@example.com',
-      role: 'admin',
-      sentDate: '2024-12-11T14:20:00Z',
-      status: 'pending'
-    },
-    {
-      id: 3,
-      email: 'bob.wilson@example.com',
-      role: 'member',
-      sentDate: '2024-12-12T09:15:00Z',
-      status: 'pending'
-    }
-  ]);
-
-  // Handler for revoking invitations (mock for now)
-  const handleRevokeInvite = (invite) => {
-    console.log('🗑️ [MOCK] Revoking invitation:', invite);
-    // TODO: Implement actual API call
-    toast.success(`Invitation to ${invite.email} would be revoked`);
-  };
-
   // Fetch team data
   const { data: teamData, isLoading: teamLoading, error: teamError } = useQuery({
     queryKey: ['team', teamId],
@@ -2415,6 +2386,30 @@ export default function TeamPage() {
     queryFn: () => getTeamMembers(teamId),
     enabled: !!teamId,
   });
+
+  // Fetch pending invitations (only for admin/owner)
+  const { data: pendingInvitationsData } = useQuery({
+    queryKey: ['teamPendingInvitations', teamId],
+    queryFn: () => getTeamPendingInvitations(teamId),
+    enabled: !!teamId,
+  });
+
+  // Revoke invitation mutation
+  const revokeInvitationMutation = useMutation({
+    mutationFn: (invitationId) => revokeInvitation(teamId, invitationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['teamPendingInvitations', teamId]);
+      toast.success('Invitation revoked successfully');
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || 'Failed to revoke invitation');
+    },
+  });
+
+  // Handler for revoking invitations
+  const handleRevokeInvite = (invite) => {
+    revokeInvitationMutation.mutate(invite.id);
+  };
 
   // Update team mutation
   const updateTeamMutation = useMutation({
@@ -2515,6 +2510,7 @@ export default function TeamPage() {
   const projects = projectsData?.data || [];
   const stats = statsData?.data || {};
   const members = membersData?.data || [];
+  const pendingInvitations = pendingInvitationsData?.data || [];
 
   // Filter and sort projects
   const filteredProjects = projects
@@ -2609,7 +2605,7 @@ export default function TeamPage() {
 
         {/* PENDING INVITATIONS */}
         <PendingInvitationsList
-          invitations={mockPendingInvites}
+          invitations={pendingInvitations}
           onRevoke={handleRevokeInvite}
           darkMode={isDarkMode}
         />

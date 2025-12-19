@@ -359,3 +359,84 @@ export const searchUsersForInvite = async (teamId, searchQuery, requestingUserId
 
   return users;
 };
+/**
+ * Get pending invitations for a team
+ * @param {number} teamId - Team ID
+ * @param {number} requestingUserId - User ID making the request (for RBAC)
+ * @returns {Promise<Array>} List of pending invitations
+ * @throws {Error} If requesting user is not a team member with admin/owner role
+ * SECURITY: Only team admins/owners can view pending invitations
+ */
+export const getTeamPendingInvitations = async (teamId, requestingUserId) => {
+  // SECURITY: Verify requesting user is a team admin or owner
+  const [membership] = await db`
+    SELECT role FROM team_members WHERE team_id = ${teamId} AND user_id = ${requestingUserId}
+  `;
+
+  if (!membership) {
+    throw new Error('Access denied: User is not a member of this team');
+  }
+
+  if (!['owner', 'admin'].includes(membership.role)) {
+    throw new Error('Access denied: Only team owner or admin can view pending invitations');
+  }
+
+  // Fetch all pending invitations for this team
+  const invitations = await db`
+    SELECT 
+      ti.id,
+      ti.email,
+      ti.role,
+      ti.status,
+      ti.created_at AS sent_date,
+      ti.expires_at,
+      u.username AS inviter_name,
+      u.avatar_url AS inviter_avatar
+    FROM team_invitations ti
+    LEFT JOIN users u ON ti.inviter_id = u.id
+    WHERE ti.team_id = ${teamId}
+      AND ti.status = 'pending'
+      AND ti.expires_at > NOW()
+    ORDER BY ti.created_at DESC
+  `;
+
+  return invitations;
+};
+
+/**
+ * Revoke (delete) a pending invitation
+ * @param {number} teamId - Team ID
+ * @param {number} invitationId - Invitation ID to revoke
+ * @param {number} requestingUserId - User ID making the request (for RBAC)
+ * @returns {Promise<boolean>} True if revoked successfully
+ * @throws {Error} If requesting user is not a team admin/owner
+ * SECURITY: Only team admins/owners can revoke invitations
+ */
+export const revokeInvitation = async (teamId, invitationId, requestingUserId) => {
+  // SECURITY: Verify requesting user is a team admin or owner
+  const [membership] = await db`
+    SELECT role FROM team_members WHERE team_id = ${teamId} AND user_id = ${requestingUserId}
+  `;
+
+  if (!membership) {
+    throw new Error('Access denied: User is not a member of this team');
+  }
+
+  if (!['owner', 'admin'].includes(membership.role)) {
+    throw new Error('Access denied: Only team owner or admin can revoke invitations');
+  }
+
+  // SECURITY: Verify invitation belongs to this team before deleting
+  const result = await db`
+    DELETE FROM team_invitations 
+    WHERE id = ${invitationId} 
+      AND team_id = ${teamId}
+      AND status = 'pending'
+  `;
+
+  if (result.count === 0) {
+    throw new Error('Invitation not found or already processed');
+  }
+
+  return true;
+};

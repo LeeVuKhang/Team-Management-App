@@ -6,7 +6,8 @@ import {
   teamIdParamSchema, 
   createTeamSchema, 
   updateTeamSchema,
-  searchUsersSchema
+  searchUsersSchema,
+  invitationIdParamSchema
 } from '../validations/team.validation.js';
 
 const router = express.Router();
@@ -116,6 +117,28 @@ router.delete(
   '/:teamId',
   validate(teamIdParamSchema, 'params'),
   TeamController.deleteTeam
+);
+
+/**
+ * @route   GET /api/v1/teams/:teamId/invitations
+ * @desc    Get all pending invitations for a team
+ * @access  Private (Owner/Admin only)
+ */
+router.get(
+  '/:teamId/invitations',
+  validate(teamIdParamSchema, 'params'),
+  TeamController.getTeamPendingInvitations
+);
+
+/**
+ * @route   DELETE /api/v1/teams/:teamId/invitations/:invitationId
+ * @desc    Revoke a pending invitation
+ * @access  Private (Owner/Admin only)
+ */
+router.delete(
+  '/:teamId/invitations/:invitationId',
+  validate(invitationIdParamSchema, 'params'),
+  TeamController.revokeInvitation
 );
 
 export default router;

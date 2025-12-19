@@ -359,3 +359,25 @@ export async function updateTeamMemberRole(teamId, userId, role) {
     body: JSON.stringify({ role }),
   });
 }
+// ==================== TEAM INVITATIONS ====================
+
+/**
+ * Get pending invitations for a team
+ * @param {number} teamId - Team ID
+ * @returns {Promise<{success: boolean, data: Array}>}
+ */
+export async function getTeamPendingInvitations(teamId) {
+  return apiFetch(`/teams/${teamId}/invitations`);
+}
+
+/**
+ * Revoke a pending invitation
+ * @param {number} teamId - Team ID
+ * @param {number} invitationId - Invitation ID to revoke
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export async function revokeInvitation(teamId, invitationId) {
+  return apiFetch(`/teams/${teamId}/invitations/${invitationId}`, {
+    method: 'DELETE',
+  });
+}
