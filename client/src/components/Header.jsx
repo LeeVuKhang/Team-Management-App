@@ -2,9 +2,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Bell, Plus, Menu, Sun, Moon, FileText, LogOut, User, HelpCircle, Check, X, Clock, AlertTriangle, CheckCircle, Info, AlertCircle } from 'lucide-react';
-import { getUserInvitations, acceptInvitation, declineInvitation } from '../services/projectApi';
 import { getSocket, disconnectSocket } from '../services/socketService';
-import { notificationApi } from '../services/notificationApi';
+import { notificationApi, getUserInvitations, acceptInvitation, declineInvitation } from '../services/notificationApi';
 import { useAuth } from '../hooks/useAuth';
 
 // Notification type icons and colors

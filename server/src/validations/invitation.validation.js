@@ -17,6 +17,16 @@ export const invitationTokenSchema = z.object({
 });
 
 /**
+ * Validate invitation token in query params (for GET preview)
+ */
+export const invitationTokenQuerySchema = z.object({
+  token: z
+    .string()
+    .length(64, 'Invalid token format')
+    .regex(/^[a-zA-Z0-9]+$/, 'Token must be alphanumeric'),
+});
+
+/**
  * Validate email format for invitation creation
  * SECURITY: Strict email validation, sanitization
  */

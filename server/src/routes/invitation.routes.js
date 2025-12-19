@@ -2,16 +2,27 @@ import express from 'express';
 import * as InvitationController from '../controllers/invitation.controller.js';
 import { validate } from '../middlewares/validate.js';
 import { verifyToken } from '../middlewares/auth.js';
-import { invitationTokenSchema, createInvitationSchema } from '../validations/invitation.validation.js';
+import { invitationTokenSchema, invitationTokenQuerySchema, createInvitationSchema } from '../validations/invitation.validation.js';
 
 const router = express.Router();
 
 /**
  * Invitation Routes
- * All routes require JWT authentication
  */
 
-// Apply JWT authentication to all invitation routes
+/**
+ * @route   GET /api/v1/invitations/preview
+ * @desc    Get invitation details for preview (PUBLIC - no auth required)
+ * @access  Public
+ * @query   token - Invitation token
+ */
+router.get(
+  '/invitations/preview',
+  validate(invitationTokenQuerySchema, 'query'),
+  InvitationController.getInvitationPreview
+);
+
+// Apply JWT authentication to all remaining invitation routes
 router.use(verifyToken);
 
 /**

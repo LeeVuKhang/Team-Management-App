@@ -155,4 +155,87 @@ export const NOTIFICATION_TYPES = {
   },
 };
 
+// ==================== INVITATION API FUNCTIONS ====================
+
+/**
+ * Get all pending invitations for the current user
+ * @returns {Promise<{success: boolean, data: Array}>}
+ */
+export async function getUserInvitations() {
+  const response = await fetch(`${API_URL}/api/v1/user/invitations`, {
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.message || 'Failed to fetch invitations');
+  }
+
+  return response.json();
+}
+
+/**
+ * Get invitation preview (public - no auth required)
+ * @param {string} token - Invitation token
+ * @returns {Promise<{success: boolean, data: object}>}
+ */
+export async function getInvitationPreview(token) {
+  const response = await fetch(`${API_URL}/api/v1/invitations/preview?token=${encodeURIComponent(token)}`, {
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.message || 'Failed to fetch invitation preview');
+  }
+
+  return response.json();
+}
+
+/**
+ * Accept a team invitation
+ * @param {string} token - Invitation token
+ * @returns {Promise<{success: boolean, message: string, data: object}>}
+ */
+export async function acceptInvitation(token) {
+  const response = await fetch(`${API_URL}/api/v1/invitations/accept`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ token }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.message || 'Failed to accept invitation');
+  }
+
+  return response.json();
+}
+
+/**
+ * Decline a team invitation
+ * @param {string} token - Invitation token
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export async function declineInvitation(token) {
+  const response = await fetch(`${API_URL}/api/v1/invitations/decline`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ token }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json();
+    throw new Error(data.message || 'Failed to decline invitation');
+  }
+
+  return response.json();
+}
+
 export default notificationApi;
