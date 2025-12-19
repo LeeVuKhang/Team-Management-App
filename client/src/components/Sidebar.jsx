@@ -45,7 +45,7 @@ export default function Sidebar({ darkMode, activePage }) {
             : `${darkMode ? 'text-gray-400 hover:bg-[#1F1F1F] hover:text-gray-200' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`
         }`}>
           <MessageSquare size={20} className="flex-shrink-0" />
-          <span className="ml-3 font-medium text-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap overflow-hidden">Messages</span>
+          <span className="ml-3 font-medium text-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap overflow-hidden">Team Chat</span>
           <span className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">3</span>
         </Link>
         <SidebarItem icon={FolderKanban} label="Projects" active={activePage === 'projects'} darkMode={darkMode} />

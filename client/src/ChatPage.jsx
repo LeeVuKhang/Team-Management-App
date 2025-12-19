@@ -23,7 +23,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { fetchTeamChannels, fetchChannelMessages, createChannel, searchMessages } from './services/channelApi.js';
-import { getTeamProjects } from './services/projectApi.js';
+import { getTeamProjects, getTeam } from './services/projectApi.js';
 import { useDebounce } from './hooks/useDebounce.js';
 import { useAuth } from './hooks/useAuth.js';
 import {
@@ -249,6 +249,9 @@ export default function ChatPage() {
   // Team projects state (for dropdown in create channel modal)
   const [teamProjects, setTeamProjects] = useState([]);
   
+  // Team data state
+  const [teamData, setTeamData] = useState(null);
+  
   // Pagination state
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -305,8 +308,12 @@ export default function ChatPage() {
       setIsLoadingChannels(true);
       setChannelError(null);
       try {
-        // Fetch both channels and projects in parallel
-        const [channelsData, projectsData] = await Promise.all([
+        // Fetch team data, channels and projects in parallel
+        const [teamDataResponse, channelsData, projectsData] = await Promise.all([
+          getTeam(teamId).catch(err => {
+            console.warn('[ChatPage] Failed to fetch team:', err);
+            return { data: null }; // Fallback to null if team fails
+          }),
           fetchTeamChannels(teamId),
           getTeamProjects(teamId).catch(err => {
             console.warn('[ChatPage] Failed to fetch projects:', err);
@@ -314,9 +321,11 @@ export default function ChatPage() {
           })
         ]);
         
+        console.log('[ChatPage] Received team:', teamDataResponse?.data);
         console.log('[ChatPage] Received channels:', channelsData);
         console.log('[ChatPage] Received projects:', projectsData);
         
+        setTeamData(teamDataResponse?.data);
         setChannels(channelsData);
         setTeamProjects(projectsData.data || []);
         
@@ -1187,7 +1196,7 @@ export default function ChatPage() {
           {/* Sidebar Header */}
           <div className={`p-4 border-b ${isDarkMode ? 'border-[#171717]' : 'border-gray-200'}`}>
             <h2 className={`font-bold text-lg ${textPrimary} flex items-center justify-between`}>
-              Channels
+              {teamData?.name || 'Channels'}
               <button 
                 className={`p-1 rounded ${hoverBg} transition-colors`}
                 onClick={() => openCreateChannelModal({ type: 'global' })}
