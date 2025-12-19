@@ -141,4 +141,15 @@ router.delete(
   TeamController.revokeInvitation
 );
 
+/**
+ * @route   POST /api/v1/teams/:teamId/leave
+ * @desc    Leave a team (for non-owner members)
+ * @access  Private (Member/Admin only - owners cannot leave)
+ */
+router.post(
+  '/:teamId/leave',
+  validate(teamIdParamSchema, 'params'),
+  TeamController.leaveTeam
+);
+
 export default router;

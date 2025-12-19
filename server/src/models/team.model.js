@@ -440,3 +440,39 @@ export const revokeInvitation = async (teamId, invitationId, requestingUserId) =
 
   return true;
 };
+
+/**
+ * Leave a team (for non-owner members)
+ * @param {number} teamId - Team ID
+ * @param {number} userId - User ID leaving the team
+ * @returns {Promise<boolean>} True if left successfully
+ * @throws {Error} If user is not a member or is the owner
+ * SECURITY: Owners cannot leave (must delete team or transfer ownership first)
+ */
+export const leaveTeam = async (teamId, userId) => {
+  // SECURITY: Verify user is a member of this team
+  const [membership] = await db`
+    SELECT role FROM team_members WHERE team_id = ${teamId} AND user_id = ${userId}
+  `;
+
+  if (!membership) {
+    throw new Error('Access denied: User is not a member of this team');
+  }
+
+  // SECURITY: Owners cannot leave the team (must transfer ownership or delete team)
+  if (membership.role === 'owner') {
+    throw new Error('Owner cannot leave the team. Please transfer ownership or delete the team.');
+  }
+
+  // Remove user from team (CASCADE will remove from projects, tasks, etc.)
+  const result = await db`
+    DELETE FROM team_members 
+    WHERE team_id = ${teamId} AND user_id = ${userId}
+  `;
+
+  if (result.count === 0) {
+    throw new Error('Failed to leave team');
+  }
+
+  return true;
+};

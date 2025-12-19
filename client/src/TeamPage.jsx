@@ -22,9 +22,11 @@ import {
   removeTeamMember,
   updateTeamMemberRole,
   getTeamPendingInvitations,
-  revokeInvitation
+  revokeInvitation,
+  leaveTeam
 } from './services/projectApi';
 import { useDebounce } from './hooks/useDebounce';
+import { useAuth } from './hooks/useAuth';
 import { 
   LayoutDashboard, 
   FolderKanban, 
@@ -238,7 +240,7 @@ const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode }) => {
     } catch (err) {
       // Extract server error message from response
       const errorMessage = err.response?.data?.message || err.message || 'Failed to update team';
-      console.error('❌ Server error:', errorMessage);
+      console.error('Server error:', errorMessage);
       setError(errorMessage);
       // Modal stays open, user can see the error and retry
     } finally {
@@ -448,6 +450,96 @@ const DeleteTeamModal = ({ isOpen, onClose, team, onConfirm, darkMode }) => {
             className="flex-1 px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isDeleting ? 'Deleting...' : 'Delete Team'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+// Leave Team Modal
+const LeaveTeamModal = ({ isOpen, onClose, team, onConfirm, darkMode }) => {
+  const [isLeaving, setIsLeaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  React.useEffect(() => {
+    setError(null);
+  }, [isOpen]);
+
+  const handleLeave = async () => {
+    setError(null);
+    setIsLeaving(true);
+
+    try {
+      await onConfirm();
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to leave team');
+    } finally {
+      setIsLeaving(false);
+    }
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Leave Team" darkMode={darkMode}>
+      <div className="space-y-4">
+        <div className={`p-4 rounded-lg border-2 ${
+          darkMode ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-yellow-50 border-yellow-200'
+        }`}>
+          <div className="flex items-start gap-3">
+            <AlertCircle className="text-yellow-500 flex-shrink-0 mt-0.5" size={20} />
+            <div>
+              <h4 className={`font-bold text-sm mb-1 ${
+                darkMode ? 'text-yellow-400' : 'text-yellow-600'
+              }`}>
+                Are you sure you want to leave this team?
+              </h4>
+              <p className={`text-sm ${
+                darkMode ? 'text-yellow-300' : 'text-yellow-600'
+              }`}>
+                Leaving <span className="font-bold">{team?.name}</span> will remove your access to:
+              </p>
+              <ul className={`text-xs mt-2 space-y-1 list-disc list-inside ${
+                darkMode ? 'text-yellow-300' : 'text-yellow-600'
+              }`}>
+                <li>All projects in this team</li>
+                <li>All tasks you're assigned to</li>
+                <li>Team chat and channels</li>
+                <li>Team notifications</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        {error && (
+          <div className={`p-3 rounded-lg border ${
+            darkMode ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-red-50 border-red-200 text-red-600'
+          }`}>
+            <div className="flex items-start gap-2">
+              <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
+              <p className="text-sm">{error}</p>
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-3 pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isLeaving}
+            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+              darkMode ? 'bg-[#171717] text-gray-300 hover:bg-[#171717]/70' : 'bg-gray-200/50 text-gray-400 hover:bg-gray-200'
+            } disabled:opacity-50`}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleLeave}
+            disabled={isLeaving}
+            className="flex-1 px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLeaving ? 'Leaving...' : 'Leave Team'}
           </button>
         </div>
       </div>
@@ -887,7 +979,7 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
           errors[fieldName] = error.message;
         });
         
-        console.log('❌ Validation failed:', errors);
+        console.log('Validation failed:', errors);
         
         // Set errors to trigger visual feedback
         setFieldErrors(errors);
@@ -929,7 +1021,7 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
     } catch (err) {
       // Extract server error message from response
       const errorMessage = err.response?.data?.message || err.message || 'Failed to create project';
-      console.error('❌ Server error:', errorMessage);
+      console.error('Server error:', errorMessage);
       setError(errorMessage);
       // Modal stays open, user can see the error and retry
     } finally {
@@ -1424,7 +1516,7 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
           errors[fieldName] = error.message;
         });
         
-        console.log('❌ EditProject validation failed:', errors);
+        console.log('EditProject validation failed:', errors);
         
         // Set errors to trigger visual feedback
         setFieldErrors(errors);
@@ -1471,7 +1563,7 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
         } catch (err) {
           // Extract server error message from response
           const errorMessage = err.response?.data?.message || err.message || 'Failed to update project';
-          console.error('❌ Server error:', errorMessage);
+          console.error('Server error:', errorMessage);
           setError(errorMessage);
           setIsSubmitting(false);
           return; // Exit early, modal stays open
@@ -2341,6 +2433,7 @@ export default function TeamPage() {
   const { teamId } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuth();
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
@@ -2350,6 +2443,7 @@ export default function TeamPage() {
   // Modal states
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
   const [showEditProjectModal, setShowEditProjectModal] = useState(false);
@@ -2426,6 +2520,19 @@ export default function TeamPage() {
     onSuccess: () => {
       queryClient.invalidateQueries(['teams']); // Refresh sidebar
       navigate('/teams/1'); // Navigate to first team (or could show "no teams" page)
+    },
+  });
+
+  // Leave team mutation (for non-owners)
+  const leaveTeamMutation = useMutation({
+    mutationFn: () => leaveTeam(teamId),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['teams']); // Refresh sidebar
+      toast.success('You have left the team');
+      navigate('/dashboard'); // Navigate to dashboard
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to leave team');
     },
   });
 
@@ -2576,30 +2683,55 @@ export default function TeamPage() {
               <Settings size={20} />
             </button>
 
-            {showSettingsMenu && (
-              <div className={`absolute right-0 mt-2 w-48 rounded-lg shadow-lg border overflow-hidden z-10 ${
-                isDarkMode ? 'bg-dark-secondary border-[#171717]' : 'bg-white border-gray-200'
-              }`}>
-                <button
-                  onClick={() => { setShowEditModal(true); setShowSettingsMenu(false); }}
-                  className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${
-                    isDarkMode ? 'hover:bg-[#171717] text-gray-300' : 'hover:bg-gray-200/30 text-black'
-                  }`}
-                >
-                  <Edit3 size={14} />
-                  Edit Team
-                </button>
-                <button
-                  onClick={() => { setShowDeleteModal(true); setShowSettingsMenu(false); }}
-                  className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${
-                    isDarkMode ? 'hover:bg-[#171717] text-red-400' : 'hover:bg-gray-200/30 text-red-600'
-                  }`}
-                >
-                  <Trash2 size={14} />
-                  Delete Team
-                </button>
-              </div>
-            )}
+            {showSettingsMenu && (() => {
+              // Find current user's role in this team
+              const currentMember = members.find(m => m.id === currentUser?.id);
+              const isOwner = currentMember?.role === 'owner';
+
+              return (
+                <div className={`absolute right-0 mt-2 w-48 rounded-lg shadow-lg border overflow-hidden z-10 ${
+                  isDarkMode ? 'bg-dark-secondary border-[#171717]' : 'bg-white border-gray-200'
+                }`}>
+                  {isOwner ? (
+                    // Owner can Edit and Delete team
+                    <>
+                      <button
+                        onClick={() => { setShowEditModal(true); setShowSettingsMenu(false); }}
+                        className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${
+                          isDarkMode ? 'hover:bg-[#171717] text-gray-300' : 'hover:bg-gray-200/30 text-black'
+                        }`}
+                      >
+                        <Edit3 size={14} />
+                        Edit Team
+                      </button>
+                      <button
+                        onClick={() => { setShowDeleteModal(true); setShowSettingsMenu(false); }}
+                        className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${
+                          isDarkMode ? 'hover:bg-[#171717] text-red-400' : 'hover:bg-gray-200/30 text-red-600'
+                        }`}
+                      >
+                        <Trash2 size={14} />
+                        Delete Team
+                      </button>
+                    </>
+                  ) : (
+                    // Members and Admins can only Leave team
+                    <button
+                      onClick={() => {
+                        setShowLeaveModal(true);
+                        setShowSettingsMenu(false);
+                      }}
+                      className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${
+                        isDarkMode ? 'hover:bg-[#171717] text-red-400' : 'hover:bg-gray-200/30 text-red-600'
+                      }`}
+                    >
+                      <Trash2 size={14} />
+                      Leave Team
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
 
@@ -2887,6 +3019,14 @@ export default function TeamPage() {
         onClose={() => setShowDeleteModal(false)}
         team={team}
         onConfirm={() => deleteTeamMutation.mutate()}
+        darkMode={isDarkMode}
+      />
+
+      <LeaveTeamModal
+        isOpen={showLeaveModal}
+        onClose={() => setShowLeaveModal(false)}
+        team={team}
+        onConfirm={() => leaveTeamMutation.mutate()}
         darkMode={isDarkMode}
       />
 

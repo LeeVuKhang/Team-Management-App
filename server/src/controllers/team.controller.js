@@ -349,3 +349,36 @@ export const revokeInvitation = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Leave a team (for non-owner members)
+ * @route POST /api/v1/teams/:teamId/leave
+ * SECURITY: Members and admins can leave, but owners cannot (must delete team or transfer ownership)
+ */
+export const leaveTeam = async (req, res, next) => {
+  try {
+    const { teamId } = req.params;
+    const userId = req.user.id;
+
+    await TeamModel.leaveTeam(teamId, userId);
+
+    res.status(200).json({
+      success: true,
+      message: 'You have left the team successfully',
+    });
+  } catch (error) {
+    if (error.message.includes('not a member')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You are not a member of this team',
+      });
+    }
+    if (error.message.includes('Owner cannot leave')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Team owners cannot leave the team. Please transfer ownership or delete the team instead.',
+      });
+    }
+    next(error);
+  }
+};

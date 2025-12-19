@@ -351,3 +351,14 @@ export async function revokeInvitation(teamId, invitationId) {
     method: 'DELETE',
   });
 }
+
+/**
+ * Leave a team (for non-owner members)
+ * @param {number} teamId - Team ID
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export async function leaveTeam(teamId) {
+  return apiFetch(`/teams/${teamId}/leave`, {
+    method: 'POST',
+  });
+}
