@@ -23,6 +23,8 @@ export const getTeamById = async (teamId, userId) => {
     throw new Error('Access denied: User is not a member of this team');
   }
 
+  const userRole = membershipCheck[0].role;
+
   // User is authorized, fetch team details
   const [team] = await db`
     SELECT 
@@ -39,7 +41,8 @@ export const getTeamById = async (teamId, userId) => {
     WHERE t.id = ${teamId}
   `;
 
-  return team || null;
+  // Include user's role in the team for frontend RBAC
+  return team ? { ...team, currentUserRole: userRole } : null;
 };
 
 /**

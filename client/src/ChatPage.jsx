@@ -1214,13 +1214,16 @@ export default function ChatPage() {
           <div className={`p-4 border-b ${isDarkMode ? 'border-[#171717]' : 'border-gray-200'}`}>
             <h2 className={`font-bold text-lg ${textPrimary} flex items-center justify-between`}>
               {teamData?.name || 'Channels'}
-              <button 
-                className={`p-1 rounded ${hoverBg} transition-colors`}
-                onClick={() => openCreateChannelModal({ type: 'global' })}
-                title="Create new channel"
-              >
-                <Plus size={18} />
-              </button>
+              {/* Only show + button for owner/admin */}
+              {teamData?.currentUserRole !== 'member' && (
+                <button 
+                  className={`p-1 rounded ${hoverBg} transition-colors`}
+                  onClick={() => openCreateChannelModal({ type: 'global' })}
+                  title="Create new channel"
+                >
+                  <Plus size={18} />
+                </button>
+              )}
             </h2>
           </div>
 
@@ -1252,17 +1255,20 @@ export default function ChatPage() {
                       <h3 className={`text-xs font-bold uppercase tracking-wider ${textSecondary}`}>
                         Team Channels
                       </h3>
-                      <button
-                        onClick={() => openCreateChannelModal({ 
-                          type: 'team', 
-                          projectId: null, 
-                          projectName: null 
-                        })}
-                        className={`p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity ${hoverBg}`}
-                        title="Add team channel"
-                      >
-                        <Plus size={14} />
-                      </button>
+                      {/* Only show + button for owner/admin */}
+                      {teamData?.currentUserRole !== 'member' && (
+                        <button
+                          onClick={() => openCreateChannelModal({ 
+                            type: 'team', 
+                            projectId: null, 
+                            projectName: null 
+                          })}
+                          className={`p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity ${hoverBg}`}
+                          title="Add team channel"
+                        >
+                          <Plus size={14} />
+                        </button>
+                      )}
                     </div>
                     {generalChannels.map(channel => (
                       <ChannelItem key={channel.id} channel={channel} />
@@ -1277,17 +1283,20 @@ export default function ChatPage() {
                       <h3 className={`text-xs font-bold uppercase tracking-wider ${textSecondary} truncate`}>
                         {projectName}
                       </h3>
-                      <button
-                        onClick={() => openCreateChannelModal({ 
-                          type: 'project', 
-                          projectId: data.projectId, 
-                          projectName 
-                        })}
-                        className={`p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity ${hoverBg}`}
-                        title={`Add channel to ${projectName}`}
-                      >
-                        <Plus size={14} />
-                      </button>
+                      {/* Only show + button for owner/admin */}
+                      {teamData?.currentUserRole !== 'member' && (
+                        <button
+                          onClick={() => openCreateChannelModal({ 
+                            type: 'project', 
+                            projectId: data.projectId, 
+                            projectName 
+                          })}
+                          className={`p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity ${hoverBg}`}
+                          title={`Add channel to ${projectName}`}
+                        >
+                          <Plus size={14} />
+                        </button>
+                      )}
                     </div>
                     {data.channels.map(channel => (
                       <ChannelItem key={channel.id} channel={channel} />
