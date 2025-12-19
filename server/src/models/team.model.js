@@ -198,6 +198,7 @@ export const getUserTeams = async (userId) => {
  * @param {Object} teamData - Team data { name, description, createdBy }
  * @returns {Promise<Object>} Created team with ID
  * SECURITY: User who creates team becomes owner automatically
+ * AUTO-CREATES: Default "general" channel for team-wide communication
  */
 export const createTeam = async ({ name, description, createdBy }) => {
   // Start transaction
@@ -211,6 +212,13 @@ export const createTeam = async ({ name, description, createdBy }) => {
   await db`
     INSERT INTO team_members (team_id, user_id, role)
     VALUES (${newTeam.id}, ${createdBy}, 'owner')
+  `;
+
+  // AUTO-CREATE "general" channel for team-wide communication
+  // This is a team-level channel (project_id IS NULL) visible to all team members
+  await db`
+    INSERT INTO channels (team_id, name, type, is_private, project_id)
+    VALUES (${newTeam.id}, 'general', 'text', false, NULL)
   `;
 
   return newTeam;
