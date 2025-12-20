@@ -81,8 +81,6 @@ const CreateChannelModal = ({
 }) => {
   if (!isModalOpen) return null;
 
-  const isProjectLocked = modalContext?.type === 'project';
-  
   const textPrimary = isDarkMode ? 'text-gray-100' : 'text-gray-900';
   const textSecondary = isDarkMode ? 'text-gray-400' : 'text-gray-500';
   const hoverBg = isDarkMode ? 'hover:bg-[#171717]' : 'hover:bg-gray-100';
@@ -111,33 +109,27 @@ const CreateChannelModal = ({
           {/* Belongs To Selector */}
           <div>
             <label className={`block text-sm font-semibold mb-2 ${textPrimary}`}>
-              Belongs to {isProjectLocked && <span className={`text-xs font-normal ${textSecondary}`}>(locked)</span>}
+              Belongs to
             </label>
             
-            {isProjectLocked ? (
-              <div className={`w-full px-4 py-3 rounded-lg border ${isDarkMode ? 'bg-[#171717] border-[#333] text-gray-400' : 'bg-gray-100 border-gray-300 text-gray-600'} cursor-not-allowed`}>
-                {modalContext.projectName ? `Project: ${modalContext.projectName}` : 'Entire Team'}
-              </div>
-            ) : (
-              <div className="relative">
-                <select
-                  value={selectedProjectId}
-                  onChange={(e) => setSelectedProjectId(e.target.value)}
-                  className={`w-full px-4 py-3 rounded-lg border appearance-none cursor-pointer ${inputBg} focus:outline-none focus:ring-2 focus:ring-[#006239]/50 ${textPrimary}`}
-                  disabled={isCreatingChannel}
-                  required
-                >
-                  <option value="">-- Select --</option>
-                  <option value="null">Entire Team</option>
-                  {availableProjects.map(project => (
-                    <option key={project.id} value={project.id}>
-                      Project: {project.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown size={18} className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${textSecondary}`} />
-              </div>
-            )}
+            <div className="relative">
+              <select
+                value={selectedProjectId}
+                onChange={(e) => setSelectedProjectId(e.target.value)}
+                className={`w-full px-4 py-3 rounded-lg border appearance-none cursor-pointer ${inputBg} focus:outline-none focus:ring-2 focus:ring-[#006239]/50 ${textPrimary}`}
+                disabled={isCreatingChannel}
+                required
+              >
+                <option value="">-- Select --</option>
+                <option value="null">Entire Team</option>
+                {availableProjects.map(project => (
+                  <option key={project.id} value={project.id}>
+                    Project: {project.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={18} className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${textSecondary}`} />
+            </div>
           </div>
 
           {/* Channel Name Input */}
