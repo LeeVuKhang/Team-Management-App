@@ -227,8 +227,8 @@ const Modal = ({ isOpen, onClose, title, children, darkMode }) => {
   );
 };
 
-// Edit Team Modal
-const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode }) => {
+// Edit Team Modal with Members Management
+const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode, teamId, queryClient }) => {
   const [formData, setFormData] = useState({
     name: '',
     description: ''
@@ -236,6 +236,28 @@ const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode }) => {
   const [error, setError] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeTab, setActiveTab] = useState('general'); // 'general' or 'members'
+
+  // Fetch team members for the members tab
+  const { data: membersData } = useQuery({
+    queryKey: ['teamMembers', teamId],
+    queryFn: () => getTeamMembers(teamId),
+    enabled: !!teamId && isOpen && activeTab === 'members',
+  });
+
+  const members = membersData?.data || [];
+
+  // Remove member mutation
+  const removeMemberMutation = useMutation({
+    mutationFn: ({ memberId }) => removeTeamMember(teamId, memberId),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['teamMembers', teamId]);
+      toast.success('Member removed successfully');
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to remove member');
+    },
+  });
 
   React.useEffect(() => {
     if (team) {
@@ -246,6 +268,7 @@ const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode }) => {
     }
     setError(null);
     setFieldErrors({});
+    setActiveTab('general'); // Reset to general tab on open
   }, [team, isOpen]);
 
   const handleSubmit = async (e) => {
@@ -286,10 +309,12 @@ const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode }) => {
     }
   };
 
-  const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
-    darkMode ? 'bg-dark-secondary border border-[#171717] text-white' : 'bg-white border border-gray-200 text-black'
-  }`;
-  
+  const handleRemoveMember = (memberId) => {
+    if (window.confirm('Are you sure you want to remove this member?')) {
+      removeMemberMutation.mutate({ memberId });
+    }
+  };
+
   const getInputClass = (fieldName) => {
     const hasError = fieldErrors[fieldName];
     return `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 transition-all ${
@@ -305,84 +330,196 @@ const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode }) => {
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Edit Team" darkMode={darkMode}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className={labelClass}>Team Name *</label>
-          <input
-            type="text"
-            maxLength={100}
-            value={formData.name}
-            onChange={(e) => {
-              setFormData({ ...formData, name: e.target.value });
-              if (fieldErrors.name) {
-                setFieldErrors({ ...fieldErrors, name: null });
-              }
-            }}
-            className={getInputClass('name')}
-            placeholder="Enter team name"
-          />
-          {fieldErrors.name && (
-            <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-              <AlertCircle size={12} />
-              {fieldErrors.name}
-            </p>
-          )}
-        </div>
+      {/* Tabs */}
+      <div className={`flex border-b mb-6 -mt-2 ${darkMode ? 'border-[#171717]' : 'border-gray-200'}`}>
+        <button
+          type="button"
+          onClick={() => setActiveTab('general')}
+          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'general'
+              ? `border-[#006239] ${darkMode ? 'text-white' : 'text-black'}`
+              : `border-transparent ${darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`
+          }`}
+        >
+          General
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('members')}
+          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'members'
+              ? `border-[#006239] ${darkMode ? 'text-white' : 'text-black'}`
+              : `border-transparent ${darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`
+          }`}
+        >
+          Members ({members.length})
+        </button>
+      </div>
 
-        <div>
-          <label className={labelClass}>Description</label>
-          <textarea
-            rows={4}
-            maxLength={500}
-            value={formData.description}
-            onChange={(e) => {
-              setFormData({ ...formData, description: e.target.value });
-              if (fieldErrors.description) {
-                setFieldErrors({ ...fieldErrors, description: null });
-              }
-            }}
-            className={getInputClass('description')}
-            placeholder="Enter team description"
-          />
-          {fieldErrors.description && (
-            <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-              <AlertCircle size={12} />
-              {fieldErrors.description}
-            </p>
-          )}
-        </div>
-
-        {error && (
-          <div className={`p-3 rounded-lg border ${
-            darkMode ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-red-50 border-red-200 text-red-600'
-          }`}>
-            <div className="flex items-start gap-2">
-              <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
-              <p className="text-sm">{error}</p>
-            </div>
+      {/* General Tab */}
+      {activeTab === 'general' && (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className={labelClass}>Team Name *</label>
+            <input
+              type="text"
+              maxLength={100}
+              value={formData.name}
+              onChange={(e) => {
+                setFormData({ ...formData, name: e.target.value });
+                if (fieldErrors.name) {
+                  setFieldErrors({ ...fieldErrors, name: null });
+                }
+              }}
+              className={getInputClass('name')}
+              placeholder="Enter team name"
+            />
+            {fieldErrors.name && (
+              <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                <AlertCircle size={12} />
+                {fieldErrors.name}
+              </p>
+            )}
           </div>
-        )}
 
-        <div className="flex gap-3 pt-4">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isSubmitting}
-            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
-              darkMode ? 'bg-[#171717] text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            } disabled:opacity-50`}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="flex-1 px-6 py-3 bg-[#006239] hover:bg-[#005230] text-white rounded-lg font-semibold transition-all disabled:opacity-50"
-          >
-            {isSubmitting ? 'Saving...' : 'Save Changes'}
-          </button>
+          <div>
+            <label className={labelClass}>Description</label>
+            <textarea
+              rows={4}
+              maxLength={500}
+              value={formData.description}
+              onChange={(e) => {
+                setFormData({ ...formData, description: e.target.value });
+                if (fieldErrors.description) {
+                  setFieldErrors({ ...fieldErrors, description: null });
+                }
+              }}
+              className={getInputClass('description')}
+              placeholder="Enter team description"
+            />
+            {fieldErrors.description && (
+              <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                <AlertCircle size={12} />
+                {fieldErrors.description}
+              </p>
+            )}
+          </div>
+
+          {error && (
+            <div className={`p-3 rounded-lg border ${
+              darkMode ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-red-50 border-red-200 text-red-600'
+            }`}>
+              <div className="flex items-start gap-2">
+                <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
+                <p className="text-sm">{error}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+                darkMode ? 'bg-[#171717] text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              } disabled:opacity-50`}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="flex-1 px-6 py-3 bg-[#006239] hover:bg-[#005230] text-white rounded-lg font-semibold transition-all disabled:opacity-50"
+            >
+              {isSubmitting ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Members Tab */}
+      {activeTab === 'members' && (
+        <div className="space-y-3">
+          <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-4`}>
+            Manage team members. Only owners can remove other members.
+          </div>
+          
+          {members.length === 0 ? (
+            <div className={`text-center py-8 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              <Users size={32} className="mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No members found</p>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {members.map((member) => (
+                <div
+                  key={member.id}
+                  className={`flex items-center justify-between p-3 rounded-lg border ${
+                    darkMode ? 'bg-[#171717] border-[#171717]' : 'bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    {renderUserAvatar(member, 'sm', darkMode)}
+                    <div>
+                      <div className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-black'}`}>
+                        {member.username}
+                      </div>
+                      <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        {member.email}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {/* Role Badge */}
+                    <span
+                      className={`px-2.5 py-1 text-xs font-medium rounded-full ${
+                        member.role === 'owner'
+                          ? 'bg-purple-500/20 text-purple-400'
+                          : member.role === 'admin'
+                          ? 'bg-blue-500/20 text-blue-400'
+                          : 'bg-gray-500/20 text-gray-400'
+                      }`}
+                    >
+                      {member.role}
+                    </span>
+
+                    {/* Remove Button (only for non-owners) */}
+                    {member.role !== 'owner' && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMember(member.user_id)}
+                        disabled={removeMemberMutation.isLoading}
+                        className={`p-1.5 rounded-lg transition-colors ${
+                          darkMode
+                            ? 'hover:bg-red-500/20 text-red-400'
+                            : 'hover:bg-red-50 text-red-600'
+                        } disabled:opacity-50`}
+                        title="Remove member"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-4 border-t" style={{ borderColor: darkMode ? '#171717' : '#e5e7eb' }}>
+            <button
+              type="button"
+              onClick={onClose}
+              className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+                darkMode ? 'bg-[#171717] text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Close
+            </button>
+          </div>
         </div>
-      </form>
+      )}
     </Modal>
   );
 };
@@ -2723,7 +2860,7 @@ export default function TeamPage() {
 
             {showSettingsMenu && (() => {
               // Find current user's role in this team
-              const currentMember = members.find(m => m.id === currentUser?.id);
+              const currentMember = members.find(m => m.user_id === currentUser?.id);
               const isOwner = currentMember?.role === 'owner';
 
               return (
@@ -3057,6 +3194,8 @@ export default function TeamPage() {
         team={team}
         onSubmit={(updates) => updateTeamMutation.mutateAsync(updates)}
         darkMode={isDarkMode}
+        teamId={teamId}
+        queryClient={queryClient}
       />
 
       <InviteMemberModal
