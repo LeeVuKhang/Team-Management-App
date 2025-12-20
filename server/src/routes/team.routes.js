@@ -1,7 +1,7 @@
 import express from 'express';
 import * as TeamController from '../controllers/team.controller.js';
 import { validate } from '../middlewares/validate.js';
-import { verifyToken } from '../middlewares/auth.js';
+//import { verifyToken } from '../middlewares/auth.js';
 import { 
   teamIdParamSchema, 
   createTeamSchema, 
@@ -19,7 +19,7 @@ const router = express.Router();
  */
 
 // Apply JWT authentication to all team routes
-router.use(verifyToken);
+//router.use(verifyToken);
 
 /**
  * @route   GET /api/v1/teams
