@@ -190,7 +190,7 @@ export const getUserTeams = async (userId) => {
     LEFT JOIN projects p ON t.id = p.team_id
     WHERE tm.user_id = ${userId}
     GROUP BY t.id, t.name, t.description, tm.role
-    ORDER BY t.created_at DESC
+    ORDER BY t.created_at ASC
   `;
   
   console.log('Query result:', teams);

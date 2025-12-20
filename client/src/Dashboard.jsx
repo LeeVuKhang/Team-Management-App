@@ -150,8 +150,8 @@ export default function Dashboard() {
       
       toast.success(`Team "${newTeamData.name}" created successfully!`);
       
-      // Add new team to state
-      setTeams([data.data, ...teams]);
+      // Add new team to end of list (right side)
+      setTeams([...teams, data.data]);
       
       setIsModalOpen(false);
       setNewTeamData({ name: '', description: '' });
@@ -430,41 +430,28 @@ export default function Dashboard() {
                         }`}>
                           {team.name}
                         </h3>
-                        <div className="flex gap-4 text-sm">
-                          <div className="flex items-center gap-1.5">
-                            <Users size={14} className={isDarkMode ? 'text-gray-400' : 'text-gray-600'} />
-                            <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>
-                              {team.membersCount} members
-                            </span>
-                          </div>
+                        {team.description && (
+                          <p className={`text-xs mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                            {team.description}
+                          </p>
+                        )}
+                        <div className="flex gap-4 text-sm items-center">
                           <div className="flex items-center gap-1.5">
                             <FolderKanban size={14} className={isDarkMode ? 'text-gray-400' : 'text-gray-600'} />
                             <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>
-                              {team.activeProjects} projects
+                              {team.project_count || 0} projects
                             </span>
                           </div>
+                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                            team.role === 'owner' 
+                              ? 'bg-[#308f68] text-white' 
+                              : team.role === 'admin'
+                              ? 'bg-blue-500 text-white'
+                              : isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
+                          }`}>
+                            {team.role}
+                          </span>
                         </div>
-                      </div>
-                      
-                      {/* Member Avatars */}
-                      <div className="flex -space-x-2 ml-4">
-                        {team.members.slice(0, 3).map((member, i) => (
-                          <div 
-                            key={i}
-                            className={`inline-block h-7 w-7 rounded-full ring-2 flex items-center justify-center text-xs font-medium
-                              ${isDarkMode ? 'ring-dark-secondary bg-[#1F1F1F] text-white' : 'ring-white bg-gray-300 text-black'}`}
-                          >
-                            {member}
-                          </div>
-                        ))}
-                        {team.members.length > 3 && (
-                          <div 
-                            className={`inline-block h-7 w-7 rounded-full ring-2 flex items-center justify-center text-xs font-medium
-                              ${isDarkMode ? 'ring-dark-secondary bg-[#171717] text-gray-400' : 'ring-white bg-gray-200 text-gray-600'}`}
-                          >
-                            +{team.members.length - 3}
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>
