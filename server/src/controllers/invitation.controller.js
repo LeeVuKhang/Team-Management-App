@@ -48,6 +48,79 @@ const triggerOnboardingWebhook = async (data) => {
 };
 
 /**
+ * Get invitation preview (PUBLIC - no auth required)
+ * Returns invitation details for display before accepting/declining
+ * @route GET /api/v1/invitations/preview?token=xxx
+ */
+export const getInvitationPreview = async (req, res, next) => {
+  try {
+    const { token } = req.query;
+
+    // Get invitation details with inviter info
+    const [invitation] = await db`
+      SELECT 
+        ti.id,
+        ti.team_id,
+        ti.email,
+        ti.role,
+        ti.status,
+        ti.expires_at,
+        ti.created_at,
+        t.name AS team_name,
+        t.description AS team_description,
+        u.id AS inviter_id,
+        u.username AS inviter_name,
+        u.avatar_url AS inviter_avatar,
+        (SELECT COUNT(*) FROM team_members WHERE team_id = ti.team_id) AS member_count
+      FROM team_invitations ti
+      INNER JOIN teams t ON ti.team_id = t.id
+      LEFT JOIN users u ON ti.inviter_id = u.id
+      WHERE ti.token = ${token}
+    `;
+
+    if (!invitation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invitation not found or has been revoked',
+      });
+    }
+
+    // Check if expired
+    if (new Date(invitation.expires_at) < new Date()) {
+      return res.status(410).json({
+        success: false,
+        message: 'This invitation has expired',
+      });
+    }
+
+    // Check if already used
+    if (invitation.status !== 'pending') {
+      return res.status(409).json({
+        success: false,
+        message: 'This invitation has already been used',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        teamName: invitation.team_name,
+        teamDescription: invitation.team_description,
+        role: invitation.role,
+        inviterName: invitation.inviter_name,
+        inviterAvatar: invitation.inviter_avatar,
+        memberCount: parseInt(invitation.member_count),
+        expiresAt: invitation.expires_at,
+        invitedEmail: invitation.email,
+      },
+    });
+  } catch (error) {
+    console.error('Get invitation preview error:', error);
+    next(error);
+  }
+};
+
+/**
  * Get all pending invitations for the current user
  * @route GET /api/v1/user/invitations
  */

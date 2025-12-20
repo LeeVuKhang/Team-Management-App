@@ -275,38 +275,8 @@ export async function updateProjectMemberRole(projectId, userId, role) {
 }
 
 // ==================== INVITATION API ====================
-
-/**
- * Get all pending invitations for the current user
- * @returns {Promise<{success: boolean, data: Array}>}
- */
-export async function getUserInvitations() {
-  return apiFetch('/user/invitations');
-}
-
-/**
- * Accept a team invitation
- * @param {string} token - Invitation token
- * @returns {Promise<{success: boolean, message: string, data: {teamId: number, teamName: string}}>}
- */
-export async function acceptInvitation(token) {
-  return apiFetch('/invitations/accept', {
-    method: 'POST',
-    body: JSON.stringify({ token }),
-  });
-}
-
-/**
- * Decline a team invitation
- * @param {string} token - Invitation token
- * @returns {Promise<{success: boolean, message: string}>}
- */
-export async function declineInvitation(token) {
-  return apiFetch('/invitations/decline', {
-    method: 'POST',
-    body: JSON.stringify({ token }),
-  });
-}
+// NOTE: getUserInvitations, acceptInvitation, declineInvitation, getInvitationPreview
+// have been moved to notificationApi.js for centralized notification handling
 
 /**
  * Search users for team invitation (with status indicators)
@@ -357,5 +327,38 @@ export async function updateTeamMemberRole(teamId, userId, role) {
   return apiFetch(`/teams/${teamId}/members/${userId}/role`, {
     method: 'PATCH',
     body: JSON.stringify({ role }),
+  });
+}
+// ==================== TEAM INVITATIONS ====================
+
+/**
+ * Get pending invitations for a team
+ * @param {number} teamId - Team ID
+ * @returns {Promise<{success: boolean, data: Array}>}
+ */
+export async function getTeamPendingInvitations(teamId) {
+  return apiFetch(`/teams/${teamId}/invitations`);
+}
+
+/**
+ * Revoke a pending invitation
+ * @param {number} teamId - Team ID
+ * @param {number} invitationId - Invitation ID to revoke
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export async function revokeInvitation(teamId, invitationId) {
+  return apiFetch(`/teams/${teamId}/invitations/${invitationId}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Leave a team (for non-owner members)
+ * @param {number} teamId - Team ID
+ * @returns {Promise<{success: boolean, message: string}>}
+ */
+export async function leaveTeam(teamId) {
+  return apiFetch(`/teams/${teamId}/leave`, {
+    method: 'POST',
   });
 }

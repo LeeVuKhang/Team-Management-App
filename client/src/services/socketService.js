@@ -4,8 +4,8 @@ import { io } from 'socket.io-client';
  * Socket Service
  * Manages Socket.io connection for real-time chat
  * 
- * Security: Uses authentication handshake with userId
- * TODO: Replace userId auth with JWT token from cookies
+ * Security: Uses JWT token from HTTP-only cookies for authentication
+ * The token is automatically sent via withCredentials option
  */
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
@@ -13,20 +13,41 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 let socket = null;
 
 /**
- * Initialize socket connection with authentication
- * @param {number} userId - Current user's ID for authentication
+ * Get JWT token from cookies (for socket auth)
+ * Note: In production, the token is HTTP-only and will be sent automatically
+ * This helper is mainly for development/debugging
+ */
+const getAuthToken = () => {
+  const cookies = document.cookie.split(';');
+  for (let cookie of cookies) {
+    const [name, value] = cookie.trim().split('=');
+    if (name === 'token') {
+      return value;
+    }
+  }
+  return null;
+};
+
+/**
+ * Initialize socket connection with JWT authentication
  * @returns {Socket} Socket.io client instance
  */
-export const initSocket = (userId) => {
+export const initSocket = () => {
   if (socket?.connected) {
     console.log('Socket already connected');
     return socket;
   }
 
+  // Get token for auth (will be sent automatically via cookies)
+  const token = getAuthToken();
+  
+  console.log('Initializing Socket.io connection...');
+  console.log('Token found in cookies:', token ? 'Yes' : 'No');
+
   socket = io(SOCKET_URL, {
-    withCredentials: true, // Send cookies for auth
+    withCredentials: true, // Send cookies (including JWT) for auth
     auth: {
-      userId, // TODO: Replace with JWT token
+      token, // Send token explicitly as backup
     },
     transports: ['websocket', 'polling'],
     reconnection: true,
@@ -41,6 +62,9 @@ export const initSocket = (userId) => {
 
   socket.on('connect_error', (error) => {
     console.error('Socket connection error:', error.message);
+    if (error.message.includes('Authentication') || error.message.includes('Token')) {
+      console.warn('Authentication failed. Please log in again.');
+    }
   });
 
   socket.on('disconnect', (reason) => {

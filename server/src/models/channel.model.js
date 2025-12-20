@@ -311,3 +311,35 @@ export const getUserById = async (userId) => {
   `;
   return user || null;
 };
+
+/**
+ * Delete a channel
+ * @param {number} channelId 
+ * @param {number} teamId - For verification
+ * @param {number} userId - For RBAC verification
+ * @returns {Promise<void>}
+ */
+export const deleteChannel = async (channelId, teamId, userId) => {
+  // SECURITY: Verify team membership and role (should be owner/admin, checked by middleware)
+  const membership = await verifyTeamMembership(teamId, userId);
+  if (!membership) {
+    throw new Error('Access denied: User is not a member of this team');
+  }
+
+  // Verify channel exists and belongs to this team
+  const [channel] = await db`
+    SELECT id, team_id, project_id FROM channels 
+    WHERE id = ${channelId} AND team_id = ${teamId}
+  `;
+
+  if (!channel) {
+    throw new Error('Channel not found');
+  }
+
+  // Delete the channel (CASCADE will delete related messages automatically via FK constraint)
+  await db`
+    DELETE FROM channels WHERE id = ${channelId}
+  `;
+
+  console.log(`[deleteChannel] Channel ${channelId} deleted successfully`);
+};

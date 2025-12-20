@@ -21,6 +21,7 @@ function App() {
           style: {
             background: '#363636',
             color: '#fff',
+            marginTop: '60px',
           },
           success: {
             iconTheme: {

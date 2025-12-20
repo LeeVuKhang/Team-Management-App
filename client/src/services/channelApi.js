@@ -151,3 +151,38 @@ export const searchMessages = async (teamId, channelId, query) => {
   const data = await response.json();
   return data.data || [];
 };
+
+/**
+ * Delete a channel
+ * @param {number} teamId 
+ * @param {number} channelId 
+ * @returns {Promise<void>}
+ */
+export const deleteChannel = async (teamId, channelId) => {
+  const response = await fetch(`${API_BASE}/teams/${teamId}/channels/${channelId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    // Try to parse error as JSON, fallback to text if it fails
+    let errorMessage = 'Failed to delete channel';
+    try {
+      const error = await response.json();
+      errorMessage = error.message || errorMessage;
+    } catch (e) {
+      // If response is not JSON (e.g., HTML error page), use status text
+      errorMessage = `Failed to delete channel (${response.status} ${response.statusText})`;
+    }
+    throw new Error(errorMessage);
+  }
+
+  // Check if response has content before parsing JSON
+  const contentType = response.headers.get('content-type');
+  if (contentType && contentType.includes('application/json')) {
+    return response.json();
+  }
+  
+  // If no JSON content, return success
+  return { success: true };
+};

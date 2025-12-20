@@ -1,19 +1,29 @@
 import express from 'express';
 import * as InvitationController from '../controllers/invitation.controller.js';
 import { validate } from '../middlewares/validate.js';
-import { mockAuth } from '../middlewares/auth.js';
-import { invitationTokenSchema, createInvitationSchema } from '../validations/invitation.validation.js';
+import { verifyToken } from '../middlewares/auth.js';
+import { invitationTokenSchema, invitationTokenQuerySchema, createInvitationSchema } from '../validations/invitation.validation.js';
 
 const router = express.Router();
 
 /**
  * Invitation Routes
- * All routes require authentication
- * TODO: Replace mockAuth with verifyToken for production
  */
 
-// Apply auth middleware to all invitation routes
-router.use(mockAuth);
+/**
+ * @route   GET /api/v1/invitations/preview
+ * @desc    Get invitation details for preview (PUBLIC - no auth required)
+ * @access  Public
+ * @query   token - Invitation token
+ */
+router.get(
+  '/invitations/preview',
+  validate(invitationTokenQuerySchema, 'query'),
+  InvitationController.getInvitationPreview
+);
+
+// Apply JWT authentication to all remaining invitation routes
+router.use(verifyToken);
 
 /**
  * @route   GET /api/v1/user/invitations

@@ -22,7 +22,9 @@ import {
   Search,
   User,
   MessageSquare,
-  Brain
+  Brain,
+  ChevronDown,
+  Filter
 } from 'lucide-react';
 
 /**
@@ -172,6 +174,7 @@ const TaskCard = ({ task, darkMode, userRole, onEdit, onDelete }) => {
 
       <div className={`space-y-3 pt-3 border-t ${darkMode ? 'border-[#171717]/50' : 'border-gray-200'}`}>
         
+        {/* Assigned To Row */}
         <div className="flex items-center justify-between">
           <span className={`text-xs font-medium ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
             Assigned to:
@@ -188,16 +191,34 @@ const TaskCard = ({ task, darkMode, userRole, onEdit, onDelete }) => {
                   <>
                     <div className="flex -space-x-2">
                       {validAssignees.slice(0, 3).map((assignee, idx) => (
-                        <div
-                          key={assignee.user_id || idx}
-                          className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-medium border-2 ${
-                            darkMode 
-                              ? 'bg-[#006239] text-white border-[rgb(30,36,30)]' 
-                              : 'bg-gray-200 text-black border-white'
-                          }`}
-                          title={assignee.username}
-                        >
-                          {assignee.username ? assignee.username.charAt(0).toUpperCase() : '?'}
+                        <div key={assignee.user_id || idx} className="relative">
+                          {assignee.avatar_url ? (
+                            <img
+                              src={assignee.avatar_url}
+                              alt={assignee.username}
+                              className={`h-6 w-6 rounded-full object-cover border-2 ${
+                                darkMode 
+                                  ? 'border-[rgb(30,36,30)]' 
+                                  : 'border-white'
+                              }`}
+                              title={assignee.username}
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.nextElementSibling.style.display = 'flex';
+                              }}
+                            />
+                          ) : null}
+                          <div
+                            className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-medium border-2 ${
+                              darkMode 
+                                ? 'bg-[#006239] text-white border-[rgb(30,36,30)]' 
+                                : 'bg-gray-200 text-black border-white'
+                            }`}
+                            title={assignee.username}
+                            style={{ display: assignee.avatar_url ? 'none' : 'flex' }}
+                          >
+                            {assignee.username ? assignee.username.charAt(0).toUpperCase() : '?'}
+                          </div>
                         </div>
                       ))}
                       {validAssignees.length > 3 && (
@@ -235,6 +256,7 @@ const TaskCard = ({ task, darkMode, userRole, onEdit, onDelete }) => {
           </div>
         </div>
 
+        {/* Due Date Row */}
         <div className="flex items-center justify-between">
           <span className={`text-xs font-medium ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
             Due date:
@@ -249,18 +271,11 @@ const TaskCard = ({ task, darkMode, userRole, onEdit, onDelete }) => {
           </div>
         </div>
 
-        <div className={`flex items-center gap-4 pt-2 border-t ${darkMode ? 'border-[#171717]/50' : 'border-gray-200'}`}>
-          <div className={`flex items-center gap-1.5 text-xs ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
-            <MessageSquare size={14} />
-            <span>{task.comments_count}</span>
-          </div>
-          <div className={`flex items-center gap-1.5 text-xs ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
-            <Paperclip size={14} />
-            <span>{task.attachments_count}</span>
-          </div>
-          <div className={`flex items-center gap-1 text-xs ml-auto ${darkMode ? 'text-gray-300' : 'text-gray-400'}`}>
+        {/* Updated Date (Subtle Footer) */}
+        <div className="flex justify-end pt-1">
+          <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'} opacity-60`}>
             Updated {formatDate(task.updated_at)}
-          </div>
+          </span>
         </div>
       </div>
     </div>
@@ -1121,7 +1136,21 @@ export default function ProjectPage() {
                     <div className="flex -space-x-2">
                       {projectMembers.map((member) => (
                         <div key={member.id} className="relative group">
-                          <div className={`h-10 w-10 rounded-full border-2 flex items-center justify-center text-sm font-medium transition-all cursor-pointer group-hover:scale-110 group-hover:z-10 ${isDarkMode ? 'border-[rgb(30,36,30)] bg-[#006239] text-white' : 'border-white bg-gray-200 text-black'}`}>
+                          {member.avatar_url ? (
+                            <img
+                              src={member.avatar_url}
+                              alt={member.username}
+                              className={`h-10 w-10 rounded-full object-cover border-2 transition-all cursor-pointer group-hover:scale-110 group-hover:z-10 ${isDarkMode ? 'border-[rgb(30,36,30)]' : 'border-white'}`}
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.nextElementSibling.style.display = 'flex';
+                              }}
+                            />
+                          ) : null}
+                          <div
+                            className={`h-10 w-10 rounded-full border-2 flex items-center justify-center text-sm font-medium transition-all cursor-pointer group-hover:scale-110 group-hover:z-10 ${isDarkMode ? 'border-[rgb(30,36,30)] bg-[#006239] text-white' : 'border-white bg-gray-200 text-black'}`}
+                            style={{ display: member.avatar_url ? 'none' : 'flex' }}
+                          >
                             {member.username.charAt(0).toUpperCase()}
                           </div>
                           <div className={`absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none ${isDarkMode ? 'bg-[#171717] text-white' : 'bg-[rgb(60,68,58)] text-white'}`}>
@@ -1178,80 +1207,138 @@ export default function ProjectPage() {
                 </div>
               )}
 
-              {/* Filters */}
-              <div className={`${cardBg} border rounded-xl p-6 mb-6`}>
-                <div className="flex flex-col md:flex-row gap-4 mb-6">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                    <input
-                      type="text"
-                      placeholder="Search tasks..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className={`w-full rounded-lg py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${inputBg}`}
-                    />
-                  </div>
-
-                  {canEditTasks(userRole) && (
-                    <button
-                      onClick={handleCreateTask}
-                      className="flex items-center justify-center gap-2 bg-[#006239] hover:bg-[#005230] text-white px-6 py-2.5 rounded-lg font-semibold shadow-lg shadow-green-500/20 transition-all active:scale-95 whitespace-nowrap"
-                    >
-                      <Plus size={18} />
-                      Create Task
-                    </button>
-                  )}
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>
-                      Status
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      <FilterButton active={statusFilter === 'all'} onClick={() => setStatusFilter('all')} darkMode={isDarkMode}>All</FilterButton>
-                      <FilterButton active={statusFilter === 'todo'} onClick={() => setStatusFilter('todo')} darkMode={isDarkMode}>To Do</FilterButton>
-                      <FilterButton active={statusFilter === 'in_progress'} onClick={() => setStatusFilter('in_progress')} darkMode={isDarkMode}>In Progress</FilterButton>
-                      <FilterButton active={statusFilter === 'review'} onClick={() => setStatusFilter('review')} darkMode={isDarkMode}>Review</FilterButton>
-                      <FilterButton active={statusFilter === 'done'} onClick={() => setStatusFilter('done')} darkMode={isDarkMode}>Done</FilterButton>
+              {/* Smart Filter Bar - Single Row */}
+              <div className={`${cardBg} border rounded-xl p-4 mb-6`}>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  
+                  {/* Left Group: Search + Filter Dropdowns */}
+                  <div className="flex items-center gap-3 flex-1 min-w-[300px]">
+                    {/* Compact Search */}
+                    <div className="relative w-[350px]">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                      <input
+                        type="text"
+                        placeholder="Search tasks..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className={`w-full rounded-lg py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${inputBg}`}
+                      />
                     </div>
-                  </div>
 
-                  <div>
-                    <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>
-                      Priority
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      <FilterButton active={priorityFilter === 'all'} onClick={() => setPriorityFilter('all')} darkMode={isDarkMode}>All</FilterButton>
-                      <FilterButton active={priorityFilter === 'urgent'} onClick={() => setPriorityFilter('urgent')} darkMode={isDarkMode}>Urgent</FilterButton>
-                      <FilterButton active={priorityFilter === 'high'} onClick={() => setPriorityFilter('high')} darkMode={isDarkMode}>High</FilterButton>
-                      <FilterButton active={priorityFilter === 'medium'} onClick={() => setPriorityFilter('medium')} darkMode={isDarkMode}>Medium</FilterButton>
-                      <FilterButton active={priorityFilter === 'low'} onClick={() => setPriorityFilter('low')} darkMode={isDarkMode}>Low</FilterButton>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <div className="flex-1">
-                      <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>Sort By</label>
-                      <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={`w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${inputBg}`}>
-                        <option value="due_date">Due Date</option>
-                        <option value="priority">Priority</option>
-                        <option value="status">Status</option>
-                        <option value="created_at">Recently Created</option>
+                    {/* Status Dropdown */}
+                    <div className="relative">
+                      <select 
+                        value={statusFilter} 
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className={`appearance-none rounded-lg pl-3 pr-8 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
+                          statusFilter !== 'all'
+                            ? isDarkMode
+                              ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                              : 'bg-blue-50 text-blue-600 border border-blue-200'
+                            : isDarkMode
+                            ? 'bg-[#171717] text-gray-300 border border-[#171717] hover:bg-gray-700'
+                            : 'bg-gray-200/50 text-gray-600 border border-gray-200 hover:bg-gray-200'
+                        }`}
+                      >
+                        <option value="all">Status: All</option>
+                        <option value="todo">Status: To Do</option>
+                        <option value="in_progress">Status: In Progress</option>
+                        <option value="review">Status: Review</option>
+                        <option value="done">Status: Done</option>
                       </select>
+                      <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
                     </div>
 
-                    <div className="flex-1">
-                      <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>Assignee</label>
-                      <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)} className={`w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${inputBg}`}>
-                        <option value="all">All Members</option>
+                    {/* Priority Dropdown */}
+                    <div className="relative">
+                      <select 
+                        value={priorityFilter} 
+                        onChange={(e) => setPriorityFilter(e.target.value)}
+                        className={`appearance-none rounded-lg pl-3 pr-8 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
+                          priorityFilter !== 'all'
+                            ? priorityFilter === 'urgent'
+                              ? isDarkMode
+                                ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                : 'bg-red-50 text-red-600 border border-red-200'
+                              : priorityFilter === 'high'
+                              ? isDarkMode
+                                ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                                : 'bg-orange-50 text-orange-600 border border-orange-200'
+                              : isDarkMode
+                              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                              : 'bg-amber-50 text-amber-600 border border-amber-200'
+                            : isDarkMode
+                            ? 'bg-[#171717] text-gray-300 border border-[#171717] hover:bg-gray-700'
+                            : 'bg-gray-200/50 text-gray-600 border border-gray-200 hover:bg-gray-200'
+                        }`}
+                      >
+                        <option value="all">Priority: All</option>
+                        <option value="urgent">Priority: Urgent</option>
+                        <option value="high">Priority: High</option>
+                        <option value="medium">Priority: Medium</option>
+                        <option value="low">Priority: Low</option>
+                      </select>
+                      <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+                    </div>
+
+                    {/* Assignee Dropdown */}
+                    <div className="relative">
+                      <select 
+                        value={assigneeFilter} 
+                        onChange={(e) => setAssigneeFilter(e.target.value)}
+                        className={`appearance-none rounded-lg pl-3 pr-8 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
+                          assigneeFilter !== 'all'
+                            ? isDarkMode
+                              ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                              : 'bg-purple-50 text-purple-600 border border-purple-200'
+                            : isDarkMode
+                            ? 'bg-[#171717] text-gray-300 border border-[#171717] hover:bg-gray-700'
+                            : 'bg-gray-200/50 text-gray-600 border border-gray-200 hover:bg-gray-200'
+                        }`}
+                      >
+                        <option value="all">Assignee: All</option>
                         {projectMembers.map(member => (
                           <option key={member.user_id} value={member.user_id}>{member.username}</option>
                         ))}
                         <option value="unassigned">Unassigned</option>
                       </select>
+                      <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
                     </div>
                   </div>
+
+                  {/* Right Group: Sort + Create Button */}
+                  <div className="flex items-center gap-3">
+                    {/* Sort Dropdown */}
+                    <div className="relative">
+                      <select 
+                        value={sortBy} 
+                        onChange={(e) => setSortBy(e.target.value)}
+                        className={`appearance-none rounded-lg pl-3 pr-8 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
+                          isDarkMode 
+                            ? 'bg-[#171717] text-gray-300 border border-[#171717] hover:bg-gray-700' 
+                            : 'bg-gray-200/50 text-gray-600 border border-gray-200 hover:bg-gray-200'
+                        }`}
+                      >
+                        <option value="due_date">Sort: Due Date</option>
+                        <option value="priority">Sort: Priority</option>
+                        <option value="status">Sort: Status</option>
+                        <option value="created_at">Sort: Newest</option>
+                      </select>
+                      <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+                    </div>
+
+                    {/* Create Task Button - Conditionally Rendered */}
+                    {canEditTasks(userRole) && (
+                      <button
+                        onClick={handleCreateTask}
+                        className="flex items-center gap-2 bg-[#006239] hover:bg-[#005230] text-white px-4 py-2 rounded-lg font-semibold shadow-lg shadow-green-500/20 transition-all active:scale-95 whitespace-nowrap"
+                      >
+                        <Plus size={16} />
+                        Create Task
+                      </button>
+                    )}
+                  </div>
+
                 </div>
               </div>
 

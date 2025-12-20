@@ -23,6 +23,8 @@ export const getTeamById = async (teamId, userId) => {
     throw new Error('Access denied: User is not a member of this team');
   }
 
+  const userRole = membershipCheck[0].role;
+
   // User is authorized, fetch team details
   const [team] = await db`
     SELECT 
@@ -39,7 +41,8 @@ export const getTeamById = async (teamId, userId) => {
     WHERE t.id = ${teamId}
   `;
 
-  return team || null;
+  // Include user's role in the team for frontend RBAC
+  return team ? { ...team, currentUserRole: userRole } : null;
 };
 
 /**
@@ -204,6 +207,7 @@ export const getUserTeams = async (userId) => {
  * @param {Object} teamData - Team data { name, description, createdBy }
  * @returns {Promise<Object>} Created team with ID
  * SECURITY: User who creates team becomes owner automatically
+ * AUTO-CREATES: Default "general" channel for team-wide communication
  */
 export const createTeam = async ({ name, description, createdBy }) => {
   // Start transaction
@@ -217,6 +221,13 @@ export const createTeam = async ({ name, description, createdBy }) => {
   await db`
     INSERT INTO team_members (team_id, user_id, role)
     VALUES (${newTeam.id}, ${createdBy}, 'owner')
+  `;
+
+  // AUTO-CREATE "general" channel for team-wide communication
+  // This is a team-level channel (project_id IS NULL) visible to all team members
+  await db`
+    INSERT INTO channels (team_id, name, type, is_private, project_id)
+    VALUES (${newTeam.id}, 'general', 'text', false, NULL)
   `;
 
   return newTeam;
@@ -364,4 +375,121 @@ export const searchUsersForInvite = async (teamId, searchQuery, requestingUserId
   `;
 
   return users;
+};
+/**
+ * Get pending invitations for a team
+ * @param {number} teamId - Team ID
+ * @param {number} requestingUserId - User ID making the request (for RBAC)
+ * @returns {Promise<Array>} List of pending invitations
+ * @throws {Error} If requesting user is not a team member with admin/owner role
+ * SECURITY: Only team admins/owners can view pending invitations
+ */
+export const getTeamPendingInvitations = async (teamId, requestingUserId) => {
+  // SECURITY: Verify requesting user is a team admin or owner
+  const [membership] = await db`
+    SELECT role FROM team_members WHERE team_id = ${teamId} AND user_id = ${requestingUserId}
+  `;
+
+  if (!membership) {
+    throw new Error('Access denied: User is not a member of this team');
+  }
+
+  if (!['owner', 'admin'].includes(membership.role)) {
+    throw new Error('Access denied: Only team owner or admin can view pending invitations');
+  }
+
+  // Fetch all pending invitations for this team
+  const invitations = await db`
+    SELECT 
+      ti.id,
+      ti.email,
+      ti.role,
+      ti.status,
+      ti.created_at AS sent_date,
+      ti.expires_at,
+      u.username AS inviter_name,
+      u.avatar_url AS inviter_avatar
+    FROM team_invitations ti
+    LEFT JOIN users u ON ti.inviter_id = u.id
+    WHERE ti.team_id = ${teamId}
+      AND ti.status = 'pending'
+      AND ti.expires_at > NOW()
+    ORDER BY ti.created_at DESC
+  `;
+
+  return invitations;
+};
+
+/**
+ * Revoke (delete) a pending invitation
+ * @param {number} teamId - Team ID
+ * @param {number} invitationId - Invitation ID to revoke
+ * @param {number} requestingUserId - User ID making the request (for RBAC)
+ * @returns {Promise<boolean>} True if revoked successfully
+ * @throws {Error} If requesting user is not a team admin/owner
+ * SECURITY: Only team admins/owners can revoke invitations
+ */
+export const revokeInvitation = async (teamId, invitationId, requestingUserId) => {
+  // SECURITY: Verify requesting user is a team admin or owner
+  const [membership] = await db`
+    SELECT role FROM team_members WHERE team_id = ${teamId} AND user_id = ${requestingUserId}
+  `;
+
+  if (!membership) {
+    throw new Error('Access denied: User is not a member of this team');
+  }
+
+  if (!['owner', 'admin'].includes(membership.role)) {
+    throw new Error('Access denied: Only team owner or admin can revoke invitations');
+  }
+
+  // SECURITY: Verify invitation belongs to this team before deleting
+  const result = await db`
+    DELETE FROM team_invitations 
+    WHERE id = ${invitationId} 
+      AND team_id = ${teamId}
+      AND status = 'pending'
+  `;
+
+  if (result.count === 0) {
+    throw new Error('Invitation not found or already processed');
+  }
+
+  return true;
+};
+
+/**
+ * Leave a team (for non-owner members)
+ * @param {number} teamId - Team ID
+ * @param {number} userId - User ID leaving the team
+ * @returns {Promise<boolean>} True if left successfully
+ * @throws {Error} If user is not a member or is the owner
+ * SECURITY: Owners cannot leave (must delete team or transfer ownership first)
+ */
+export const leaveTeam = async (teamId, userId) => {
+  // SECURITY: Verify user is a member of this team
+  const [membership] = await db`
+    SELECT role FROM team_members WHERE team_id = ${teamId} AND user_id = ${userId}
+  `;
+
+  if (!membership) {
+    throw new Error('Access denied: User is not a member of this team');
+  }
+
+  // SECURITY: Owners cannot leave the team (must transfer ownership or delete team)
+  if (membership.role === 'owner') {
+    throw new Error('Owner cannot leave the team. Please transfer ownership or delete the team.');
+  }
+
+  // Remove user from team (CASCADE will remove from projects, tasks, etc.)
+  const result = await db`
+    DELETE FROM team_members 
+    WHERE team_id = ${teamId} AND user_id = ${userId}
+  `;
+
+  if (result.count === 0) {
+    throw new Error('Failed to leave team');
+  }
+
+  return true;
 };

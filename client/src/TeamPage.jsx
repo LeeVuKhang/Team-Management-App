@@ -20,9 +20,13 @@ import {
   searchUsers,
   createInvitation,
   removeTeamMember,
-  updateTeamMemberRole
+  updateTeamMemberRole,
+  getTeamPendingInvitations,
+  revokeInvitation,
+  leaveTeam
 } from './services/projectApi';
 import { useDebounce } from './hooks/useDebounce';
+import { useAuth } from './hooks/useAuth';
 import { 
   LayoutDashboard, 
   FolderKanban, 
@@ -42,6 +46,44 @@ import {
   UserCheck,
   Mail
 } from 'lucide-react';
+
+/**
+ * UTILITY FUNCTIONS
+ */
+
+// Render user avatar with image or initials fallback
+const renderUserAvatar = (user, size = 'md', darkMode = false) => {
+  const sizeClasses = {
+    sm: 'h-6 w-6 text-xs',
+    md: 'h-10 w-10 text-sm',
+    lg: 'h-12 w-12 text-base'
+  };
+
+  if (user.avatar_url) {
+    return (
+      <img
+        src={user.avatar_url}
+        alt={user.username || 'User'}
+        className={`${sizeClasses[size]} rounded-full object-cover border-2 ${
+          darkMode ? 'border-[rgb(30,36,30)]' : 'border-white'
+        }`}
+        onError={(e) => {
+          // Fallback to initials if image fails to load
+          e.target.style.display = 'none';
+          e.target.nextSibling.style.display = 'flex';
+        }}
+      />
+    );
+  }
+
+  return (
+    <div className={`${sizeClasses[size]} rounded-full flex items-center justify-center font-medium ${
+      darkMode ? 'bg-[#006239] text-white' : 'bg-gray-200 text-black'
+    }`}>
+      {user.username?.substring(0, 2).toUpperCase() || 'U'}
+    </div>
+  );
+};
 
 /**
  * VALIDATION SCHEMAS (Client-Side with Zod)
@@ -185,8 +227,8 @@ const Modal = ({ isOpen, onClose, title, children, darkMode }) => {
   );
 };
 
-// Edit Team Modal
-const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode }) => {
+// Edit Team Modal with Members Management
+const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode, teamId, queryClient }) => {
   const [formData, setFormData] = useState({
     name: '',
     description: ''
@@ -194,6 +236,28 @@ const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode }) => {
   const [error, setError] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeTab, setActiveTab] = useState('general'); // 'general' or 'members'
+
+  // Fetch team members for the members tab
+  const { data: membersData } = useQuery({
+    queryKey: ['teamMembers', teamId],
+    queryFn: () => getTeamMembers(teamId),
+    enabled: !!teamId && isOpen && activeTab === 'members',
+  });
+
+  const members = membersData?.data || [];
+
+  // Remove member mutation
+  const removeMemberMutation = useMutation({
+    mutationFn: ({ memberId }) => removeTeamMember(teamId, memberId),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['teamMembers', teamId]);
+      toast.success('Member removed successfully');
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to remove member');
+    },
+  });
 
   React.useEffect(() => {
     if (team) {
@@ -204,6 +268,7 @@ const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode }) => {
     }
     setError(null);
     setFieldErrors({});
+    setActiveTab('general'); // Reset to general tab on open
   }, [team, isOpen]);
 
   const handleSubmit = async (e) => {
@@ -236,7 +301,7 @@ const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode }) => {
     } catch (err) {
       // Extract server error message from response
       const errorMessage = err.response?.data?.message || err.message || 'Failed to update team';
-      console.error('❌ Server error:', errorMessage);
+      console.error('Server error:', errorMessage);
       setError(errorMessage);
       // Modal stays open, user can see the error and retry
     } finally {
@@ -244,10 +309,12 @@ const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode }) => {
     }
   };
 
-  const inputClass = `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
-    darkMode ? 'bg-dark-secondary border border-[#171717] text-white' : 'bg-white border border-gray-200 text-black'
-  }`;
-  
+  const handleRemoveMember = (memberId) => {
+    if (window.confirm('Are you sure you want to remove this member?')) {
+      removeMemberMutation.mutate({ memberId });
+    }
+  };
+
   const getInputClass = (fieldName) => {
     const hasError = fieldErrors[fieldName];
     return `w-full rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 transition-all ${
@@ -263,84 +330,196 @@ const EditTeamModal = ({ isOpen, onClose, team, onSubmit, darkMode }) => {
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Edit Team" darkMode={darkMode}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className={labelClass}>Team Name *</label>
-          <input
-            type="text"
-            maxLength={100}
-            value={formData.name}
-            onChange={(e) => {
-              setFormData({ ...formData, name: e.target.value });
-              if (fieldErrors.name) {
-                setFieldErrors({ ...fieldErrors, name: null });
-              }
-            }}
-            className={getInputClass('name')}
-            placeholder="Enter team name"
-          />
-          {fieldErrors.name && (
-            <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-              <AlertCircle size={12} />
-              {fieldErrors.name}
-            </p>
-          )}
-        </div>
+      {/* Tabs */}
+      <div className={`flex border-b mb-6 -mt-2 ${darkMode ? 'border-[#171717]' : 'border-gray-200'}`}>
+        <button
+          type="button"
+          onClick={() => setActiveTab('general')}
+          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'general'
+              ? `border-[#006239] ${darkMode ? 'text-white' : 'text-black'}`
+              : `border-transparent ${darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`
+          }`}
+        >
+          General
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('members')}
+          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'members'
+              ? `border-[#006239] ${darkMode ? 'text-white' : 'text-black'}`
+              : `border-transparent ${darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-500 hover:text-gray-700'}`
+          }`}
+        >
+          Members ({members.length})
+        </button>
+      </div>
 
-        <div>
-          <label className={labelClass}>Description</label>
-          <textarea
-            rows={4}
-            maxLength={500}
-            value={formData.description}
-            onChange={(e) => {
-              setFormData({ ...formData, description: e.target.value });
-              if (fieldErrors.description) {
-                setFieldErrors({ ...fieldErrors, description: null });
-              }
-            }}
-            className={getInputClass('description')}
-            placeholder="Enter team description"
-          />
-          {fieldErrors.description && (
-            <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
-              <AlertCircle size={12} />
-              {fieldErrors.description}
-            </p>
-          )}
-        </div>
-
-        {error && (
-          <div className={`p-3 rounded-lg border ${
-            darkMode ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-red-50 border-red-200 text-red-600'
-          }`}>
-            <div className="flex items-start gap-2">
-              <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
-              <p className="text-sm">{error}</p>
-            </div>
+      {/* General Tab */}
+      {activeTab === 'general' && (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className={labelClass}>Team Name *</label>
+            <input
+              type="text"
+              maxLength={100}
+              value={formData.name}
+              onChange={(e) => {
+                setFormData({ ...formData, name: e.target.value });
+                if (fieldErrors.name) {
+                  setFieldErrors({ ...fieldErrors, name: null });
+                }
+              }}
+              className={getInputClass('name')}
+              placeholder="Enter team name"
+            />
+            {fieldErrors.name && (
+              <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                <AlertCircle size={12} />
+                {fieldErrors.name}
+              </p>
+            )}
           </div>
-        )}
 
-        <div className="flex gap-3 pt-4">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isSubmitting}
-            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
-              darkMode ? 'bg-[#171717] text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            } disabled:opacity-50`}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="flex-1 px-6 py-3 bg-[#006239] hover:bg-[#005230] text-white rounded-lg font-semibold transition-all disabled:opacity-50"
-          >
-            {isSubmitting ? 'Saving...' : 'Save Changes'}
-          </button>
+          <div>
+            <label className={labelClass}>Description</label>
+            <textarea
+              rows={4}
+              maxLength={500}
+              value={formData.description}
+              onChange={(e) => {
+                setFormData({ ...formData, description: e.target.value });
+                if (fieldErrors.description) {
+                  setFieldErrors({ ...fieldErrors, description: null });
+                }
+              }}
+              className={getInputClass('description')}
+              placeholder="Enter team description"
+            />
+            {fieldErrors.description && (
+              <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                <AlertCircle size={12} />
+                {fieldErrors.description}
+              </p>
+            )}
+          </div>
+
+          {error && (
+            <div className={`p-3 rounded-lg border ${
+              darkMode ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-red-50 border-red-200 text-red-600'
+            }`}>
+              <div className="flex items-start gap-2">
+                <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
+                <p className="text-sm">{error}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSubmitting}
+              className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+                darkMode ? 'bg-[#171717] text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              } disabled:opacity-50`}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="flex-1 px-6 py-3 bg-[#006239] hover:bg-[#005230] text-white rounded-lg font-semibold transition-all disabled:opacity-50"
+            >
+              {isSubmitting ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* Members Tab */}
+      {activeTab === 'members' && (
+        <div className="space-y-3">
+          <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} mb-4`}>
+            Manage team members. Only owners can remove other members.
+          </div>
+          
+          {members.length === 0 ? (
+            <div className={`text-center py-8 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+              <Users size={32} className="mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No members found</p>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {members.map((member) => (
+                <div
+                  key={member.id}
+                  className={`flex items-center justify-between p-3 rounded-lg border ${
+                    darkMode ? 'bg-[#171717] border-[#171717]' : 'bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    {renderUserAvatar(member, 'sm', darkMode)}
+                    <div>
+                      <div className={`text-sm font-medium ${darkMode ? 'text-white' : 'text-black'}`}>
+                        {member.username}
+                      </div>
+                      <div className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        {member.email}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {/* Role Badge */}
+                    <span
+                      className={`px-2.5 py-1 text-xs font-medium rounded-full ${
+                        member.role === 'owner'
+                          ? 'bg-purple-500/20 text-purple-400'
+                          : member.role === 'admin'
+                          ? 'bg-blue-500/20 text-blue-400'
+                          : 'bg-gray-500/20 text-gray-400'
+                      }`}
+                    >
+                      {member.role}
+                    </span>
+
+                    {/* Remove Button (only for non-owners) */}
+                    {member.role !== 'owner' && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMember(member.user_id)}
+                        disabled={removeMemberMutation.isLoading}
+                        className={`p-1.5 rounded-lg transition-colors ${
+                          darkMode
+                            ? 'hover:bg-red-500/20 text-red-400'
+                            : 'hover:bg-red-50 text-red-600'
+                        } disabled:opacity-50`}
+                        title="Remove member"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-4 border-t" style={{ borderColor: darkMode ? '#171717' : '#e5e7eb' }}>
+            <button
+              type="button"
+              onClick={onClose}
+              className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+                darkMode ? 'bg-[#171717] text-gray-300 hover:bg-gray-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Close
+            </button>
+          </div>
         </div>
-      </form>
+      )}
     </Modal>
   );
 };
@@ -453,6 +632,96 @@ const DeleteTeamModal = ({ isOpen, onClose, team, onConfirm, darkMode }) => {
   );
 };
 
+// Leave Team Modal
+const LeaveTeamModal = ({ isOpen, onClose, team, onConfirm, darkMode }) => {
+  const [isLeaving, setIsLeaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  React.useEffect(() => {
+    setError(null);
+  }, [isOpen]);
+
+  const handleLeave = async () => {
+    setError(null);
+    setIsLeaving(true);
+
+    try {
+      await onConfirm();
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to leave team');
+    } finally {
+      setIsLeaving(false);
+    }
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Leave Team" darkMode={darkMode}>
+      <div className="space-y-4">
+        <div className={`p-4 rounded-lg border-2 ${
+          darkMode ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-yellow-50 border-yellow-200'
+        }`}>
+          <div className="flex items-start gap-3">
+            <AlertCircle className="text-yellow-500 flex-shrink-0 mt-0.5" size={20} />
+            <div>
+              <h4 className={`font-bold text-sm mb-1 ${
+                darkMode ? 'text-yellow-400' : 'text-yellow-600'
+              }`}>
+                Are you sure you want to leave this team?
+              </h4>
+              <p className={`text-sm ${
+                darkMode ? 'text-yellow-300' : 'text-yellow-600'
+              }`}>
+                Leaving <span className="font-bold">{team?.name}</span> will remove your access to:
+              </p>
+              <ul className={`text-xs mt-2 space-y-1 list-disc list-inside ${
+                darkMode ? 'text-yellow-300' : 'text-yellow-600'
+              }`}>
+                <li>All projects in this team</li>
+                <li>All tasks you're assigned to</li>
+                <li>Team chat and channels</li>
+                <li>Team notifications</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        {error && (
+          <div className={`p-3 rounded-lg border ${
+            darkMode ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-red-50 border-red-200 text-red-600'
+          }`}>
+            <div className="flex items-start gap-2">
+              <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
+              <p className="text-sm">{error}</p>
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-3 pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isLeaving}
+            className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-all ${
+              darkMode ? 'bg-[#171717] text-gray-300 hover:bg-[#171717]/70' : 'bg-gray-200/50 text-gray-400 hover:bg-gray-200'
+            } disabled:opacity-50`}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleLeave}
+            disabled={isLeaving}
+            className="flex-1 px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLeaving ? 'Leaving...' : 'Leave Team'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 // Invite Member Modal (GitHub-Style Search & Select)
 const InviteMemberModal = ({ isOpen, onClose, teamId, darkMode }) => {
   const queryClient = useQueryClient();
@@ -487,6 +756,7 @@ const InviteMemberModal = ({ isOpen, onClose, teamId, darkMode }) => {
     onSuccess: (data) => {
       toast.success(data.message || 'Invitation sent successfully!');
       queryClient.invalidateQueries(['teamMembers', teamId]);
+      queryClient.invalidateQueries(['teamPendingInvitations', teamId]);
       onClose();
     },
     onError: (error) => {
@@ -791,7 +1061,7 @@ const PendingInvitationsList = ({ invitations, onRevoke, darkMode }) => {
                 <td className={`py-3 px-3 text-sm ${
                   darkMode ? 'text-gray-400' : 'text-gray-600'
                 }`}>
-                  {new Date(invite.sentDate).toLocaleDateString('en-US', { 
+                  {new Date(invite.sent_date).toLocaleDateString('en-US', { 
                     month: 'short', 
                     day: 'numeric', 
                     year: 'numeric' 
@@ -884,7 +1154,7 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
           errors[fieldName] = error.message;
         });
         
-        console.log('❌ Validation failed:', errors);
+        console.log('Validation failed:', errors);
         
         // Set errors to trigger visual feedback
         setFieldErrors(errors);
@@ -926,7 +1196,7 @@ const CreateProjectModal = ({ isOpen, onClose, teamId, teamMembers, onSubmit, da
     } catch (err) {
       // Extract server error message from response
       const errorMessage = err.response?.data?.message || err.message || 'Failed to create project';
-      console.error('❌ Server error:', errorMessage);
+      console.error('Server error:', errorMessage);
       setError(errorMessage);
       // Modal stays open, user can see the error and retry
     } finally {
@@ -1421,7 +1691,7 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
           errors[fieldName] = error.message;
         });
         
-        console.log('❌ EditProject validation failed:', errors);
+        console.log('EditProject validation failed:', errors);
         
         // Set errors to trigger visual feedback
         setFieldErrors(errors);
@@ -1468,7 +1738,7 @@ const EditProjectModal = ({ isOpen, onClose, project, onSubmit, darkMode, teamMe
         } catch (err) {
           // Extract server error message from response
           const errorMessage = err.response?.data?.message || err.message || 'Failed to update project';
-          console.error('❌ Server error:', errorMessage);
+          console.error('Server error:', errorMessage);
           setError(errorMessage);
           setIsSubmitting(false);
           return; // Exit early, modal stays open
@@ -2338,6 +2608,7 @@ export default function TeamPage() {
   const { teamId } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuth();
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
@@ -2347,6 +2618,7 @@ export default function TeamPage() {
   // Modal states
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
   const [showEditProjectModal, setShowEditProjectModal] = useState(false);
@@ -2355,38 +2627,6 @@ export default function TeamPage() {
   const [showMembersModal, setShowMembersModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
   const [projectMenuOpen, setProjectMenuOpen] = useState(null);
-
-  // MOCK DATA: Pending invitations (replace with real API call later)
-  const [mockPendingInvites] = useState([
-    {
-      id: 1,
-      email: 'john.doe@example.com',
-      role: 'member',
-      sentDate: '2024-12-10T10:30:00Z',
-      status: 'pending'
-    },
-    {
-      id: 2,
-      email: 'jane.smith@example.com',
-      role: 'admin',
-      sentDate: '2024-12-11T14:20:00Z',
-      status: 'pending'
-    },
-    {
-      id: 3,
-      email: 'bob.wilson@example.com',
-      role: 'member',
-      sentDate: '2024-12-12T09:15:00Z',
-      status: 'pending'
-    }
-  ]);
-
-  // Handler for revoking invitations (mock for now)
-  const handleRevokeInvite = (invite) => {
-    console.log('🗑️ [MOCK] Revoking invitation:', invite);
-    // TODO: Implement actual API call
-    toast.success(`Invitation to ${invite.email} would be revoked`);
-  };
 
   // Fetch team data
   const { data: teamData, isLoading: teamLoading, error: teamError } = useQuery({
@@ -2416,6 +2656,30 @@ export default function TeamPage() {
     enabled: !!teamId,
   });
 
+  // Fetch pending invitations (only for admin/owner)
+  const { data: pendingInvitationsData } = useQuery({
+    queryKey: ['teamPendingInvitations', teamId],
+    queryFn: () => getTeamPendingInvitations(teamId),
+    enabled: !!teamId,
+  });
+
+  // Revoke invitation mutation
+  const revokeInvitationMutation = useMutation({
+    mutationFn: (invitationId) => revokeInvitation(teamId, invitationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['teamPendingInvitations', teamId]);
+      toast.success('Invitation revoked successfully');
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || 'Failed to revoke invitation');
+    },
+  });
+
+  // Handler for revoking invitations
+  const handleRevokeInvite = (invite) => {
+    revokeInvitationMutation.mutate(invite.id);
+  };
+
   // Update team mutation
   const updateTeamMutation = useMutation({
     mutationFn: (updates) => updateTeam(teamId, updates),
@@ -2431,6 +2695,19 @@ export default function TeamPage() {
     onSuccess: () => {
       queryClient.invalidateQueries(['teams']); // Refresh sidebar
       navigate('/teams/1'); // Navigate to first team (or could show "no teams" page)
+    },
+  });
+
+  // Leave team mutation (for non-owners)
+  const leaveTeamMutation = useMutation({
+    mutationFn: () => leaveTeam(teamId),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['teams']); // Refresh sidebar
+      toast.success('You have left the team');
+      navigate('/dashboard'); // Navigate to dashboard
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to leave team');
     },
   });
 
@@ -2515,6 +2792,7 @@ export default function TeamPage() {
   const projects = projectsData?.data || [];
   const stats = statsData?.data || {};
   const members = membersData?.data || [];
+  const pendingInvitations = pendingInvitationsData?.data || [];
 
   // Filter and sort projects
   const filteredProjects = projects
@@ -2580,36 +2858,61 @@ export default function TeamPage() {
               <Settings size={20} />
             </button>
 
-            {showSettingsMenu && (
-              <div className={`absolute right-0 mt-2 w-48 rounded-lg shadow-lg border overflow-hidden z-10 ${
-                isDarkMode ? 'bg-dark-secondary border-[#171717]' : 'bg-white border-gray-200'
-              }`}>
-                <button
-                  onClick={() => { setShowEditModal(true); setShowSettingsMenu(false); }}
-                  className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${
-                    isDarkMode ? 'hover:bg-[#171717] text-gray-300' : 'hover:bg-gray-200/30 text-black'
-                  }`}
-                >
-                  <Edit3 size={14} />
-                  Edit Team
-                </button>
-                <button
-                  onClick={() => { setShowDeleteModal(true); setShowSettingsMenu(false); }}
-                  className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${
-                    isDarkMode ? 'hover:bg-[#171717] text-red-400' : 'hover:bg-gray-200/30 text-red-600'
-                  }`}
-                >
-                  <Trash2 size={14} />
-                  Delete Team
-                </button>
-              </div>
-            )}
+            {showSettingsMenu && (() => {
+              // Find current user's role in this team
+              const currentMember = members.find(m => m.user_id === currentUser?.id);
+              const isOwner = currentMember?.role === 'owner';
+
+              return (
+                <div className={`absolute right-0 mt-2 w-48 rounded-lg shadow-lg border overflow-hidden z-10 ${
+                  isDarkMode ? 'bg-dark-secondary border-[#171717]' : 'bg-white border-gray-200'
+                }`}>
+                  {isOwner ? (
+                    // Owner can Edit and Delete team
+                    <>
+                      <button
+                        onClick={() => { setShowEditModal(true); setShowSettingsMenu(false); }}
+                        className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${
+                          isDarkMode ? 'hover:bg-[#171717] text-gray-300' : 'hover:bg-gray-200/30 text-black'
+                        }`}
+                      >
+                        <Edit3 size={14} />
+                        Edit Team
+                      </button>
+                      <button
+                        onClick={() => { setShowDeleteModal(true); setShowSettingsMenu(false); }}
+                        className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${
+                          isDarkMode ? 'hover:bg-[#171717] text-red-400' : 'hover:bg-gray-200/30 text-red-600'
+                        }`}
+                      >
+                        <Trash2 size={14} />
+                        Delete Team
+                      </button>
+                    </>
+                  ) : (
+                    // Members and Admins can only Leave team
+                    <button
+                      onClick={() => {
+                        setShowLeaveModal(true);
+                        setShowSettingsMenu(false);
+                      }}
+                      className={`w-full flex items-center gap-2 px-4 py-2.5 text-sm transition-colors ${
+                        isDarkMode ? 'hover:bg-[#171717] text-red-400' : 'hover:bg-gray-200/30 text-red-600'
+                      }`}
+                    >
+                      <Trash2 size={14} />
+                      Leave Team
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
 
         {/* PENDING INVITATIONS */}
         <PendingInvitationsList
-          invitations={mockPendingInvites}
+          invitations={pendingInvitations}
           onRevoke={handleRevokeInvite}
           darkMode={isDarkMode}
         />
@@ -2646,7 +2949,21 @@ export default function TeamPage() {
                 <div className="space-y-3">
                   {members.slice(0, 4).map((member) => (
                     <div key={member.id} className={`flex items-center gap-4 p-2 rounded-lg transition-all ${isDarkMode ? 'hover:bg-[#171717]/50' : 'hover:bg-gray-200/20'}`}>
-                      <div className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-medium ${isDarkMode ? 'bg-[#006239] text-white' : 'bg-gray-200 text-black'}`}>
+                      {member.avatar_url ? (
+                        <img
+                          src={member.avatar_url}
+                          alt={member.username}
+                          className={`h-10 w-10 rounded-full object-cover border-2 ${isDarkMode ? 'border-[rgb(30,36,30)]' : 'border-gray-100'}`}
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextElementSibling.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <div
+                        className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-medium ${isDarkMode ? 'bg-[#006239] text-white' : 'bg-gray-200 text-black'}`}
+                        style={{ display: member.avatar_url ? 'none' : 'flex' }}
+                      >
                         {member.username?.substring(0, 2).toUpperCase() || 'U'}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -2735,47 +3052,38 @@ export default function TeamPage() {
         {/* PROJECTS SECTION - FULL WIDTH */}
         <div className="space-y-6">
           
-          {/* Filter Bar */}
-          <div className={`${cardBg} border rounded-xl p-6`}>
-            <div className="flex flex-col md:flex-row gap-4 mb-6">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <input
-                  type="text"
-                  placeholder="Search projects..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className={`w-full rounded-lg py-2.5 pl-10 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder:opacity-60 ${
-                    isDarkMode 
-                      ? 'bg-dark-secondary text-white border border-[#171717] placeholder:text-gray-300' 
-                      : 'bg-white text-black border border-gray-200 placeholder:text-gray-400'
-                  }`}
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
-                  >
-                    <X size={18} />
-                  </button>
-                )}
-              </div>
+          {/* Compact Toolbar - Single Row */}
+          <div className={`${cardBg} border rounded-xl p-4`}>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              
+              {/* Left Group: Search + Filter Tabs */}
+              <div className="flex items-center gap-3 flex-1 min-w-[300px]">
+                {/* Compact Search */}
+                <div className="relative w-[380px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <input
+                    type="text"
+                    placeholder="Search projects..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className={`w-full rounded-lg py-2 pl-9 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
+                      isDarkMode 
+                        ? 'bg-dark-secondary text-white border border-[#171717] placeholder:text-gray-500' 
+                        : 'bg-white text-black border border-gray-200 placeholder:text-gray-400'
+                    }`}
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
 
-              <button
-                onClick={() => setShowCreateProjectModal(true)}
-                className="flex items-center justify-center gap-2 bg-[#006239] hover:bg-[#005230] text-white px-6 py-2.5 rounded-lg font-semibold shadow-lg shadow-[rgb(119,136,115)]/20 transition-all active:scale-95 whitespace-nowrap"
-              >
-                <Plus size={18} />
-                Create Project
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>
-                  Status
-                </label>
-                <div className="flex flex-wrap gap-2">
+                {/* Status Filter Pills */}
+                <div className="flex items-center gap-1.5">
                   <FilterButton active={statusFilter === 'all'} onClick={() => setStatusFilter('all')} darkMode={isDarkMode}>All</FilterButton>
                   <FilterButton active={statusFilter === 'active'} onClick={() => setStatusFilter('active')} darkMode={isDarkMode}>Active</FilterButton>
                   <FilterButton active={statusFilter === 'completed'} onClick={() => setStatusFilter('completed')} darkMode={isDarkMode}>Completed</FilterButton>
@@ -2783,24 +3091,40 @@ export default function TeamPage() {
                 </div>
               </div>
 
-              <div>
-                <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>
-                  Sort By
-                </label>
+              {/* Right Group: Sort + Create Button */}
+              <div className="flex items-center gap-3">
+                {/* Sort Dropdown (compact) */}
                 <select 
                   value={sortBy} 
                   onChange={(e) => setSortBy(e.target.value)} 
-                  className={`w-full md:w-auto rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
+                  className={`rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
                     isDarkMode 
-                      ? 'bg-dark-secondary text-white border border-[#171717]' 
-                      : 'bg-white text-black border border-gray-200'
+                      ? 'bg-[#171717] text-gray-300 border border-[#171717] hover:bg-gray-700' 
+                      : 'bg-gray-200/50 text-gray-600 border border-gray-200 hover:bg-gray-200'
                   }`}
                 >
-                  <option value="created_at">Recently Created</option>
-                  <option value="name">Project Name</option>
-                  <option value="progress">Progress</option>
+                  <option value="created_at">Sort: Newest</option>
+                  <option value="name">Sort: Name</option>
+                  <option value="progress">Sort: Progress</option>
                 </select>
+
+                {/* Create Project Button - Conditionally Rendered */}
+                {(() => {
+                  const currentMember = members.find(m => m.id === currentUser?.id);
+                  const canCreateProject = currentMember?.role === 'owner' || currentMember?.role === 'admin';
+                  
+                  return canCreateProject ? (
+                    <button
+                      onClick={() => setShowCreateProjectModal(true)}
+                      className="flex items-center gap-2 bg-[#006239] hover:bg-[#005230] text-white px-4 py-2 rounded-lg font-semibold shadow-lg shadow-[rgb(119,136,115)]/20 transition-all active:scale-95 whitespace-nowrap"
+                    >
+                      <Plus size={16} />
+                      Create Project
+                    </button>
+                  ) : null;
+                })()}
               </div>
+
             </div>
           </div>
 
@@ -2870,6 +3194,8 @@ export default function TeamPage() {
         team={team}
         onSubmit={(updates) => updateTeamMutation.mutateAsync(updates)}
         darkMode={isDarkMode}
+        teamId={teamId}
+        queryClient={queryClient}
       />
 
       <InviteMemberModal
@@ -2891,6 +3217,14 @@ export default function TeamPage() {
         onClose={() => setShowDeleteModal(false)}
         team={team}
         onConfirm={() => deleteTeamMutation.mutate()}
+        darkMode={isDarkMode}
+      />
+
+      <LeaveTeamModal
+        isOpen={showLeaveModal}
+        onClose={() => setShowLeaveModal(false)}
+        team={team}
+        onConfirm={() => leaveTeamMutation.mutate()}
         darkMode={isDarkMode}
       />
 

@@ -2,7 +2,7 @@ import express from 'express';
 import { z } from 'zod';
 import * as projectController from '../controllers/project.controller.js';
 import { validate } from '../middlewares/validate.js';
-import { mockAuth } from '../middlewares/auth.js';
+import { verifyToken } from '../middlewares/auth.js';
 import {
   projectIdSchema,
   teamIdParamSchema,
@@ -21,11 +21,11 @@ const router = express.Router();
 /**
  * Project Routes
  * Base: /api/v1/projects
- * Security: Using mockAuth for testing (user ID 1) - replace with verifyToken in production
+ * Security: JWT authentication required via verifyToken middleware
  */
 
-// Apply mock authentication to all project routes
-router.use(mockAuth);
+// Apply JWT authentication to all project routes
+router.use(verifyToken);
 
 /**
  * @route   GET /api/v1/projects/:projectId
@@ -118,7 +118,7 @@ router.delete(
  * @body    {name, description?, status?, start_date?, end_date?}
  */
 export const teamProjectRouter = express.Router({ mergeParams: true });
-teamProjectRouter.use(mockAuth);
+teamProjectRouter.use(verifyToken);
 
 teamProjectRouter.post(
   '/',
