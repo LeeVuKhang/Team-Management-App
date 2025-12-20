@@ -1,55 +1,7 @@
 import React from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
-import { Plus, Search, Users, FolderKanban, X } from 'lucide-react';
+import { Plus, Search, Users, FolderKanban, X, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-
-/**
- * MOCK DATA - Teams
- */
-const TEAMS = [
-  {
-    id: 1,
-    name: 'Engineering Team',
-    membersCount: 12,
-    activeProjects: 8,
-    members: ['JD', 'AS', 'MK', 'TR', 'ZR']
-  },
-  {
-    id: 2,
-    name: 'Design Team',
-    membersCount: 6,
-    activeProjects: 4,
-    members: ['LP', 'KS', 'RH']
-  },
-  {
-    id: 3,
-    name: 'Marketing Team',
-    membersCount: 8,
-    activeProjects: 5,
-    members: ['EM', 'BN', 'CJ', 'DW']
-  },
-  {
-    id: 4,
-    name: 'Product Team',
-    membersCount: 5,
-    activeProjects: 6,
-    members: ['FG', 'GH', 'HI']
-  },
-  {
-    id: 5,
-    name: 'Sales Team',
-    membersCount: 10,
-    activeProjects: 3,
-    members: ['JK', 'KL', 'LM', 'MN']
-  },
-  {
-    id: 6,
-    name: 'Support Team',
-    membersCount: 7,
-    activeProjects: 2,
-    members: ['NO', 'OP', 'PQ']
-  }
-];
 
 /**
  * TEAM CARD COMPONENT
@@ -65,43 +17,34 @@ const TeamCard = ({ team, darkMode, onClick }) => (
       <h3 className={`font-semibold text-lg mb-1 ${darkMode ? 'text-white' : 'text-black'}`}>
         {team.name}
       </h3>
+      {team.description && (
+        <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+          {team.description}
+        </p>
+      )}
     </div>
 
     {/* Stats */}
     <div className="flex gap-4 mb-4">
       <div className="flex items-center gap-2">
-        <Users size={16} className={darkMode ? 'text-gray-400' : 'text-gray-600'} />
-        <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-          {team.membersCount} members
-        </span>
-      </div>
-      <div className="flex items-center gap-2">
         <FolderKanban size={16} className={darkMode ? 'text-gray-400' : 'text-gray-600'} />
         <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-          {team.activeProjects} projects
+          {team.project_count || 0} projects
         </span>
       </div>
     </div>
 
-    {/* Member Avatars */}
-    <div className="flex -space-x-2">
-      {team.members.slice(0, 4).map((member, i) => (
-        <div 
-          key={i}
-          className={`inline-block h-8 w-8 rounded-full ring-2 flex items-center justify-center text-xs font-medium transition-all group-hover:scale-110
-            ${darkMode ? 'ring-dark-primary bg-[#1F1F1F] text-white' : 'ring-white bg-gray-300 text-black'}`}
-        >
-          {member}
-        </div>
-      ))}
-      {team.members.length > 4 && (
-        <div 
-          className={`inline-block h-8 w-8 rounded-full ring-2 flex items-center justify-center text-xs font-medium
-            ${darkMode ? 'ring-dark-primary bg-[#171717] text-gray-400' : 'ring-white bg-gray-200 text-gray-600'}`}
-        >
-          +{team.members.length - 4}
-        </div>
-      )}
+    {/* Role Badge */}
+    <div className="flex items-center gap-2">
+      <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+        team.role === 'owner' 
+          ? 'bg-[#308f68] text-white' 
+          : team.role === 'admin'
+          ? 'bg-blue-500 text-white'
+          : darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
+      }`}>
+        {team.role}
+      </span>
     </div>
   </div>
 );
@@ -113,13 +56,8 @@ export default function Dashboard() {
   const { isDarkMode } = useOutletContext();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = React.useState('');
-  
-  // Initialize teams from localStorage or use TEAMS as default
-  const [teams, setTeams] = React.useState(() => {
-    const savedTeams = localStorage.getItem('teams');
-    return savedTeams ? JSON.parse(savedTeams) : TEAMS;
-  });
-  
+  const [teams, setTeams] = React.useState([]);
+  const [isLoading, setIsLoading] = React.useState(true);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [isAllTeamsModalOpen, setIsAllTeamsModalOpen] = React.useState(false);
   const [newTeamData, setNewTeamData] = React.useState({
@@ -127,10 +65,44 @@ export default function Dashboard() {
     description: ''
   });
 
-  // Save teams to localStorage whenever it changes
+  // Fetch teams from backend on mount
   React.useEffect(() => {
-    localStorage.setItem('teams', JSON.stringify(teams));
-  }, [teams]);
+    const fetchTeams = async () => {
+      try {
+        console.log('=== FRONTEND: Fetching teams ===');
+        const response = await fetch('http://localhost:5000/api/v1/teams', {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        console.log('Response status:', response.status);
+        console.log('Response ok:', response.ok);
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Error response:', errorData);
+          throw new Error(errorData.message || 'Failed to fetch teams');
+        }
+
+        const data = await response.json();
+        console.log('Received data:', data);
+        console.log('Teams array:', data.data);
+        console.log('Number of teams:', data.data?.length || 0);
+        
+        setTeams(data.data || []);
+      } catch (error) {
+        console.error('Error fetching teams:', error);
+        toast.error('Failed to load teams');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTeams();
+  }, []);
 
   // Filter teams based on search
   const filteredTeams = teams.filter(team =>
@@ -145,7 +117,7 @@ export default function Dashboard() {
     navigate(`/teams/${teamId}`);
   };
 
-  const handleCreateTeam = (e) => {
+  const handleCreateTeam = async (e) => {
     e.preventDefault();
     
     if (!newTeamData.name.trim()) {
@@ -153,18 +125,42 @@ export default function Dashboard() {
       return;
     }
 
-    const newTeam = {
-      id: teams.length + 1,
-      name: newTeamData.name,
-      membersCount: 1, // Current user
-      activeProjects: 0,
-      members: ['YOU'] // Current user's initials 
-    };
+    setIsLoading(true);
+    
+    try {
+      const response = await fetch('http://localhost:5000/api/v1/teams', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          name: newTeamData.name.trim(),
+          description: newTeamData.description.trim() || null
+        }),
+      });
 
-    setTeams([...teams, newTeam]);
-    toast.success(`Team "${newTeamData.name}" created successfully!`);
-    setIsModalOpen(false);
-    setNewTeamData({ name: '', description: '' });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create team');
+      }
+
+      const data = await response.json();
+      console.log('Team created:', data);
+      
+      toast.success(`Team "${newTeamData.name}" created successfully!`);
+      
+      // Add new team to end of list (right side)
+      setTeams([...teams, data.data]);
+      
+      setIsModalOpen(false);
+      setNewTeamData({ name: '', description: '' });
+    } catch (error) {
+      console.error('Error creating team:', error);
+      toast.error(error.message || 'Failed to create team');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleCloseModal = () => {
@@ -216,40 +212,62 @@ export default function Dashboard() {
 
       {/* Teams Grid */}
       <div className="pb-12">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {displayedTeams.map((team) => (
-            <TeamCard 
-              key={team.id} 
-              team={team} 
-              darkMode={isDarkMode}
-              onClick={() => handleTeamClick(team.id)}
-            />
-          ))}
-          
-          {/* Show "+N more teams" card if there are more than 7 teams */}
-          {remainingTeamsCount > 0 && (
-            <div 
-              onClick={() => setIsAllTeamsModalOpen(true)}
-              className={`${isDarkMode ? 'bg-dark-secondary border-[#171717] hover:border-gray-700' : 'bg-white border-gray-200 hover:border-gray-400'} 
-                border rounded-xl p-3 cursor-pointer transition-all hover:shadow-lg hover:-translate-y-1 active:scale-[0.98] flex items-center justify-center min-h-[140px]`}
-            >
-              <div className="text-center">
-                <div className={`text-4xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-black'}`}>
-                  +{remainingTeamsCount}
-                </div>
-                <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                  more {remainingTeamsCount === 1 ? 'team' : 'teams'}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Empty State */}
-        {filteredTeams.length === 0 && (
-          <div className={`text-center py-12 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-            <p>No teams found matching "{searchQuery}"</p>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className={`w-8 h-8 animate-spin ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`} />
           </div>
+        ) : (
+          <>
+            {teams.length === 0 ? (
+              <div className={`text-center py-20 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                <Users size={48} className="mx-auto mb-4 opacity-50" />
+                <p className="text-lg font-medium mb-2">No teams yet</p>
+                <p className="text-sm mb-4">Create your first team to get started</p>
+                <button 
+                  onClick={() => setIsModalOpen(true)}
+                  className="px-4 py-2 rounded-lg bg-[#006239] hover:bg-[#005230] text-white transition-colors"
+                >
+                  Create Team
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {displayedTeams.map((team) => (
+                    <TeamCard 
+                      key={team.id} 
+                      team={team} 
+                      darkMode={isDarkMode}
+                      onClick={() => handleTeamClick(team.id)}
+                    />
+                  ))}
+                  
+                  {remainingTeamsCount > 0 && (
+                    <div 
+                      onClick={() => setIsAllTeamsModalOpen(true)}
+                      className={`${isDarkMode ? 'bg-dark-secondary border-[#171717] hover:border-gray-700' : 'bg-white border-gray-200 hover:border-gray-400'} 
+                        border rounded-xl p-3 cursor-pointer transition-all hover:shadow-lg hover:-translate-y-1 active:scale-[0.98] flex items-center justify-center min-h-[140px]`}
+                    >
+                      <div className="text-center">
+                        <div className={`text-4xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-black'}`}>
+                          +{remainingTeamsCount}
+                        </div>
+                        <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          more {remainingTeamsCount === 1 ? 'team' : 'teams'}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {filteredTeams.length === 0 && (
+                  <div className={`text-center py-12 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                    <p>No teams found matching "{searchQuery}"</p>
+                  </div>
+                )}
+              </>
+            )}
+          </>
         )}
       </div>
 
@@ -412,41 +430,28 @@ export default function Dashboard() {
                         }`}>
                           {team.name}
                         </h3>
-                        <div className="flex gap-4 text-sm">
-                          <div className="flex items-center gap-1.5">
-                            <Users size={14} className={isDarkMode ? 'text-gray-400' : 'text-gray-600'} />
-                            <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>
-                              {team.membersCount} members
-                            </span>
-                          </div>
+                        {team.description && (
+                          <p className={`text-xs mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                            {team.description}
+                          </p>
+                        )}
+                        <div className="flex gap-4 text-sm items-center">
                           <div className="flex items-center gap-1.5">
                             <FolderKanban size={14} className={isDarkMode ? 'text-gray-400' : 'text-gray-600'} />
                             <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>
-                              {team.activeProjects} projects
+                              {team.project_count || 0} projects
                             </span>
                           </div>
+                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                            team.role === 'owner' 
+                              ? 'bg-[#308f68] text-white' 
+                              : team.role === 'admin'
+                              ? 'bg-blue-500 text-white'
+                              : isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
+                          }`}>
+                            {team.role}
+                          </span>
                         </div>
-                      </div>
-                      
-                      {/* Member Avatars */}
-                      <div className="flex -space-x-2 ml-4">
-                        {team.members.slice(0, 3).map((member, i) => (
-                          <div 
-                            key={i}
-                            className={`inline-block h-7 w-7 rounded-full ring-2 flex items-center justify-center text-xs font-medium
-                              ${isDarkMode ? 'ring-dark-secondary bg-[#1F1F1F] text-white' : 'ring-white bg-gray-300 text-black'}`}
-                          >
-                            {member}
-                          </div>
-                        ))}
-                        {team.members.length > 3 && (
-                          <div 
-                            className={`inline-block h-7 w-7 rounded-full ring-2 flex items-center justify-center text-xs font-medium
-                              ${isDarkMode ? 'ring-dark-secondary bg-[#171717] text-gray-400' : 'ring-white bg-gray-200 text-gray-600'}`}
-                          >
-                            +{team.members.length - 3}
-                          </div>
-                        )}
                       </div>
                     </div>
                   </div>
