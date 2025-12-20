@@ -1,7 +1,6 @@
 import express from 'express';
 import * as TeamController from '../controllers/team.controller.js';
 import { validate } from '../middlewares/validate.js';
-import { mockAuth } from '../middlewares/auth.js';
 import { 
   teamIdParamSchema, 
   createTeamSchema, 
@@ -13,12 +12,8 @@ const router = express.Router();
 
 /**
  * Team Routes
- * All routes require authentication (verifyToken middleware applied at router level in index.js)
- * SECURITY: Team membership is verified in the model layer (RBAC + IDOR prevention)
+ * Auth: verifyToken middleware applied at router level in index.js
  */
-
-// Apply mock authentication to all team routes
-router.use(mockAuth);
 
 /**
  * @route   GET /api/v1/teams

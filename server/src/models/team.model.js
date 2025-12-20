@@ -175,6 +175,9 @@ export const getTeamStats = async (teamId, userId) => {
  * @returns {Promise<Array>} List of teams the user is a member of
  */
 export const getUserTeams = async (userId) => {
+  console.log('=== getUserTeams Model DEBUG ===');
+  console.log('Querying teams for userId:', userId);
+  
   const teams = await db`
     SELECT 
       t.id,
@@ -189,6 +192,9 @@ export const getUserTeams = async (userId) => {
     GROUP BY t.id, t.name, t.description, tm.role
     ORDER BY t.created_at DESC
   `;
+  
+  console.log('Query result:', teams);
+  console.log('Number of teams:', teams.length);
 
   return teams;
 };
