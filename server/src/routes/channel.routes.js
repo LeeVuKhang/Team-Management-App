@@ -113,4 +113,17 @@ router.post(
   ChannelController.createMessage
 );
 
+/**
+ * DELETE /teams/:teamId/channels/:channelId
+ * Delete a channel
+ * Access: Team OWNER or ADMIN only
+ */
+router.delete(
+  '/:channelId',
+  validate({ params: teamChannelParamsSchema }),
+  verifyTeamMember,
+  verifyTeamRole(['owner', 'admin']),
+  ChannelController.deleteChannel
+);
+
 export default router;

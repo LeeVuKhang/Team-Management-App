@@ -243,3 +243,44 @@ export const createMessage = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * DELETE /teams/:teamId/channels/:channelId
+ * Delete a channel
+ * 
+ * Middleware: verifyTeamMember, verifyTeamRole(['owner', 'admin'])
+ * Security: Only team owners and admins can delete channels
+ */
+export const deleteChannel = async (req, res, next) => {
+  try {
+    const { teamId, channelId } = req.validated?.params || req.params;
+    const userId = req.user.id;
+
+    console.log(`[deleteChannel] User ${userId} deleting channel ${channelId} in team ${teamId}`);
+
+    // Delete the channel (cascades to messages via FK constraint)
+    await ChannelModel.deleteChannel(channelId, teamId, userId);
+
+    console.log(`[deleteChannel] Channel ${channelId} deleted successfully`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Channel deleted successfully',
+    });
+  } catch (error) {
+    console.error('[deleteChannel] Error:', error.message);
+    if (error.message.includes('not found')) {
+      return res.status(404).json({
+        success: false,
+        message: 'Channel not found',
+      });
+    }
+    if (error.message.includes('Access denied')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied',
+      });
+    }
+    next(error);
+  }
+};

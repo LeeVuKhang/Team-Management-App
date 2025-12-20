@@ -21,9 +21,11 @@ import {
   Link as LinkIcon,
   Download,
   ExternalLink,
-  Users
+  Users,
+  Trash2,
+  AlertCircle
 } from 'lucide-react';
-import { fetchTeamChannels, fetchChannelMessages, createChannel, searchMessages } from './services/channelApi.js';
+import { fetchTeamChannels, fetchChannelMessages, createChannel, searchMessages, deleteChannel } from './services/channelApi.js';
 import { getTeamProjects, getTeam } from './services/projectApi.js';
 import { useDebounce } from './hooks/useDebounce.js';
 import { useAuth } from './hooks/useAuth.js';
@@ -61,6 +63,110 @@ const ALLOWED_FILE_TYPES = [
   // Audio
   'audio/mpeg', 'audio/wav', 'audio/ogg'
 ];
+
+/**
+ * SUB-COMPONENT: Delete Channel Confirmation Modal
+ */
+const DeleteChannelModal = ({
+  isOpen,
+  channelName,
+  onConfirm,
+  onCancel,
+  isDeleting,
+  isDarkMode
+}) => {
+  if (!isOpen) return null;
+
+  const textPrimary = isDarkMode ? 'text-gray-100' : 'text-gray-900';
+  const textSecondary = isDarkMode ? 'text-gray-400' : 'text-gray-500';
+  const hoverBg = isDarkMode ? 'hover:bg-[#171717]' : 'hover:bg-gray-100';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className={`w-full max-w-md rounded-xl shadow-2xl ${isDarkMode ? 'bg-dark-secondary' : 'bg-white'}`}>
+        {/* Modal Header */}
+        <div className={`flex items-center justify-between px-6 py-4 border-b ${isDarkMode ? 'border-[#171717]' : 'border-gray-200'}`}>
+          <h2 className={`text-xl font-bold ${textPrimary}`}>
+            Delete Channel
+          </h2>
+          <button
+            onClick={onCancel}
+            className={`p-1 rounded-lg ${hoverBg} ${textSecondary}`}
+            disabled={isDeleting}
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <div className="p-6 space-y-4">
+          <div className={`p-4 rounded-lg border-2 ${
+            isDarkMode ? 'bg-red-500/10 border-red-500/30' : 'bg-red-50 border-red-200'
+          }`}>
+            <div className="flex items-start gap-3">
+              <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+              <div>
+                <h4 className={`font-bold text-sm mb-1 ${
+                  isDarkMode ? 'text-red-400' : 'text-red-600'
+                }`}>
+                  Warning: This action cannot be undone
+                </h4>
+                <p className={`text-sm ${
+                  isDarkMode ? 'text-red-300' : 'text-red-500'
+                }`}>
+                  Are you sure you want to delete <span className="font-bold">#{channelName}</span>?
+                </p>
+                <p className={`text-xs mt-2 ${
+                  isDarkMode ? 'text-red-300' : 'text-red-500'
+                }`}>
+                  All messages and files in this channel will be permanently deleted.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              className={`flex-1 px-4 py-2.5 rounded-lg font-medium border transition-colors ${
+                isDarkMode 
+                  ? 'border-[#333] text-gray-300 hover:bg-[#171717]' 
+                  : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+              }`}
+              disabled={isDeleting}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onConfirm}
+              className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-white transition-colors flex items-center justify-center gap-2 ${
+                isDeleting 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-red-500 hover:bg-red-600'
+              }`}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 size={16} />
+                  Delete Channel
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 /**
  * SUB-COMPONENT: Create Channel Modal
@@ -226,6 +332,10 @@ export default function ChatPage() {
   // Info sidebar state
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  
+  // Delete channel modal state
+  const [showDeleteChannelModal, setShowDeleteChannelModal] = useState(false);
+  const [isDeletingChannel, setIsDeletingChannel] = useState(false);
   
   // File attachment state
   const [selectedFiles, setSelectedFiles] = useState([]);
@@ -1779,8 +1889,55 @@ export default function ChatPage() {
               )}
             </div>
           </div>
+
+          {/* Delete Channel Section - Only for Admin/Owner */}
+          {(teamData?.currentUserRole === 'owner' || teamData?.currentUserRole === 'admin') && (
+            <div className={`p-4 border-t ${isDarkMode ? 'border-[#171717]' : 'border-gray-200'}`}>
+              <button
+                onClick={() => setShowDeleteChannelModal(true)}
+                className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-colors ${
+                  isDarkMode
+                    ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30'
+                    : 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
+                }`}
+              >
+                <Trash2 size={18} />
+                Delete Channel
+              </button>
+              <p className={`text-xs text-center mt-2 ${textSecondary}`}>
+                This action cannot be undone
+              </p>
+            </div>
+          )}
         </div>
       )}
+
+      {/* Delete Channel Modal */}
+      <DeleteChannelModal
+        isOpen={showDeleteChannelModal}
+        channelName={activeChannel?.name}
+        onConfirm={async () => {
+          setIsDeletingChannel(true);
+          try {
+            await deleteChannel(teamId, activeChannel.id);
+            toast.success('Channel deleted successfully');
+            setShowDeleteChannelModal(false);
+            setIsInfoOpen(false);
+            setActiveChannel(null);
+            // Refetch channels
+            const freshChannels = await fetchTeamChannels(teamId);
+            setChannels(freshChannels);
+          } catch (err) {
+            console.error('Failed to delete channel:', err);
+            toast.error(err.message || 'Failed to delete channel');
+          } finally {
+            setIsDeletingChannel(false);
+          }
+        }}
+        onCancel={() => setShowDeleteChannelModal(false)}
+        isDeleting={isDeletingChannel}
+        isDarkMode={isDarkMode}
+      />
     </div>
   );
 }
