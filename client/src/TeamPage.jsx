@@ -48,6 +48,44 @@ import {
 } from 'lucide-react';
 
 /**
+ * UTILITY FUNCTIONS
+ */
+
+// Render user avatar with image or initials fallback
+const renderUserAvatar = (user, size = 'md', darkMode = false) => {
+  const sizeClasses = {
+    sm: 'h-6 w-6 text-xs',
+    md: 'h-10 w-10 text-sm',
+    lg: 'h-12 w-12 text-base'
+  };
+
+  if (user.avatar_url) {
+    return (
+      <img
+        src={user.avatar_url}
+        alt={user.username || 'User'}
+        className={`${sizeClasses[size]} rounded-full object-cover border-2 ${
+          darkMode ? 'border-[rgb(30,36,30)]' : 'border-white'
+        }`}
+        onError={(e) => {
+          // Fallback to initials if image fails to load
+          e.target.style.display = 'none';
+          e.target.nextSibling.style.display = 'flex';
+        }}
+      />
+    );
+  }
+
+  return (
+    <div className={`${sizeClasses[size]} rounded-full flex items-center justify-center font-medium ${
+      darkMode ? 'bg-[#006239] text-white' : 'bg-gray-200 text-black'
+    }`}>
+      {user.username?.substring(0, 2).toUpperCase() || 'U'}
+    </div>
+  );
+};
+
+/**
  * VALIDATION SCHEMAS (Client-Side with Zod)
  */
 
@@ -2774,7 +2812,21 @@ export default function TeamPage() {
                 <div className="space-y-3">
                   {members.slice(0, 4).map((member) => (
                     <div key={member.id} className={`flex items-center gap-4 p-2 rounded-lg transition-all ${isDarkMode ? 'hover:bg-[#171717]/50' : 'hover:bg-gray-200/20'}`}>
-                      <div className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-medium ${isDarkMode ? 'bg-[#006239] text-white' : 'bg-gray-200 text-black'}`}>
+                      {member.avatar_url ? (
+                        <img
+                          src={member.avatar_url}
+                          alt={member.username}
+                          className={`h-10 w-10 rounded-full object-cover border-2 ${isDarkMode ? 'border-[rgb(30,36,30)]' : 'border-gray-100'}`}
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextElementSibling.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <div
+                        className={`h-10 w-10 rounded-full flex items-center justify-center text-sm font-medium ${isDarkMode ? 'bg-[#006239] text-white' : 'bg-gray-200 text-black'}`}
+                        style={{ display: member.avatar_url ? 'none' : 'flex' }}
+                      >
                         {member.username?.substring(0, 2).toUpperCase() || 'U'}
                       </div>
                       <div className="flex-1 min-w-0">

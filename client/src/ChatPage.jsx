@@ -956,7 +956,21 @@ export default function ChatPage() {
     >
       {/* Avatar */}
       <div className={`flex-shrink-0 w-8 h-8 ${isSequence ? 'invisible' : ''}`}>
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-300 text-black'}`}>
+        {msg.user.avatar_url ? (
+          <img
+            src={msg.user.avatar_url}
+            alt={msg.user.username}
+            className="w-8 h-8 rounded-full object-cover"
+            onError={(e) => {
+              e.target.style.display = 'none';
+              e.target.nextElementSibling.style.display = 'flex';
+            }}
+          />
+        ) : null}
+        <div
+          className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-300 text-black'}`}
+          style={{ display: msg.user.avatar_url ? 'none' : 'flex' }}
+        >
           {msg.user.username.substring(0,2).toUpperCase()}
         </div>
       </div>
@@ -1166,9 +1180,23 @@ export default function ChatPage() {
                         }}
                       >
                         <div className="flex items-start gap-3">
-                          <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-                            isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-300 text-black'
-                          }`}>
+                          {msg.user?.avatar_url ? (
+                            <img
+                              src={msg.user.avatar_url}
+                              alt={msg.user.username}
+                              className="flex-shrink-0 w-8 h-8 rounded-full object-cover"
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.nextElementSibling.style.display = 'flex';
+                              }}
+                            />
+                          ) : null}
+                          <div
+                            className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                              isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-300 text-black'
+                            }`}
+                            style={{ display: msg.user?.avatar_url ? 'none' : 'flex' }}
+                          >
                             {msg.user?.username?.substring(0,2).toUpperCase() || 'U'}
                           </div>
                           <div className="flex-1 min-w-0">
@@ -1349,13 +1377,6 @@ export default function ChatPage() {
 
           {/* Header Actions */}
           <div className="flex items-center gap-2">
-            <div className="hidden md:flex -space-x-2 mr-4">
-              {[1,2,3].map(i => (
-                <div key={i} className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold ${isDarkMode ? 'border-dark-secondary bg-gray-700' : 'border-white bg-gray-200'}`}>
-                  U{i}
-                </div>
-              ))}
-            </div>
             <button 
               onClick={openSearch}
               className={`p-2 rounded-full ${hoverBg} ${textSecondary} ${!activeChannel ? 'opacity-50 cursor-not-allowed' : ''}`}

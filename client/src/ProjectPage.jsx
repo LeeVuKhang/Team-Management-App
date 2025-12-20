@@ -191,16 +191,34 @@ const TaskCard = ({ task, darkMode, userRole, onEdit, onDelete }) => {
                   <>
                     <div className="flex -space-x-2">
                       {validAssignees.slice(0, 3).map((assignee, idx) => (
-                        <div
-                          key={assignee.user_id || idx}
-                          className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-medium border-2 ${
-                            darkMode 
-                              ? 'bg-[#006239] text-white border-[rgb(30,36,30)]' 
-                              : 'bg-gray-200 text-black border-white'
-                          }`}
-                          title={assignee.username}
-                        >
-                          {assignee.username ? assignee.username.charAt(0).toUpperCase() : '?'}
+                        <div key={assignee.user_id || idx} className="relative">
+                          {assignee.avatar_url ? (
+                            <img
+                              src={assignee.avatar_url}
+                              alt={assignee.username}
+                              className={`h-6 w-6 rounded-full object-cover border-2 ${
+                                darkMode 
+                                  ? 'border-[rgb(30,36,30)]' 
+                                  : 'border-white'
+                              }`}
+                              title={assignee.username}
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.nextElementSibling.style.display = 'flex';
+                              }}
+                            />
+                          ) : null}
+                          <div
+                            className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-medium border-2 ${
+                              darkMode 
+                                ? 'bg-[#006239] text-white border-[rgb(30,36,30)]' 
+                                : 'bg-gray-200 text-black border-white'
+                            }`}
+                            title={assignee.username}
+                            style={{ display: assignee.avatar_url ? 'none' : 'flex' }}
+                          >
+                            {assignee.username ? assignee.username.charAt(0).toUpperCase() : '?'}
+                          </div>
                         </div>
                       ))}
                       {validAssignees.length > 3 && (
@@ -1118,7 +1136,21 @@ export default function ProjectPage() {
                     <div className="flex -space-x-2">
                       {projectMembers.map((member) => (
                         <div key={member.id} className="relative group">
-                          <div className={`h-10 w-10 rounded-full border-2 flex items-center justify-center text-sm font-medium transition-all cursor-pointer group-hover:scale-110 group-hover:z-10 ${isDarkMode ? 'border-[rgb(30,36,30)] bg-[#006239] text-white' : 'border-white bg-gray-200 text-black'}`}>
+                          {member.avatar_url ? (
+                            <img
+                              src={member.avatar_url}
+                              alt={member.username}
+                              className={`h-10 w-10 rounded-full object-cover border-2 transition-all cursor-pointer group-hover:scale-110 group-hover:z-10 ${isDarkMode ? 'border-[rgb(30,36,30)]' : 'border-white'}`}
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.nextElementSibling.style.display = 'flex';
+                              }}
+                            />
+                          ) : null}
+                          <div
+                            className={`h-10 w-10 rounded-full border-2 flex items-center justify-center text-sm font-medium transition-all cursor-pointer group-hover:scale-110 group-hover:z-10 ${isDarkMode ? 'border-[rgb(30,36,30)] bg-[#006239] text-white' : 'border-white bg-gray-200 text-black'}`}
+                            style={{ display: member.avatar_url ? 'none' : 'flex' }}
+                          >
                             {member.username.charAt(0).toUpperCase()}
                           </div>
                           <div className={`absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none ${isDarkMode ? 'bg-[#171717] text-white' : 'bg-[rgb(60,68,58)] text-white'}`}>
