@@ -2863,47 +2863,38 @@ export default function TeamPage() {
         {/* PROJECTS SECTION - FULL WIDTH */}
         <div className="space-y-6">
           
-          {/* Filter Bar */}
-          <div className={`${cardBg} border rounded-xl p-6`}>
-            <div className="flex flex-col md:flex-row gap-4 mb-6">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <input
-                  type="text"
-                  placeholder="Search projects..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className={`w-full rounded-lg py-2.5 pl-10 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all placeholder:opacity-60 ${
-                    isDarkMode 
-                      ? 'bg-dark-secondary text-white border border-[#171717] placeholder:text-gray-300' 
-                      : 'bg-white text-black border border-gray-200 placeholder:text-gray-400'
-                  }`}
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
-                  >
-                    <X size={18} />
-                  </button>
-                )}
-              </div>
+          {/* Compact Toolbar - Single Row */}
+          <div className={`${cardBg} border rounded-xl p-4`}>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              
+              {/* Left Group: Search + Filter Tabs */}
+              <div className="flex items-center gap-3 flex-1 min-w-[300px]">
+                {/* Compact Search */}
+                <div className="relative w-[380px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <input
+                    type="text"
+                    placeholder="Search projects..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className={`w-full rounded-lg py-2 pl-9 pr-9 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
+                      isDarkMode 
+                        ? 'bg-dark-secondary text-white border border-[#171717] placeholder:text-gray-500' 
+                        : 'bg-white text-black border border-gray-200 placeholder:text-gray-400'
+                    }`}
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
 
-              <button
-                onClick={() => setShowCreateProjectModal(true)}
-                className="flex items-center justify-center gap-2 bg-[#006239] hover:bg-[#005230] text-white px-6 py-2.5 rounded-lg font-semibold shadow-lg shadow-[rgb(119,136,115)]/20 transition-all active:scale-95 whitespace-nowrap"
-              >
-                <Plus size={18} />
-                Create Project
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>
-                  Status
-                </label>
-                <div className="flex flex-wrap gap-2">
+                {/* Status Filter Pills */}
+                <div className="flex items-center gap-1.5">
                   <FilterButton active={statusFilter === 'all'} onClick={() => setStatusFilter('all')} darkMode={isDarkMode}>All</FilterButton>
                   <FilterButton active={statusFilter === 'active'} onClick={() => setStatusFilter('active')} darkMode={isDarkMode}>Active</FilterButton>
                   <FilterButton active={statusFilter === 'completed'} onClick={() => setStatusFilter('completed')} darkMode={isDarkMode}>Completed</FilterButton>
@@ -2911,24 +2902,40 @@ export default function TeamPage() {
                 </div>
               </div>
 
-              <div>
-                <label className={`block text-xs font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-400'}`}>
-                  Sort By
-                </label>
+              {/* Right Group: Sort + Create Button */}
+              <div className="flex items-center gap-3">
+                {/* Sort Dropdown (compact) */}
                 <select 
                   value={sortBy} 
                   onChange={(e) => setSortBy(e.target.value)} 
-                  className={`w-full md:w-auto rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
+                  className={`rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all ${
                     isDarkMode 
-                      ? 'bg-dark-secondary text-white border border-[#171717]' 
-                      : 'bg-white text-black border border-gray-200'
+                      ? 'bg-[#171717] text-gray-300 border border-[#171717] hover:bg-gray-700' 
+                      : 'bg-gray-200/50 text-gray-600 border border-gray-200 hover:bg-gray-200'
                   }`}
                 >
-                  <option value="created_at">Recently Created</option>
-                  <option value="name">Project Name</option>
-                  <option value="progress">Progress</option>
+                  <option value="created_at">Sort: Newest</option>
+                  <option value="name">Sort: Name</option>
+                  <option value="progress">Sort: Progress</option>
                 </select>
+
+                {/* Create Project Button - Conditionally Rendered */}
+                {(() => {
+                  const currentMember = members.find(m => m.id === currentUser?.id);
+                  const canCreateProject = currentMember?.role === 'owner' || currentMember?.role === 'admin';
+                  
+                  return canCreateProject ? (
+                    <button
+                      onClick={() => setShowCreateProjectModal(true)}
+                      className="flex items-center gap-2 bg-[#006239] hover:bg-[#005230] text-white px-4 py-2 rounded-lg font-semibold shadow-lg shadow-[rgb(119,136,115)]/20 transition-all active:scale-95 whitespace-nowrap"
+                    >
+                      <Plus size={16} />
+                      Create Project
+                    </button>
+                  ) : null;
+                })()}
               </div>
+
             </div>
           </div>
 
