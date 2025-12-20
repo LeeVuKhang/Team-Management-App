@@ -2,54 +2,9 @@ import React from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { Plus, Search, Users, FolderKanban, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useQueryClient } from '@tanstack/react-query';
+import * as teamApi from './services/teamApi';
 
-/**
- * MOCK DATA - Teams
- */
-const TEAMS = [
-  {
-    id: 1,
-    name: 'Engineering Team',
-    membersCount: 12,
-    activeProjects: 8,
-    members: ['JD', 'AS', 'MK', 'TR', 'ZR']
-  },
-  {
-    id: 2,
-    name: 'Design Team',
-    membersCount: 6,
-    activeProjects: 4,
-    members: ['LP', 'KS', 'RH']
-  },
-  {
-    id: 3,
-    name: 'Marketing Team',
-    membersCount: 8,
-    activeProjects: 5,
-    members: ['EM', 'BN', 'CJ', 'DW']
-  },
-  {
-    id: 4,
-    name: 'Product Team',
-    membersCount: 5,
-    activeProjects: 6,
-    members: ['FG', 'GH', 'HI']
-  },
-  {
-    id: 5,
-    name: 'Sales Team',
-    membersCount: 10,
-    activeProjects: 3,
-    members: ['JK', 'KL', 'LM', 'MN']
-  },
-  {
-    id: 6,
-    name: 'Support Team',
-    membersCount: 7,
-    activeProjects: 2,
-    members: ['NO', 'OP', 'PQ']
-  }
-];
 
 /**
  * TEAM CARD COMPONENT
@@ -112,13 +67,12 @@ const TeamCard = ({ team, darkMode, onClick }) => (
 export default function Dashboard() {
   const { isDarkMode } = useOutletContext();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = React.useState('');
   
-  // Initialize teams from localStorage or use TEAMS as default
-  const [teams, setTeams] = React.useState(() => {
-    const savedTeams = localStorage.getItem('teams');
-    return savedTeams ? JSON.parse(savedTeams) : TEAMS;
-  });
+  // Teams state: load from API on mount. Keep localStorage as a cache/fallback
+  const [teams, setTeams] = React.useState([]);
+  const [isLoadingTeams, setIsLoadingTeams] = React.useState(true);
   
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [isAllTeamsModalOpen, setIsAllTeamsModalOpen] = React.useState(false);
@@ -126,6 +80,39 @@ export default function Dashboard() {
     name: '',
     description: ''
   });
+
+  // Fetch teams from backend, fallback to localStorage/mock if API fails
+  React.useEffect(() => {
+    let mounted = true;
+
+    async function loadTeams() {
+      try {
+        const res = await teamApi.getUserTeams();
+        if (!mounted) return;
+        const apiTeams = (res.data || []).map((t) => ({
+          id: t.id,
+          name: t.name,
+          membersCount: t.total_members || 1,
+          activeProjects: t.project_count || 0,
+          members: ['YOU'],
+          description: t.description || ''
+        }));
+
+        setTeams(apiTeams.length ? apiTeams : TEAMS);
+        try { localStorage.setItem('teams', JSON.stringify(apiTeams.length ? apiTeams : TEAMS)); } catch(e) { /* ignore */ }
+      } catch (err) {
+        // If API fails, try localStorage and finally the mock TEAMS
+        console.error('Failed to fetch teams:', err);
+        const savedTeams = localStorage.getItem('teams');
+        setTeams(savedTeams ? JSON.parse(savedTeams) : TEAMS);
+      } finally {
+        setIsLoadingTeams(false);
+      }
+    }
+
+    loadTeams();
+    return () => { mounted = false; };
+  }, []);
 
   // Save teams to localStorage whenever it changes
   React.useEffect(() => {
@@ -145,26 +132,44 @@ export default function Dashboard() {
     navigate(`/teams/${teamId}`);
   };
 
-  const handleCreateTeam = (e) => {
+  const handleCreateTeam = async (e) => {
     e.preventDefault();
-    
+
     if (!newTeamData.name.trim()) {
       toast.error('Team name is required');
       return;
     }
 
-    const newTeam = {
-      id: teams.length + 1,
-      name: newTeamData.name,
-      membersCount: 1, // Current user
-      activeProjects: 0,
-      members: ['YOU'] // Current user's initials 
-    };
+    try {
+      const res = await teamApi.createTeam({
+        name: newTeamData.name,
+        description: newTeamData.description,
+      });
 
-    setTeams([...teams, newTeam]);
-    toast.success(`Team "${newTeamData.name}" created successfully!`);
-    setIsModalOpen(false);
-    setNewTeamData({ name: '', description: '' });
+      const created = res.data;
+
+      const teamForUI = {
+        id: created.id,
+        name: created.name,
+        membersCount: 1,
+        activeProjects: 0,
+        members: ['YOU'],
+        description: created.description || ''
+      };
+
+      setTeams(prev => [...prev, teamForUI]);
+      try { localStorage.setItem('teams', JSON.stringify([...teams, teamForUI])); } catch(e) { /* ignore */ }
+
+      // Invalidate sidebar teams cache to refresh "My Teams" list
+      queryClient.invalidateQueries({ queryKey: ['userTeams'] });
+
+      toast.success(`Team "${created.name}" created successfully!`);
+      setIsModalOpen(false);
+      setNewTeamData({ name: '', description: '' });
+    } catch (err) {
+      console.error('Failed to create team:', err);
+      toast.error('Failed to create team. Please try again.');
+    }
   };
 
   const handleCloseModal = () => {
