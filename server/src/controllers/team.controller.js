@@ -278,3 +278,107 @@ export const searchUsers = async (req, res, next) => {
     next(error);
   }
 };
+/**
+ * Get pending invitations for a team
+ * @route GET /api/v1/teams/:teamId/invitations
+ * SECURITY: Only owner/admin can view pending invitations
+ */
+export const getTeamPendingInvitations = async (req, res, next) => {
+  try {
+    const { teamId } = req.params;
+    const userId = req.user.id;
+
+    const invitations = await TeamModel.getTeamPendingInvitations(teamId, userId);
+
+    res.status(200).json({
+      success: true,
+      data: invitations,
+    });
+  } catch (error) {
+    if (error.message.includes('not a member')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You are not a member of this team',
+      });
+    }
+    if (error.message.includes('Only team owner or admin')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Only team owner or admin can view pending invitations',
+      });
+    }
+    next(error);
+  }
+};
+
+/**
+ * Revoke a pending invitation
+ * @route DELETE /api/v1/teams/:teamId/invitations/:invitationId
+ * SECURITY: Only owner/admin can revoke invitations
+ */
+export const revokeInvitation = async (req, res, next) => {
+  try {
+    const { teamId, invitationId } = req.params;
+    const userId = req.user.id;
+
+    await TeamModel.revokeInvitation(teamId, invitationId, userId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Invitation revoked successfully',
+    });
+  } catch (error) {
+    if (error.message.includes('not a member')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You are not a member of this team',
+      });
+    }
+    if (error.message.includes('Only team owner or admin')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: Only team owner or admin can revoke invitations',
+      });
+    }
+    if (error.message.includes('not found')) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invitation not found or already processed',
+      });
+    }
+    next(error);
+  }
+};
+
+/**
+ * Leave a team (for non-owner members)
+ * @route POST /api/v1/teams/:teamId/leave
+ * SECURITY: Members and admins can leave, but owners cannot (must delete team or transfer ownership)
+ */
+export const leaveTeam = async (req, res, next) => {
+  try {
+    const { teamId } = req.params;
+    const userId = req.user.id;
+
+    await TeamModel.leaveTeam(teamId, userId);
+
+    res.status(200).json({
+      success: true,
+      message: 'You have left the team successfully',
+    });
+  } catch (error) {
+    if (error.message.includes('not a member')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied: You are not a member of this team',
+      });
+    }
+    if (error.message.includes('Owner cannot leave')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Team owners cannot leave the team. Please transfer ownership or delete the team instead.',
+      });
+    }
+    next(error);
+  }
+};

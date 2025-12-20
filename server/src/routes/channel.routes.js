@@ -16,7 +16,7 @@ import {
  * Mounted at /teams/:teamId/channels
  * 
  * Security:
- * - All routes require authentication (mockAuth for dev, replace with verifyToken)
+ * - All routes require JWT authentication via verifyToken
  * - All inputs validated with Zod schemas
  * - RBAC enforced via verifyTeamMember and verifyTeamRole middleware
  * - Model layer enforces team/project membership (IDOR prevention)
@@ -111,6 +111,19 @@ router.post(
   }),
   verifyTeamMember,
   ChannelController.createMessage
+);
+
+/**
+ * DELETE /teams/:teamId/channels/:channelId
+ * Delete a channel
+ * Access: Team OWNER or ADMIN only
+ */
+router.delete(
+  '/:channelId',
+  validate({ params: teamChannelParamsSchema }),
+  verifyTeamMember,
+  verifyTeamRole(['owner', 'admin']),
+  ChannelController.deleteChannel
 );
 
 export default router;

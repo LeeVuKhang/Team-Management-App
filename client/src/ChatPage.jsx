@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
-import { useOutletContext, useParams } from 'react-router-dom';
+import { useOutletContext, useParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   Hash,
@@ -20,11 +20,15 @@ import {
   FileText,
   Link as LinkIcon,
   Download,
-  ExternalLink
+  ExternalLink,
+  Users,
+  Trash2,
+  AlertCircle
 } from 'lucide-react';
-import { fetchTeamChannels, fetchChannelMessages, createChannel, searchMessages } from './services/channelApi.js';
-import { getTeamProjects } from './services/projectApi.js';
+import { fetchTeamChannels, fetchChannelMessages, createChannel, searchMessages, deleteChannel } from './services/channelApi.js';
+import { getTeamProjects, getTeam } from './services/projectApi.js';
 import { useDebounce } from './hooks/useDebounce.js';
+import { useAuth } from './hooks/useAuth.js';
 import {
   initSocket,
   disconnectSocket,
@@ -38,9 +42,6 @@ import {
   emitTypingStop,
   getSocket,
 } from './services/socketService.js';
-
-// TODO: Replace with actual user from auth context
-const CURRENT_USER_ID = 1; // Mock user ID for development
 const MAX_MESSAGE_LENGTH = 2000; // Character limit for messages (matches DB constraint)
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB per file
 const MAX_FILES = 5; // Maximum files per message
@@ -64,6 +65,110 @@ const ALLOWED_FILE_TYPES = [
 ];
 
 /**
+ * SUB-COMPONENT: Delete Channel Confirmation Modal
+ */
+const DeleteChannelModal = ({
+  isOpen,
+  channelName,
+  onConfirm,
+  onCancel,
+  isDeleting,
+  isDarkMode
+}) => {
+  if (!isOpen) return null;
+
+  const textPrimary = isDarkMode ? 'text-gray-100' : 'text-gray-900';
+  const textSecondary = isDarkMode ? 'text-gray-400' : 'text-gray-500';
+  const hoverBg = isDarkMode ? 'hover:bg-[#171717]' : 'hover:bg-gray-100';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className={`w-full max-w-md rounded-xl shadow-2xl ${isDarkMode ? 'bg-dark-secondary' : 'bg-white'}`}>
+        {/* Modal Header */}
+        <div className={`flex items-center justify-between px-6 py-4 border-b ${isDarkMode ? 'border-[#171717]' : 'border-gray-200'}`}>
+          <h2 className={`text-xl font-bold ${textPrimary}`}>
+            Delete Channel
+          </h2>
+          <button
+            onClick={onCancel}
+            className={`p-1 rounded-lg ${hoverBg} ${textSecondary}`}
+            disabled={isDeleting}
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <div className="p-6 space-y-4">
+          <div className={`p-4 rounded-lg border-2 ${
+            isDarkMode ? 'bg-red-500/10 border-red-500/30' : 'bg-red-50 border-red-200'
+          }`}>
+            <div className="flex items-start gap-3">
+              <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={20} />
+              <div>
+                <h4 className={`font-bold text-sm mb-1 ${
+                  isDarkMode ? 'text-red-400' : 'text-red-600'
+                }`}>
+                  Warning: This action cannot be undone
+                </h4>
+                <p className={`text-sm ${
+                  isDarkMode ? 'text-red-300' : 'text-red-500'
+                }`}>
+                  Are you sure you want to delete <span className="font-bold">#{channelName}</span>?
+                </p>
+                <p className={`text-xs mt-2 ${
+                  isDarkMode ? 'text-red-300' : 'text-red-500'
+                }`}>
+                  All messages and files in this channel will be permanently deleted.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onCancel}
+              className={`flex-1 px-4 py-2.5 rounded-lg font-medium border transition-colors ${
+                isDarkMode 
+                  ? 'border-[#333] text-gray-300 hover:bg-[#171717]' 
+                  : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+              }`}
+              disabled={isDeleting}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onConfirm}
+              className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-white transition-colors flex items-center justify-center gap-2 ${
+                isDeleting 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-red-500 hover:bg-red-600'
+              }`}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 size={16} />
+                  Delete Channel
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
  * SUB-COMPONENT: Create Channel Modal
  * Extracted outside main component to prevent re-creation on every render
  */
@@ -82,8 +187,6 @@ const CreateChannelModal = ({
 }) => {
   if (!isModalOpen) return null;
 
-  const isProjectLocked = modalContext?.type === 'project';
-  
   const textPrimary = isDarkMode ? 'text-gray-100' : 'text-gray-900';
   const textSecondary = isDarkMode ? 'text-gray-400' : 'text-gray-500';
   const hoverBg = isDarkMode ? 'hover:bg-[#171717]' : 'hover:bg-gray-100';
@@ -109,35 +212,30 @@ const CreateChannelModal = ({
         {/* Modal Body */}
         <form onSubmit={handleCreateChannel} className="p-6 space-y-5">
           
-          {/* Project Selector */}
+          {/* Belongs To Selector */}
           <div>
             <label className={`block text-sm font-semibold mb-2 ${textPrimary}`}>
-              Project {isProjectLocked && <span className={`text-xs font-normal ${textSecondary}`}>(locked)</span>}
+              Belongs to
             </label>
             
-            {isProjectLocked ? (
-              <div className={`w-full px-4 py-3 rounded-lg border ${isDarkMode ? 'bg-[#171717] border-[#333] text-gray-400' : 'bg-gray-100 border-gray-300 text-gray-600'} cursor-not-allowed`}>
-                {modalContext.projectName}
-              </div>
-            ) : (
-              <div className="relative">
-                <select
-                  value={selectedProjectId}
-                  onChange={(e) => setSelectedProjectId(e.target.value)}
-                  className={`w-full px-4 py-3 rounded-lg border appearance-none cursor-pointer ${inputBg} focus:outline-none focus:ring-2 focus:ring-[#006239]/50 ${textPrimary}`}
-                  disabled={isCreatingChannel}
-                  required
-                >
-                  <option value="">-- Select a Project --</option>
-                  {availableProjects.map(project => (
-                    <option key={project.id} value={project.id}>
-                      {project.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown size={18} className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${textSecondary}`} />
-              </div>
-            )}
+            <div className="relative">
+              <select
+                value={selectedProjectId}
+                onChange={(e) => setSelectedProjectId(e.target.value)}
+                className={`w-full px-4 py-3 rounded-lg border appearance-none cursor-pointer ${inputBg} focus:outline-none focus:ring-2 focus:ring-[#006239]/50 ${textPrimary}`}
+                disabled={isCreatingChannel}
+                required
+              >
+                <option value="">-- Select --</option>
+                <option value="null">Entire Team</option>
+                {availableProjects.map(project => (
+                  <option key={project.id} value={project.id}>
+                    Project: {project.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={18} className={`absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${textSecondary}`} />
+            </div>
           </div>
 
           {/* Channel Name Input */}
@@ -190,6 +288,18 @@ const CreateChannelModal = ({
 export default function ChatPage() {
   const { isDarkMode } = useOutletContext();
   const { teamId } = useParams();
+  const navigate = useNavigate();
+  
+  // Get current authenticated user
+  const { user: currentUser, isLoading: isLoadingUser, isError: isAuthError } = useAuth();
+  
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (isAuthError) {
+      toast.error('Please log in to access chat');
+      navigate('/login');
+    }
+  }, [isAuthError, navigate]);
   
   // State
   const [channels, setChannels] = useState([]);
@@ -223,6 +333,10 @@ export default function ChatPage() {
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   
+  // Delete channel modal state
+  const [showDeleteChannelModal, setShowDeleteChannelModal] = useState(false);
+  const [isDeletingChannel, setIsDeletingChannel] = useState(false);
+  
   // File attachment state
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -238,6 +352,9 @@ export default function ChatPage() {
   
   // Team projects state (for dropdown in create channel modal)
   const [teamProjects, setTeamProjects] = useState([]);
+  
+  // Team data state
+  const [teamData, setTeamData] = useState(null);
   
   // Pagination state
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
@@ -256,10 +373,22 @@ export default function ChatPage() {
    * Initialize Socket connection on mount
    */
   useEffect(() => {
-    const socket = initSocket(CURRENT_USER_ID);
+    console.log('[ChatPage] Initializing Socket connection...');
+    const socket = initSocket();
     
-    socket.on('connect', () => setIsConnected(true));
-    socket.on('disconnect', () => setIsConnected(false));
+    socket.on('connect', () => {
+      console.log('[ChatPage] Socket connected successfully!');
+      setIsConnected(true);
+    });
+    
+    socket.on('disconnect', () => {
+      console.log('[ChatPage] Socket disconnected');
+      setIsConnected(false);
+    });
+    
+    socket.on('connect_error', (error) => {
+      console.error('[ChatPage] Socket connection error:', error.message);
+    });
 
     return () => {
       disconnectSocket();
@@ -283,8 +412,12 @@ export default function ChatPage() {
       setIsLoadingChannels(true);
       setChannelError(null);
       try {
-        // Fetch both channels and projects in parallel
-        const [channelsData, projectsData] = await Promise.all([
+        // Fetch team data, channels and projects in parallel
+        const [teamDataResponse, channelsData, projectsData] = await Promise.all([
+          getTeam(teamId).catch(err => {
+            console.warn('[ChatPage] Failed to fetch team:', err);
+            return { data: null }; // Fallback to null if team fails
+          }),
           fetchTeamChannels(teamId),
           getTeamProjects(teamId).catch(err => {
             console.warn('[ChatPage] Failed to fetch projects:', err);
@@ -292,9 +425,11 @@ export default function ChatPage() {
           })
         ]);
         
+        console.log('[ChatPage] Received team:', teamDataResponse?.data);
         console.log('[ChatPage] Received channels:', channelsData);
         console.log('[ChatPage] Received projects:', projectsData);
         
+        setTeamData(teamDataResponse?.data);
         setChannels(channelsData);
         setTeamProjects(projectsData.data || []);
         
@@ -337,12 +472,12 @@ export default function ChatPage() {
         // Join new channel room for real-time updates
         await joinChannel(activeChannel.id);
         
-        // Fetch initial message history (last 10 messages)
-        const data = await fetchChannelMessages(teamId, activeChannel.id, { limit: 10 });
+        // Fetch initial message history (last 20 messages for better scrolling)
+        const data = await fetchChannelMessages(teamId, activeChannel.id, { limit: 20 });
         setMessages(data || []);
         
-        // If we got less than 10 messages, there are no more to load
-        setHasMoreMessages(data && data.length === 10);
+        // If we got less than 20 messages, there are no more to load
+        setHasMoreMessages(data && data.length === 20);
         
         previousChannelRef.current = activeChannel.id;
       } catch (err) {
@@ -539,7 +674,7 @@ export default function ChatPage() {
     });
 
     const unsubTyping = onUserTyping(({ userId, username }) => {
-      if (userId !== CURRENT_USER_ID) {
+      if (currentUser && userId !== currentUser.id) {
         setTypingUsers(prev => {
           if (!prev.find(u => u.userId === userId)) {
             return [...prev, { userId, username }];
@@ -558,7 +693,7 @@ export default function ChatPage() {
       unsubTyping();
       unsubStopTyping();
     };
-  }, [activeChannel?.id]);
+  }, [activeChannel?.id, currentUser]);
 
   /**
    * 1. HANDLE SCROLL POSITION (Layout Effect)
@@ -605,6 +740,24 @@ export default function ChatPage() {
     // Only run smooth scroll for actual new messages while chatting
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  /**
+   * 3. AUTO-LOAD MORE MESSAGES IF CONTAINER ISN'T SCROLLABLE
+   * Ensures users can always access pagination by making content scrollable
+   */
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container || isLoadingMore || !hasMoreMessages || messages.length === 0) return;
+
+    // Check if container has scrollable content
+    const hasScrollbar = container.scrollHeight > container.clientHeight;
+    
+    if (!hasScrollbar) {
+      // Container isn't scrollable, auto-load more messages
+      loadMoreMessages();
+    }
+  }, [messages, hasMoreMessages, isLoadingMore, loadMoreMessages]);
+
 
   // Categorize channels
   const generalChannels = channels.filter(c => !c.project_id);
@@ -738,6 +891,9 @@ export default function ChatPage() {
     
     if (context.type === 'project') {
       setSelectedProjectId(context.projectId);
+    } else if (context.type === 'team') {
+      // Pre-select "Entire Team" option for team-level channels
+      setSelectedProjectId('null');
     } else {
       setSelectedProjectId('');
     }
@@ -787,17 +943,21 @@ export default function ChatPage() {
       return;
     }
     
+    // Validate selection (accept "null" string for team-level channels)
     if (!selectedProjectId && modalContext?.type === 'global') {
-      toast.error('Please select a project');
+      toast.error('Please select where this channel belongs to');
       return;
     }
     
     setIsCreatingChannel(true);
     
     try {
+      // Convert "null" string to actual null, otherwise convert to number
+      const projectIdValue = selectedProjectId === "null" ? null : (selectedProjectId ? Number(selectedProjectId) : null);
+      
       const channelData = {
         name: trimmedName,
-        projectId: selectedProjectId ? Number(selectedProjectId) : null,
+        projectId: projectIdValue,
         type: 'text',
         isPrivate: false,
       };
@@ -898,7 +1058,21 @@ export default function ChatPage() {
     >
       {/* Avatar */}
       <div className={`flex-shrink-0 w-8 h-8 ${isSequence ? 'invisible' : ''}`}>
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-300 text-black'}`}>
+        {msg.user.avatar_url ? (
+          <img
+            src={msg.user.avatar_url}
+            alt={msg.user.username}
+            className="w-8 h-8 rounded-full object-cover"
+            onError={(e) => {
+              e.target.style.display = 'none';
+              e.target.nextElementSibling.style.display = 'flex';
+            }}
+          />
+        ) : null}
+        <div
+          className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-300 text-black'}`}
+          style={{ display: msg.user.avatar_url ? 'none' : 'flex' }}
+        >
           {msg.user.username.substring(0,2).toUpperCase()}
         </div>
       </div>
@@ -964,19 +1138,27 @@ export default function ChatPage() {
    */
   const NoTeamState = () => (
     <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-      <Hash size={64} className={`${textSecondary} mb-4`} />
-      <h3 className={`text-xl font-bold ${textPrimary} mb-2`}>
-        No Team Selected
+      <div className={`inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 ${
+        isDarkMode ? 'bg-blue-500/10' : 'bg-blue-50'
+      }`}>
+        <Users size={32} className="text-blue-500" />
+      </div>
+      <h3 className={`text-2xl font-bold ${textPrimary} mb-3`}>
+        You're Not in Any Team Yet
       </h3>
-      <p className={`${textSecondary} max-w-md mb-4`}>
-        Please select a team from the sidebar to start chatting.
+      <p className={`text-sm ${textSecondary} max-w-md mb-6`}>
+        To start chatting, you need to create your first team or wait for an invitation to join an existing team.
       </p>
-      <a 
-        href="/dashboard" 
-        className="px-4 py-2 bg-[#006239] text-white rounded-lg hover:bg-[#005230] transition-colors"
+      <button
+        onClick={() => navigate('/dashboard')}
+        className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+          isDarkMode 
+            ? 'bg-[#006239] hover:bg-[#005230] text-white' 
+            : 'bg-[#006239] hover:bg-[#005230] text-white'
+        }`}
       >
         Go to Dashboard
-      </a>
+      </button>
     </div>
   );
 
@@ -985,6 +1167,18 @@ export default function ChatPage() {
     return (
       <div className={`flex h-[calc(100vh-64px)] ${bgBase}`}>
         <NoTeamState />
+      </div>
+    );
+  }
+
+  // Show loading state while fetching user
+  if (isLoadingUser) {
+    return (
+      <div className={`flex h-[calc(100vh-64px)] items-center justify-center ${bgBase}`}>
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-12 h-12 border-4 border-[#006239] border-t-transparent rounded-full animate-spin" />
+          <p className={textSecondary}>Loading user information...</p>
+        </div>
       </div>
     );
   }
@@ -1088,9 +1282,23 @@ export default function ChatPage() {
                         }}
                       >
                         <div className="flex items-start gap-3">
-                          <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-                            isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-300 text-black'
-                          }`}>
+                          {msg.user?.avatar_url ? (
+                            <img
+                              src={msg.user.avatar_url}
+                              alt={msg.user.username}
+                              className="flex-shrink-0 w-8 h-8 rounded-full object-cover"
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                e.target.nextElementSibling.style.display = 'flex';
+                              }}
+                            />
+                          ) : null}
+                          <div
+                            className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                              isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-300 text-black'
+                            }`}
+                            style={{ display: msg.user?.avatar_url ? 'none' : 'flex' }}
+                          >
                             {msg.user?.username?.substring(0,2).toUpperCase() || 'U'}
                           </div>
                           <div className="flex-1 min-w-0">
@@ -1135,14 +1343,17 @@ export default function ChatPage() {
           {/* Sidebar Header */}
           <div className={`p-4 border-b ${isDarkMode ? 'border-[#171717]' : 'border-gray-200'}`}>
             <h2 className={`font-bold text-lg ${textPrimary} flex items-center justify-between`}>
-              Channels
-              <button 
-                className={`p-1 rounded ${hoverBg} transition-colors`}
-                onClick={() => openCreateChannelModal({ type: 'global' })}
-                title="Create new channel"
-              >
-                <Plus size={18} />
-              </button>
+              {teamData?.name || 'Channels'}
+              {/* Only show + button for owner/admin */}
+              {teamData?.currentUserRole !== 'member' && (
+                <button 
+                  className={`p-1 rounded ${hoverBg} transition-colors`}
+                  onClick={() => openCreateChannelModal({ type: 'global' })}
+                  title="Create new channel"
+                >
+                  <Plus size={18} />
+                </button>
+              )}
             </h2>
           </div>
 
@@ -1170,9 +1381,25 @@ export default function ChatPage() {
                 {/* 1. TEAM CHANNELS */}
                 {generalChannels.length > 0 && (
                   <div>
-                    <h3 className={`text-xs font-bold uppercase tracking-wider mb-2 px-3 ${textSecondary}`}>
-                      Team Channels
-                    </h3>
+                    <div className={`flex items-center justify-between px-3 mb-2 group`}>
+                      <h3 className={`text-xs font-bold uppercase tracking-wider ${textSecondary}`}>
+                        Team Channels
+                      </h3>
+                      {/* Only show + button for owner/admin */}
+                      {teamData?.currentUserRole !== 'member' && (
+                        <button
+                          onClick={() => openCreateChannelModal({ 
+                            type: 'team', 
+                            projectId: null, 
+                            projectName: null 
+                          })}
+                          className={`p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity ${hoverBg}`}
+                          title="Add team channel"
+                        >
+                          <Plus size={14} />
+                        </button>
+                      )}
+                    </div>
                     {generalChannels.map(channel => (
                       <ChannelItem key={channel.id} channel={channel} />
                     ))}
@@ -1186,17 +1413,20 @@ export default function ChatPage() {
                       <h3 className={`text-xs font-bold uppercase tracking-wider ${textSecondary} truncate`}>
                         {projectName}
                       </h3>
-                      <button
-                        onClick={() => openCreateChannelModal({ 
-                          type: 'project', 
-                          projectId: data.projectId, 
-                          projectName 
-                        })}
-                        className={`p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity ${hoverBg}`}
-                        title={`Add channel to ${projectName}`}
-                      >
-                        <Plus size={14} />
-                      </button>
+                      {/* Only show + button for owner/admin */}
+                      {teamData?.currentUserRole !== 'member' && (
+                        <button
+                          onClick={() => openCreateChannelModal({ 
+                            type: 'project', 
+                            projectId: data.projectId, 
+                            projectName 
+                          })}
+                          className={`p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity ${hoverBg}`}
+                          title={`Add channel to ${projectName}`}
+                        >
+                          <Plus size={14} />
+                        </button>
+                      )}
                     </div>
                     {data.channels.map(channel => (
                       <ChannelItem key={channel.id} channel={channel} />
@@ -1249,13 +1479,6 @@ export default function ChatPage() {
 
           {/* Header Actions */}
           <div className="flex items-center gap-2">
-            <div className="hidden md:flex -space-x-2 mr-4">
-              {[1,2,3].map(i => (
-                <div key={i} className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold ${isDarkMode ? 'border-dark-secondary bg-gray-700' : 'border-white bg-gray-200'}`}>
-                  U{i}
-                </div>
-              ))}
-            </div>
             <button 
               onClick={openSearch}
               className={`p-2 rounded-full ${hoverBg} ${textSecondary} ${!activeChannel ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -1318,6 +1541,22 @@ export default function ChatPage() {
             <EmptyState />
           ) : (
             <>
+              {/* Load More Button (when messages don't fill the container) */}
+              {hasMoreMessages && !isLoadingMore && (
+                <div className="flex justify-center py-4">
+                  <button
+                    onClick={loadMoreMessages}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      isDarkMode 
+                        ? 'bg-[#1F1F1F] hover:bg-[#2A2A2A] text-gray-300 border border-[#333]' 
+                        : 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 shadow-sm'
+                    }`}
+                  >
+                    Load older messages
+                  </button>
+                </div>
+              )}
+              
               {/* Load More Indicator */}
               {isLoadingMore && (
                 <div className="flex justify-center py-4">
@@ -1343,7 +1582,7 @@ export default function ChatPage() {
               
               <div className="space-y-1">
                 {messages.map((msg, index) => {
-                  const isMe = msg.user_id === CURRENT_USER_ID;
+                  const isMe = currentUser && msg.user_id === currentUser.id;
                   const isSequence = index > 0 && messages[index-1].user_id === msg.user_id;
 
                   return (
@@ -1650,8 +1889,55 @@ export default function ChatPage() {
               )}
             </div>
           </div>
+
+          {/* Delete Channel Section - Only for Admin/Owner */}
+          {(teamData?.currentUserRole === 'owner' || teamData?.currentUserRole === 'admin') && (
+            <div className={`p-4 border-t ${isDarkMode ? 'border-[#171717]' : 'border-gray-200'}`}>
+              <button
+                onClick={() => setShowDeleteChannelModal(true)}
+                className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-medium transition-colors ${
+                  isDarkMode
+                    ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30'
+                    : 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200'
+                }`}
+              >
+                <Trash2 size={18} />
+                Delete Channel
+              </button>
+              <p className={`text-xs text-center mt-2 ${textSecondary}`}>
+                This action cannot be undone
+              </p>
+            </div>
+          )}
         </div>
       )}
+
+      {/* Delete Channel Modal */}
+      <DeleteChannelModal
+        isOpen={showDeleteChannelModal}
+        channelName={activeChannel?.name}
+        onConfirm={async () => {
+          setIsDeletingChannel(true);
+          try {
+            await deleteChannel(teamId, activeChannel.id);
+            toast.success('Channel deleted successfully');
+            setShowDeleteChannelModal(false);
+            setIsInfoOpen(false);
+            setActiveChannel(null);
+            // Refetch channels
+            const freshChannels = await fetchTeamChannels(teamId);
+            setChannels(freshChannels);
+          } catch (err) {
+            console.error('Failed to delete channel:', err);
+            toast.error(err.message || 'Failed to delete channel');
+          } finally {
+            setIsDeletingChannel(false);
+          }
+        }}
+        onCancel={() => setShowDeleteChannelModal(false)}
+        isDeleting={isDeletingChannel}
+        isDarkMode={isDarkMode}
+      />
     </div>
   );
 }

@@ -70,17 +70,6 @@ export const optionalAuth = async (req, res, next) => {
 };
 
 /**
- * Mock Authentication Middleware (FOR TESTING ONLY)
- * Simulates authenticated user without requiring token
- * ⚠️ REMOVE IN PRODUCTION
- */
-export const mockAuth = (req, res, next) => {
-  req.user = { id: 1 };
-  console.warn('⚠️  Using MOCK AUTH - User ID 1 (Replace with verifyToken in production)');
-  next();
-};
-
-/**
  * Team Membership Verification Middleware
  * Verifies that authenticated user is a member of the team specified in :teamId param
  * Prevents IDOR attacks by checking team_members table

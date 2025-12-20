@@ -2,9 +2,9 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Bell, Plus, Menu, Sun, Moon, FileText, LogOut, User, HelpCircle, Check, X, Clock, AlertTriangle, CheckCircle, Info, AlertCircle } from 'lucide-react';
-import { getUserInvitations, acceptInvitation, declineInvitation } from '../services/projectApi';
 import { getSocket, disconnectSocket } from '../services/socketService';
-import { notificationApi } from '../services/notificationApi';
+import { notificationApi, getUserInvitations, acceptInvitation, declineInvitation } from '../services/notificationApi';
+import { useAuth } from '../hooks/useAuth';
 
 // Notification type icons and colors
 const NOTIFICATION_STYLES = {
@@ -24,6 +24,9 @@ export default function Header({ isDarkMode, toggleDarkMode }) {
   const queryClient = useQueryClient();
   const notificationRef = useRef(null);
   const avatarRef = useRef(null);
+  
+  // Get current authenticated user
+  const { user: currentUser } = useAuth();
 
   // Fetch pending invitations
   const { data: invitationsData } = useQuery({
@@ -477,8 +480,12 @@ export default function Header({ isDarkMode, toggleDarkMode }) {
           {isDropdownOpen && (
             <div className={`absolute right-0 mt-2 w-56 rounded-xl shadow-lg border overflow-hidden ${isDarkMode ? 'bg-dark-secondary border-[#171717]' : 'bg-white border-gray-200'}`}>
               <div className={`px-4 py-3 border-b ${isDarkMode ? 'border-[#171717]' : 'border-gray-200'}`}>
-                <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Alex Johnson</p>
-                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>alex@company.com</p>
+                <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  {currentUser?.username || 'Loading...'}
+                </p>
+                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {currentUser?.email || ''}
+                </p>
               </div>
               
               <button className={`w-full flex items-center space-x-3 px-4 py-3 transition-colors ${isDarkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-700'}`}>

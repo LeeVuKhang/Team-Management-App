@@ -98,7 +98,7 @@ CREATE TABLE channels (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     
     -- Tên kênh phải duy nhất trong phạm vi 1 team (tránh trùng tên #general)
-    UNIQUE(team_id, name) 
+    UNIQUE(team_id, project_id, name) 
 );
 
 -- 8. Bảng MESSAGES

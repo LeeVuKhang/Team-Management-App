@@ -1,24 +1,25 @@
 import express from 'express';
 import * as TeamController from '../controllers/team.controller.js';
 import { validate } from '../middlewares/validate.js';
-import { mockAuth } from '../middlewares/auth.js';
+import { verifyToken } from '../middlewares/auth.js';
 import { 
   teamIdParamSchema, 
   createTeamSchema, 
   updateTeamSchema,
-  searchUsersSchema
+  searchUsersSchema,
+  invitationIdParamSchema
 } from '../validations/team.validation.js';
 
 const router = express.Router();
 
 /**
  * Team Routes
- * All routes require authentication (verifyToken middleware applied at router level in index.js)
+ * All routes require JWT authentication (verifyToken middleware)
  * SECURITY: Team membership is verified in the model layer (RBAC + IDOR prevention)
  */
 
-// Apply mock authentication to all team routes
-router.use(mockAuth);
+// Apply JWT authentication to all team routes
+router.use(verifyToken);
 
 /**
  * @route   GET /api/v1/teams
@@ -116,6 +117,39 @@ router.delete(
   '/:teamId',
   validate(teamIdParamSchema, 'params'),
   TeamController.deleteTeam
+);
+
+/**
+ * @route   GET /api/v1/teams/:teamId/invitations
+ * @desc    Get all pending invitations for a team
+ * @access  Private (Owner/Admin only)
+ */
+router.get(
+  '/:teamId/invitations',
+  validate(teamIdParamSchema, 'params'),
+  TeamController.getTeamPendingInvitations
+);
+
+/**
+ * @route   DELETE /api/v1/teams/:teamId/invitations/:invitationId
+ * @desc    Revoke a pending invitation
+ * @access  Private (Owner/Admin only)
+ */
+router.delete(
+  '/:teamId/invitations/:invitationId',
+  validate(invitationIdParamSchema, 'params'),
+  TeamController.revokeInvitation
+);
+
+/**
+ * @route   POST /api/v1/teams/:teamId/leave
+ * @desc    Leave a team (for non-owner members)
+ * @access  Private (Member/Admin only - owners cannot leave)
+ */
+router.post(
+  '/:teamId/leave',
+  validate(teamIdParamSchema, 'params'),
+  TeamController.leaveTeam
 );
 
 export default router;

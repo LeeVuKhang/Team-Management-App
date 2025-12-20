@@ -68,3 +68,18 @@ export const searchUsersSchema = z.object({
     .trim()
     .refine((val) => val.length > 0, 'Search query cannot be empty'),
 });
+/**
+ * Validate invitation ID parameter in route params
+ */
+export const invitationIdParamSchema = z.object({
+  teamId: z
+    .string()
+    .regex(/^\d+$/, 'Team ID must be a positive integer')
+    .transform(Number)
+    .refine((val) => val > 0, 'Team ID must be greater than 0'),
+  invitationId: z
+    .string()
+    .regex(/^\d+$/, 'Invitation ID must be a positive integer')
+    .transform(Number)
+    .refine((val) => val > 0, 'Invitation ID must be greater than 0'),
+});
