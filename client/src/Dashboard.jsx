@@ -2,6 +2,8 @@ import React from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { Plus, Search, Users, FolderKanban, X, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useQueryClient } from '@tanstack/react-query';
+import * as teamApi from './services/teamApi';
 
 /**
  * TEAM CARD COMPONENT
@@ -55,6 +57,7 @@ const TeamCard = ({ team, darkMode, onClick }) => (
 export default function Dashboard() {
   const { isDarkMode } = useOutletContext();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = React.useState('');
   const [teams, setTeams] = React.useState([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -65,7 +68,40 @@ export default function Dashboard() {
     description: ''
   });
 
-  // Fetch teams from backend on mount
+  // Fetch teams from backend, fallback to localStorage/mock if API fails
+  React.useEffect(() => {
+    let mounted = true;
+
+    async function loadTeams() {
+      try {
+        const res = await teamApi.getUserTeams();
+        if (!mounted) return;
+        const apiTeams = (res.data || []).map((t) => ({
+          id: t.id,
+          name: t.name,
+          membersCount: t.total_members || 1,
+          activeProjects: t.project_count || 0,
+          members: ['YOU'],
+          description: t.description || ''
+        }));
+
+        setTeams(apiTeams.length ? apiTeams : TEAMS);
+        try { localStorage.setItem('teams', JSON.stringify(apiTeams.length ? apiTeams : TEAMS)); } catch(e) { /* ignore */ }
+      } catch (err) {
+        // If API fails, try localStorage and finally the mock TEAMS
+        console.error('Failed to fetch teams:', err);
+        const savedTeams = localStorage.getItem('teams');
+        setTeams(savedTeams ? JSON.parse(savedTeams) : TEAMS);
+      } finally {
+        setIsLoadingTeams(false);
+      }
+    }
+
+    loadTeams();
+    return () => { mounted = false; };
+  }, []);
+
+  // Save teams to localStorage whenever it changes
   React.useEffect(() => {
     const fetchTeams = async () => {
       try {
@@ -119,47 +155,41 @@ export default function Dashboard() {
 
   const handleCreateTeam = async (e) => {
     e.preventDefault();
-    
+
     if (!newTeamData.name.trim()) {
       toast.error('Team name is required');
       return;
     }
 
-    setIsLoading(true);
-    
     try {
-      const response = await fetch('http://localhost:5000/api/v1/teams', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          name: newTeamData.name.trim(),
-          description: newTeamData.description.trim() || null
-        }),
+      const res = await teamApi.createTeam({
+        name: newTeamData.name,
+        description: newTeamData.description,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to create team');
-      }
+      const created = res.data;
 
-      const data = await response.json();
-      console.log('Team created:', data);
-      
-      toast.success(`Team "${newTeamData.name}" created successfully!`);
-      
-      // Add new team to end of list (right side)
-      setTeams([...teams, data.data]);
-      
+      const teamForUI = {
+        id: created.id,
+        name: created.name,
+        membersCount: 1,
+        activeProjects: 0,
+        members: ['YOU'],
+        description: created.description || ''
+      };
+
+      setTeams(prev => [...prev, teamForUI]);
+      try { localStorage.setItem('teams', JSON.stringify([...teams, teamForUI])); } catch(e) { /* ignore */ }
+
+      // Invalidate sidebar teams cache to refresh "My Teams" list
+      queryClient.invalidateQueries({ queryKey: ['userTeams'] });
+
+      toast.success(`Team "${created.name}" created successfully!`);
       setIsModalOpen(false);
       setNewTeamData({ name: '', description: '' });
-    } catch (error) {
-      console.error('Error creating team:', error);
-      toast.error(error.message || 'Failed to create team');
-    } finally {
-      setIsLoading(false);
+    } catch (err) {
+      console.error('Failed to create team:', err);
+      toast.error('Failed to create team. Please try again.');
     }
   };
 
