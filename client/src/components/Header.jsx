@@ -474,7 +474,22 @@ export default function Header({ isDarkMode, toggleDarkMode }) {
             onClick={() => setDropdownOpen(!isDropdownOpen)}
             className={`h-10 w-10 rounded-full border-2 flex items-center justify-center overflow-hidden transition-all hover:ring-2 ${isDarkMode ? 'bg-dark-secondary border-[#171717] hover:ring-[#1F1F1F]' : 'bg-gray-100 border-gray-300 hover:ring-gray-400 shadow-sm'}`}
           >
-            <User size={20} className={isDarkMode ? 'text-gray-400' : 'text-gray-600'} />
+            {currentUser?.avatar_url ? (
+              <img 
+                src={currentUser.avatar_url} 
+                alt={currentUser.username || 'User'}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextElementSibling.style.display = 'flex';
+                }}
+              />
+            ) : null}
+            <User 
+              size={20} 
+              className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}
+              style={{ display: currentUser?.avatar_url ? 'none' : 'block' }}
+            />
           </button>
 
           {isDropdownOpen && (
