@@ -1,4 +1,5 @@
-import { LayoutDashboard, FolderKanban, Users, Settings, MessageSquare, Zap, Folder, CheckSquare, MoreHorizontal } from 'lucide-react';
+import { useState } from 'react';
+import { LayoutDashboard, FolderKanban, Users, Settings, MessageSquare, Zap, Folder, CheckSquare, ChevronDown } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getUserTeams } from '../services/projectApi';
@@ -18,7 +19,9 @@ export default function Sidebar({ darkMode, activePage }) {
   });
 
   const teams = teamsData?.data || [];
-  const visibleTeams = teams.slice(0, MAX_VISIBLE_TEAMS);
+  const [isTeamsExpanded, setIsTeamsExpanded] = useState(false);
+  
+  const visibleTeams = isTeamsExpanded ? teams : teams.slice(0, MAX_VISIBLE_TEAMS);
   const hasMoreTeams = teams.length > MAX_VISIBLE_TEAMS;
   const hiddenTeamsCount = teams.length - MAX_VISIBLE_TEAMS;
   
@@ -27,12 +30,15 @@ export default function Sidebar({ darkMode, activePage }) {
   const chatTeamId = teamId || (teams.length > 0 ? teams[0].id : null);
   const chatLink = chatTeamId ? `/teams/${chatTeamId}/chat` : '/chat';
 
+  // Custom scrollbar class based on theme
+  const scrollbarClass = darkMode ? 'custom-scrollbar-dark' : 'custom-scrollbar';
+
   return (
     <aside 
       className={`w-16 hover:w-56 group ${bgSidebar} border-r flex flex-col transition-all duration-300 overflow-hidden`}
     >
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-6 space-y-1 overflow-hidden">
+      <nav className={`flex-1 px-3 py-6 space-y-1 overflow-y-auto overflow-x-hidden ${scrollbarClass}`}>
         <Link to="/dashboard" className={`w-full flex items-center px-3 py-3 rounded-lg transition-all duration-200 group/item relative ${
           activePage === 'dashboard'
             ? darkMode
@@ -117,22 +123,27 @@ export default function Sidebar({ darkMode, activePage }) {
               </Link>
             ))}
             
-            {/* See more button */}
+            {/* Expand/Collapse Ghost Button - Gemini style */}
             {hasMoreTeams && (
-              <Link 
-                to="/dashboard"
-                className={`w-full flex items-center px-3 py-2.5 text-sm rounded-lg transition-all ${
+              <button 
+                onClick={() => setIsTeamsExpanded(!isTeamsExpanded)}
+                className={`w-full flex items-center px-3 py-2.5 text-sm rounded-lg transition-all duration-200 ${
                   darkMode 
-                    ? 'text-gray-500 hover:text-gray-300 hover:bg-[#1F1F1F]' 
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                    ? 'text-gray-600 hover:text-gray-400 hover:bg-[#1F1F1F]/50' 
+                    : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100/70'
                 }`}
-                title={`View all ${teams.length} teams`}
+                title={isTeamsExpanded ? 'Show less' : `Show ${hiddenTeamsCount} more teams`}
               >
-                <MoreHorizontal size={18} className="flex-shrink-0" />
-                <span className="ml-3 flex-1 truncate opacity-0 group-hover:opacity-100 transition-opacity">
-                  {hiddenTeamsCount} more teams
+                <ChevronDown 
+                  size={16} 
+                  className={`flex-shrink-0 transition-transform duration-200 ${
+                    isTeamsExpanded ? 'rotate-180' : ''
+                  }`} 
+                />
+                <span className="ml-3 flex-1 text-left opacity-0 group-hover:opacity-100 transition-opacity">
+                  {isTeamsExpanded ? 'Show less' : <><span className="font-semibold">{hiddenTeamsCount}</span> more</>}
                 </span>
-              </Link>
+              </button>
             )}
           </>
         )}
