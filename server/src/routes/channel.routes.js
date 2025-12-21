@@ -85,6 +85,20 @@ router.get(
 );
 
 /**
+ * GET /teams/:teamId/channels/:channelId/links
+ * Get all scraped links for a channel (for Channel Info sidebar)
+ * Access: Any team member (project membership checked in model)
+ */
+router.get(
+  '/:channelId/links',
+  validate({
+    params: teamChannelParamsSchema,
+  }),
+  verifyTeamMember,
+  ChannelController.getChannelLinks
+);
+
+/**
  * GET /teams/:teamId/channels/:channelId/messages
  * Get messages for a channel (with pagination)
  * Access: Any team member (project membership checked in model)

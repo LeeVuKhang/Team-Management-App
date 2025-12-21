@@ -1,5 +1,6 @@
 import { Server } from 'socket.io';
 import * as ChannelModel from '../models/channel.model.js';
+import * as MessageLinkModel from '../models/messageLink.model.js';
 import { socketMessageSchema, joinChannelSchema, typingSchema } from '../validations/channel.validation.js';
 
 /**
@@ -14,6 +15,88 @@ import { socketMessageSchema, joinChannelSchema, typingSchema } from '../validat
 
 // In-memory store for active users in channels (for typing indicators, presence)
 const channelUsers = new Map(); // channelId -> Set of {socketId, userId, username}
+
+/**
+ * URL Regex Pattern - Matches HTTP and HTTPS URLs
+ */
+const URL_REGEX = /https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&\/=]*)/gi;
+
+/**
+ * Extract first URL from text content
+ */
+const extractFirstUrl = (text) => {
+  if (!text) return null;
+  const matches = text.match(URL_REGEX);
+  return matches ? matches[0] : null;
+};
+
+/**
+ * Extract domain from URL
+ */
+const extractDomain = (url) => {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.hostname.replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Scrape Open Graph metadata from URL
+ */
+const scrapeUrlMetadata = async (url) => {
+  try {
+    const ogs = (await import('open-graph-scraper')).default;
+    const { result, error } = await ogs({ 
+      url, 
+      timeout: 5000,
+      fetchOptions: {
+        headers: { 'user-agent': 'Mozilla/5.0 (compatible; TeamManagementBot/1.0)' }
+      }
+    });
+    
+    if (error || !result.success) {
+      console.log(`[scrapeUrlMetadata] Failed to scrape ${url}`);
+      return { title: null, description: null, imageUrl: null };
+    }
+    
+    return {
+      title: result.ogTitle || result.twitterTitle || null,
+      description: result.ogDescription || result.twitterDescription || null,
+      imageUrl: result.ogImage?.[0]?.url || result.twitterImage?.[0]?.url || null
+    };
+  } catch (err) {
+    console.error(`[scrapeUrlMetadata] Error: ${err.message}`);
+    return { title: null, description: null, imageUrl: null };
+  }
+};
+
+/**
+ * Process and save link metadata for a message (background task)
+ */
+const processMessageLinks = async (messageId, content) => {
+  try {
+    const url = extractFirstUrl(content);
+    if (!url) return;
+    
+    const domain = extractDomain(url);
+    const { title, description, imageUrl } = await scrapeUrlMetadata(url);
+    
+    await MessageLinkModel.createMessageLink({
+      messageId,
+      url,
+      title,
+      description,
+      imageUrl,
+      domain
+    });
+    
+    console.log(`[processMessageLinks] Saved link for message ${messageId}: ${url}`);
+  } catch (err) {
+    console.error(`[processMessageLinks] Error: ${err.message}`);
+  }
+};
 
 /**
  * Initialize Socket.io with the HTTP server
@@ -213,6 +296,13 @@ export const initializeSocket = (httpServer) => {
           { channelId, content },
           userId
         );
+
+        // Process link metadata in background (non-blocking)
+        if (content) {
+          processMessageLinks(message.id, content).catch(err => {
+            console.error('[send-message] Background link processing failed:', err.message);
+          });
+        }
 
         // Broadcast message to all users in the channel (including sender)
         const roomName = `channel:${channelId}`;

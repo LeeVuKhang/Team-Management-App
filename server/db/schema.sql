@@ -218,3 +218,22 @@ INSERT INTO bot_users (username, display_name, description) VALUES
     ('reminder-bot', 'Reminder Bot', 'Deadline reminders and task notifications'),
     ('onboarding-bot', 'Onboarding Bot', 'Welcome messages for new team members'),
     ('health-bot', 'Health Monitor', 'Project health reports and analytics');
+
+-- 13. Bảng MESSAGE_LINKS (Scraped Link Metadata)
+-- Stores Open Graph metadata for URLs shared in messages
+CREATE TABLE message_links (
+    id SERIAL PRIMARY KEY,
+    message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+    url TEXT NOT NULL,
+    title TEXT,                    -- OG:title
+    description TEXT,              -- OG:description  
+    image_url TEXT,                -- OG:image
+    domain TEXT,                   -- Extracted domain (e.g., "youtube.com")
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Index for efficient lookup by message_id
+CREATE INDEX idx_message_links_message_id ON message_links(message_id);
+
+-- Index for fetching links by channel (via JOIN with messages)
+CREATE INDEX idx_message_links_created_at ON message_links(created_at DESC);

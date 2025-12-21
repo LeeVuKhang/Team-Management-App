@@ -1,4 +1,107 @@
 import * as ChannelModel from '../models/channel.model.js';
+import * as MessageLinkModel from '../models/messageLink.model.js';
+
+/**
+ * URL Regex Pattern
+ * Matches HTTP and HTTPS URLs in text
+ */
+const URL_REGEX = /https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&\/=]*)/gi;
+
+/**
+ * Extract first URL from text content
+ * @param {string} text 
+ * @returns {string|null} First URL found or null
+ */
+const extractFirstUrl = (text) => {
+  if (!text) return null;
+  const matches = text.match(URL_REGEX);
+  return matches ? matches[0] : null;
+};
+
+/**
+ * Extract domain from URL
+ * @param {string} url 
+ * @returns {string|null} Domain (e.g., "youtube.com")
+ */
+const extractDomain = (url) => {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.hostname.replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Scrape Open Graph metadata from URL (async, non-blocking)
+ * Uses dynamic import to handle the ESM module
+ * @param {string} url 
+ * @returns {Promise<Object>} { title, description, imageUrl }
+ */
+const scrapeUrlMetadata = async (url) => {
+  try {
+    // Dynamic import of open-graph-scraper
+    const ogs = (await import('open-graph-scraper')).default;
+    
+    const options = { 
+      url,
+      timeout: 5000, // 5 second timeout to not block too long
+      fetchOptions: {
+        headers: {
+          'user-agent': 'Mozilla/5.0 (compatible; TeamManagementBot/1.0)'
+        }
+      }
+    };
+    
+    const { result, error } = await ogs(options);
+    
+    if (error || !result.success) {
+      console.log(`[scrapeUrlMetadata] Failed to scrape ${url}:`, error);
+      return { title: null, description: null, imageUrl: null };
+    }
+    
+    return {
+      title: result.ogTitle || result.twitterTitle || result.dcTitle || null,
+      description: result.ogDescription || result.twitterDescription || result.dcDescription || null,
+      imageUrl: result.ogImage?.[0]?.url || result.twitterImage?.[0]?.url || null
+    };
+  } catch (err) {
+    console.error(`[scrapeUrlMetadata] Error scraping ${url}:`, err.message);
+    return { title: null, description: null, imageUrl: null };
+  }
+};
+
+/**
+ * Process and save link metadata for a message (runs async in background)
+ * @param {number} messageId 
+ * @param {string} content 
+ */
+const processMessageLinks = async (messageId, content) => {
+  try {
+    const url = extractFirstUrl(content);
+    if (!url) return;
+    
+    const domain = extractDomain(url);
+    
+    // Scrape metadata (this can take a few seconds)
+    const { title, description, imageUrl } = await scrapeUrlMetadata(url);
+    
+    // Save to database
+    await MessageLinkModel.createMessageLink({
+      messageId,
+      url,
+      title,
+      description,
+      imageUrl,
+      domain
+    });
+    
+    console.log(`[processMessageLinks] Saved link metadata for message ${messageId}: ${url}`);
+  } catch (err) {
+    console.error(`[processMessageLinks] Error processing links for message ${messageId}:`, err.message);
+    // Don't throw - we don't want to fail the message if link scraping fails
+  }
+};
 
 /**
  * Channel Controller
@@ -283,6 +386,16 @@ export const createMessage = async (req, res, next) => {
 
     console.log(`[createMessage] Total messages created: ${createdMessages.length}`);
 
+    // Process link metadata in background (non-blocking)
+    // Only process the first message if it has text content
+    if (createdMessages.length > 0 && content) {
+      const firstMessage = createdMessages[0];
+      // Fire and forget - don't await, let it run in background
+      processMessageLinks(firstMessage.id, content).catch(err => {
+        console.error('[createMessage] Background link processing failed:', err.message);
+      });
+    }
+
     // Return response
     // If single message, return it directly for backward compatibility
     // If multiple messages, return array
@@ -338,6 +451,51 @@ export const deleteChannel = async (req, res, next) => {
       return res.status(403).json({
         success: false,
         message: 'Access denied',
+      });
+    }
+    next(error);
+  }
+};
+
+/**
+ * GET /teams/:teamId/channels/:channelId/links
+ * Get all scraped links for a channel (for Channel Info sidebar)
+ * 
+ * Middleware: verifyTeamMember
+ */
+export const getChannelLinks = async (req, res, next) => {
+  try {
+    const { channelId } = req.validated?.params || req.params;
+    const userId = req.user.id;
+    const { limit, offset } = req.validated?.query || req.query;
+
+    // Verify user has access to this channel
+    const channel = await ChannelModel.getChannelById(channelId, userId);
+    if (!channel) {
+      return res.status(404).json({
+        success: false,
+        message: 'Channel not found or access denied',
+      });
+    }
+
+    // Fetch links for this channel
+    const links = await MessageLinkModel.getChannelLinks(channelId, {
+      limit: limit || 50,
+      offset: offset || 0
+    });
+
+    console.log(`[getChannelLinks] Found ${links.length} links for channel ${channelId}`);
+
+    res.status(200).json({
+      success: true,
+      data: links,
+    });
+  } catch (error) {
+    console.error('[getChannelLinks] Error:', error.message);
+    if (error.message.includes('Access denied')) {
+      return res.status(403).json({
+        success: false,
+        message: error.message,
       });
     }
     next(error);

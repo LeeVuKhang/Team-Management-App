@@ -32,7 +32,7 @@ import {
   Music,
   Play
 } from 'lucide-react';
-import { fetchTeamChannels, fetchChannelMessages, createChannel, searchMessages, deleteChannel, sendMessageWithFiles } from './services/channelApi.js';
+import { fetchTeamChannels, fetchChannelMessages, createChannel, searchMessages, deleteChannel, sendMessageWithFiles, fetchChannelLinks } from './services/channelApi.js';
 import { getTeamProjects, getTeam } from './services/projectApi.js';
 import { useDebounce } from './hooks/useDebounce.js';
 import { useAuth } from './hooks/useAuth.js';
@@ -452,7 +452,12 @@ export default function ChatPage() {
       .reverse(); // Most recent first
   }, [messages]);
   
-  const [channelLinks] = useState([]);
+  // Channel links state (fetched from API)
+  const [channelLinks, setChannelLinks] = useState([]);
+  const [isLoadingLinks, setIsLoadingLinks] = useState(false);
+  
+  // Message link metadata (for inline previews)
+  const [messageLinkMetadata, setMessageLinkMetadata] = useState({}); // { messageId: linkData }
   
   // Team projects state (for dropdown in create channel modal)
   const [teamProjects, setTeamProjects] = useState([]);
@@ -565,6 +570,7 @@ export default function ChatPage() {
       setTypingUsers([]);
       setMessageError(null);
       setHasMoreMessages(true);
+      setChannelLinks([]); // Clear links when switching channels
       isInitialLoadRef.current = true; // Mark as initial load for new channel
 
       // Leave previous channel room
@@ -765,6 +771,60 @@ export default function ChatPage() {
 
     performSearch();
   }, [debouncedSearchQuery, activeChannel, teamId, isSearchOpen]);
+
+  /**
+   * Fetch channel links when info sidebar is opened
+   */
+  useEffect(() => {
+    if (!isInfoOpen || !activeChannel || !teamId) {
+      return;
+    }
+
+    const loadChannelLinks = async () => {
+      setIsLoadingLinks(true);
+      try {
+        const links = await fetchChannelLinks(teamId, activeChannel.id);
+        setChannelLinks(links);
+      } catch (err) {
+        console.error('Failed to fetch channel links:', err);
+        // Don't show error toast - just leave empty
+        setChannelLinks([]);
+      } finally {
+        setIsLoadingLinks(false);
+      }
+    };
+
+    loadChannelLinks();
+  }, [isInfoOpen, activeChannel?.id, teamId]);
+
+  /**
+   * Fetch link metadata for messages when messages change
+   */
+  useEffect(() => {
+    if (!activeChannel || !teamId || messages.length === 0) {
+      return;
+    }
+
+    const loadMessageLinkMetadata = async () => {
+      try {
+        const links = await fetchChannelLinks(teamId, activeChannel.id);
+        
+        // Create a map: messageId -> linkData
+        const linkMap = {};
+        links.forEach(link => {
+          linkMap[link.message_id] = link;
+        });
+        
+        setMessageLinkMetadata(linkMap);
+      } catch (err) {
+        console.error('Failed to fetch message link metadata:', err);
+        // Silently fail - not critical
+      }
+    };
+
+    loadMessageLinkMetadata();
+    // Only re-fetch when channel changes or when new messages arrive (length changes)
+  }, [messages.length, activeChannel?.id, teamId]);
 
   /**
    * Subscribe to real-time message events
@@ -1170,6 +1230,9 @@ export default function ChatPage() {
     const FileIcon = fileType ? getFileTypeIcon(fileType) : File;
     const fileColor = fileType ? getFileTypeColor(fileType) : 'bg-gray-500';
     
+    // Get link metadata for this message (if available)
+    const linkData = messageLinkMetadata[msg.id];
+    
     /**
      * Render attachment based on file type
      */
@@ -1342,6 +1405,73 @@ export default function ChatPage() {
       );
     };
     
+    /**
+     * Render link preview card
+     */
+    const renderLinkPreview = () => {
+      if (!linkData) return null;
+      
+      return (
+        <div className="mt-2 max-w-md">
+          <a
+            href={linkData.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`block rounded-lg border overflow-hidden transition-colors ${
+              isDarkMode
+                ? 'bg-[#1F1F1F] border-[#333] hover:bg-[#252525]'
+                : 'bg-white border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            {/* Image Preview */}
+            {linkData.image_url && (
+              <div className="w-full h-48 overflow-hidden">
+                <img
+                  src={linkData.image_url}
+                  alt={linkData.title || 'Link preview'}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.parentElement.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
+            
+            {/* Link Info */}
+            <div className="p-3">
+              <div className="flex items-start gap-2">
+                <div className={`w-8 h-8 rounded flex-shrink-0 flex items-center justify-center ${
+                  isDarkMode ? 'bg-[#333]' : 'bg-gray-100'
+                }`}>
+                  <ExternalLink size={16} className={isDarkMode ? 'text-gray-400' : 'text-gray-600'} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-semibold mb-1 line-clamp-2 ${
+                    isDarkMode ? 'text-gray-100' : 'text-gray-900'
+                  }`}>
+                    {linkData.title || 'Untitled'}
+                  </p>
+                  {linkData.description && (
+                    <p className={`text-xs mb-2 line-clamp-2 ${
+                      isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                    }`}>
+                      {linkData.description}
+                    </p>
+                  )}
+                  <p className={`text-xs flex items-center gap-1 ${
+                    isDarkMode ? 'text-gray-500' : 'text-gray-500'
+                  }`}>
+                    <ExternalLink size={10} />
+                    {linkData.domain || new URL(linkData.url).hostname}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </a>
+        </div>
+      );
+    };
+    
     return (
       <div 
         data-message-id={msg.id}
@@ -1392,6 +1522,9 @@ export default function ChatPage() {
           
           {/* Attachment (if any) */}
           {renderAttachment()}
+          
+          {/* Link Preview (if available) */}
+          {renderLinkPreview()}
         </div>
       </div>
     );
@@ -2159,40 +2292,78 @@ export default function ChatPage() {
               <div className="flex items-center gap-2">
                 <LinkIcon size={18} className={textSecondary} />
                 <span className={`font-medium ${textPrimary}`}>Link</span>
+                {channelLinks.length > 0 && (
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                    isDarkMode ? 'bg-[#333] text-gray-400' : 'bg-gray-200 text-gray-600'
+                  }`}>
+                    {channelLinks.length}
+                  </span>
+                )}
               </div>
               <ChevronDown size={18} className={textSecondary} />
             </button>
             <div className="px-4 pb-4">
-              {channelLinks.length === 0 ? (
+              {isLoadingLinks ? (
+                <div className="flex justify-center py-8">
+                  <div className="w-6 h-6 border-2 border-[#006239] border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : channelLinks.length === 0 ? (
                 <p className={`text-sm text-center py-8 ${textSecondary}`}>
                   No links shared yet
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {channelLinks.map(link => (
+                  {channelLinks.slice(0, 10).map(link => (
                     <a
                       key={link.id}
                       href={link.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                      className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
                         isDarkMode
                           ? 'bg-[#1F1F1F] border-[#333] hover:bg-[#252525]'
                           : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
                       }`}
                     >
-                      <ExternalLink size={16} className={textSecondary} />
+                      {link.image_url ? (
+                        <img 
+                          src={link.image_url} 
+                          alt=""
+                          className="w-12 h-12 rounded object-cover flex-shrink-0"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <div 
+                        className={`w-12 h-12 rounded flex-shrink-0 flex items-center justify-center ${
+                          isDarkMode ? 'bg-[#333]' : 'bg-gray-200'
+                        } ${link.image_url ? 'hidden' : ''}`}
+                      >
+                        <ExternalLink size={20} className={textSecondary} />
+                      </div>
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm truncate ${textPrimary}`}>
-                          {link.title || link.url}
+                        <p className={`text-sm font-medium truncate ${textPrimary}`}>
+                          {link.title || 'Untitled'}
                         </p>
-                        <p className={`text-xs truncate ${textSecondary}`}>
-                          {link.domain}
+                        {link.description && (
+                          <p className={`text-xs line-clamp-2 mt-0.5 ${textSecondary}`}>
+                            {link.description}
+                          </p>
+                        )}
+                        <p className={`text-xs mt-1 ${textSecondary}`}>
+                          {link.domain || new URL(link.url).hostname}
                         </p>
                       </div>
                     </a>
                   ))}
                 </div>
+              )}
+              {channelLinks.length > 10 && (
+                <button className={`w-full text-center text-sm py-2 mt-2 ${textSecondary} hover:underline`}>
+                  View all {channelLinks.length} links
+                </button>
               )}
             </div>
           </div>

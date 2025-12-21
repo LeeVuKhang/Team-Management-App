@@ -222,3 +222,30 @@ export const deleteChannel = async (teamId, channelId) => {
   // If no JSON content, return success
   return { success: true };
 };
+
+/**
+ * Fetch scraped links for a channel (for Channel Info sidebar)
+ * @param {number} teamId 
+ * @param {number} channelId 
+ * @param {Object} options - {limit, offset} for pagination
+ * @returns {Promise<Array>} Links with metadata
+ */
+export const fetchChannelLinks = async (teamId, channelId, options = {}) => {
+  const params = new URLSearchParams();
+  if (options.limit) params.set('limit', options.limit);
+  if (options.offset) params.set('offset', options.offset);
+
+  const url = `${API_BASE}/teams/${teamId}/channels/${channelId}/links${params.toString() ? `?${params}` : ''}`;
+
+  const response = await fetch(url, {
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Failed to fetch links' }));
+    throw new Error(error.message || 'Failed to fetch links');
+  }
+
+  const data = await response.json();
+  return data.data || [];
+};
