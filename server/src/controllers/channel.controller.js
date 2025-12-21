@@ -218,6 +218,12 @@ export const getChannelMessages = async (req, res, next) => {
  * POST /teams/:teamId/channels/:channelId/messages
  * Create a new message in a channel (REST fallback, prefer WebSocket)
  * Supports file attachments via multipart/form-data (files uploaded to S3)
+ * 
+ * Multiple files: Since DB only allows one attachment_url per message,
+ * we create separate messages for each file:
+ * - Message 1: content + file1
+ * - Message 2: empty content + file2
+ * - Message 3: empty content + file3
  */
 export const createMessage = async (req, res, next) => {
   try {
@@ -225,41 +231,65 @@ export const createMessage = async (req, res, next) => {
     const userId = req.user.id;
     
     // Get content from body (may come from FormData or JSON)
-    const content = req.body.content || '';
+    const content = (req.body.content || '').trim();
     
-    // Handle file attachments - get S3 URL from uploaded file
-    let attachmentUrl = req.body.attachmentUrl || null;
+    // Collect all uploaded files from multer-s3
+    const uploadedFiles = req.files || [];
     
-    // If files were uploaded via multer-s3, get the S3 location
-    if (req.files && req.files.length > 0) {
-      // Take the first file's S3 URL (location property from multer-s3)
-      attachmentUrl = req.files[0].location;
-      console.log(`[createMessage] File uploaded to S3: ${attachmentUrl}`);
-      
-      // Log all uploaded files for debugging
-      req.files.forEach((file, index) => {
-        console.log(`[createMessage] File ${index + 1}: ${file.originalname} -> ${file.location}`);
+    // Log uploaded files for debugging
+    if (uploadedFiles.length > 0) {
+      console.log(`[createMessage] ${uploadedFiles.length} file(s) uploaded to S3:`);
+      uploadedFiles.forEach((file, index) => {
+        console.log(`  File ${index + 1}: ${file.originalname} -> ${file.location}`);
       });
     }
 
-    // Validate: must have either content or attachment
-    if (!content.trim() && !attachmentUrl) {
+    // Validate: must have either content or at least one file
+    if (!content && uploadedFiles.length === 0) {
       return res.status(400).json({
         success: false,
         message: 'Message must have content or attachment',
       });
     }
 
-    const message = await ChannelModel.createMessage(
-      { channelId, content: content.trim(), attachmentUrl },
-      userId
-    );
+    const createdMessages = [];
 
-    console.log(`[createMessage] Message created: ID ${message.id}, hasAttachment: ${!!attachmentUrl}`);
+    // Case 1: No files - just create one message with content
+    if (uploadedFiles.length === 0) {
+      const message = await ChannelModel.createMessage(
+        { channelId, content, attachmentUrl: null },
+        userId
+      );
+      createdMessages.push(message);
+      console.log(`[createMessage] Text message created: ID ${message.id}`);
+    }
+    // Case 2: One or more files - create separate message for each
+    else {
+      for (let i = 0; i < uploadedFiles.length; i++) {
+        const file = uploadedFiles[i];
+        const attachmentUrl = file.location;
+        
+        // First message gets the text content, subsequent messages get empty content
+        const messageContent = i === 0 ? content : '';
+        
+        const message = await ChannelModel.createMessage(
+          { channelId, content: messageContent, attachmentUrl },
+          userId
+        );
+        createdMessages.push(message);
+        console.log(`[createMessage] Message ${i + 1} created: ID ${message.id}, file: ${file.originalname}`);
+      }
+    }
 
+    console.log(`[createMessage] Total messages created: ${createdMessages.length}`);
+
+    // Return response
+    // If single message, return it directly for backward compatibility
+    // If multiple messages, return array
     res.status(201).json({
       success: true,
-      data: message,
+      data: createdMessages.length === 1 ? createdMessages[0] : createdMessages,
+      count: createdMessages.length,
     });
   } catch (error) {
     console.error('[createMessage] Error:', error.message);
