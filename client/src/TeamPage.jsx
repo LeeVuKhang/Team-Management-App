@@ -3110,7 +3110,7 @@ export default function TeamPage() {
 
                 {/* Create Project Button - Conditionally Rendered */}
                 {(() => {
-                  const currentMember = members.find(m => m.id === currentUser?.id);
+                  const currentMember = members.find(m => m.user_id === currentUser?.id);
                   const canCreateProject = currentMember?.role === 'owner' || currentMember?.role === 'admin';
                   
                   return canCreateProject ? (
