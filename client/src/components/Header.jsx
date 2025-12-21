@@ -26,7 +26,7 @@ export default function Header({ isDarkMode, toggleDarkMode }) {
   const avatarRef = useRef(null);
   
   // Get current authenticated user
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, isLoading: isUserLoading } = useAuth();
 
   // Fetch pending invitations
   const { data: invitationsData } = useQuery({
@@ -495,15 +495,30 @@ export default function Header({ isDarkMode, toggleDarkMode }) {
           {isDropdownOpen && (
             <div className={`absolute right-0 mt-2 w-56 rounded-xl shadow-lg border overflow-hidden ${isDarkMode ? 'bg-dark-secondary border-[#171717]' : 'bg-white border-gray-200'}`}>
               <div className={`px-4 py-3 border-b ${isDarkMode ? 'border-[#171717]' : 'border-gray-200'}`}>
-                <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                  {currentUser?.username || 'Loading...'}
-                </p>
-                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                  {currentUser?.email || ''}
-                </p>
+                {isUserLoading ? (
+                  <>
+                    <div className={`h-5 w-32 rounded animate-pulse mb-2 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}></div>
+                    <div className={`h-3 w-40 rounded animate-pulse ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}></div>
+                  </>
+                ) : (
+                  <>
+                    <p className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {currentUser?.username || 'Unknown User'}
+                    </p>
+                    <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      {currentUser?.email || 'No email'}
+                    </p>
+                  </>
+                )}
               </div>
               
-              <button className={`w-full flex items-center space-x-3 px-4 py-3 transition-colors ${isDarkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-700'}`}>
+              <button 
+                onClick={() => {
+                  setDropdownOpen(false);
+                  navigate('/my-tasks');
+                }}
+                className={`w-full flex items-center space-x-3 px-4 py-3 transition-colors ${isDarkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-700'}`}
+              >
                 <FileText size={16} />
                 <span className="text-sm font-medium">My Tasks</span>
               </button>
