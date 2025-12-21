@@ -23,9 +23,16 @@ import {
   ExternalLink,
   Users,
   Trash2,
-  AlertCircle
+  AlertCircle,
+  Image,
+  Film,
+  File,
+  FileCode,
+  FileArchive,
+  Music,
+  Play
 } from 'lucide-react';
-import { fetchTeamChannels, fetchChannelMessages, createChannel, searchMessages, deleteChannel } from './services/channelApi.js';
+import { fetchTeamChannels, fetchChannelMessages, createChannel, searchMessages, deleteChannel, sendMessageWithFiles, fetchChannelLinks } from './services/channelApi.js';
 import { getTeamProjects, getTeam } from './services/projectApi.js';
 import { useDebounce } from './hooks/useDebounce.js';
 import { useAuth } from './hooks/useAuth.js';
@@ -43,7 +50,7 @@ import {
   getSocket,
 } from './services/socketService.js';
 const MAX_MESSAGE_LENGTH = 2000; // Character limit for messages (matches DB constraint)
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB per file
+const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB per file (matches backend limit)
 const MAX_FILES = 5; // Maximum files per message
 const ALLOWED_FILE_TYPES = [
   // Images
@@ -63,6 +70,90 @@ const ALLOWED_FILE_TYPES = [
   // Audio
   'audio/mpeg', 'audio/wav', 'audio/ogg'
 ];
+
+/**
+ * Helper: Extract clean filename from S3 URL
+ * Removes timestamp prefix (e.g., "1734567890123-abc123-filename.pdf" -> "filename.pdf")
+ */
+const getFileNameFromUrl = (url) => {
+  if (!url) return 'Unknown file';
+  try {
+    // Get the last part of the URL path
+    const urlPath = new URL(url).pathname;
+    const fullName = urlPath.split('/').pop() || 'Unknown file';
+    // Remove timestamp-random prefix pattern: "1734567890123-123456789-"
+    // Pattern: digits-digits-restOfName
+    const cleanName = fullName.replace(/^\d+-\d+-/, '');
+    // Decode URI components (spaces, special chars)
+    return decodeURIComponent(cleanName);
+  } catch {
+    // Fallback: just get everything after last slash
+    const parts = url.split('/');
+    const fullName = parts[parts.length - 1] || 'Unknown file';
+    return fullName.replace(/^\d+-\d+-/, '');
+  }
+};
+
+/**
+ * Helper: Get file type category from URL based on extension
+ */
+const getFileTypeFromUrl = (url) => {
+  if (!url) return 'file';
+  const extension = url.split('.').pop()?.toLowerCase().split('?')[0] || '';
+  
+  const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico'];
+  const videoExts = ['mp4', 'webm', 'mov', 'avi', 'mkv', 'wmv', 'flv'];
+  const audioExts = ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'];
+  const documentExts = ['pdf', 'doc', 'docx', 'txt', 'md', 'rtf'];
+  const spreadsheetExts = ['xls', 'xlsx', 'csv'];
+  const presentationExts = ['ppt', 'pptx'];
+  const archiveExts = ['zip', 'rar', '7z', 'tar', 'gz'];
+  const codeExts = ['js', 'ts', 'jsx', 'tsx', 'py', 'java', 'c', 'cpp', 'h', 'css', 'html', 'json', 'xml', 'sql', 'sh', 'yml', 'yaml'];
+  
+  if (imageExts.includes(extension)) return 'image';
+  if (videoExts.includes(extension)) return 'video';
+  if (audioExts.includes(extension)) return 'audio';
+  if (documentExts.includes(extension)) return 'document';
+  if (spreadsheetExts.includes(extension)) return 'spreadsheet';
+  if (presentationExts.includes(extension)) return 'presentation';
+  if (archiveExts.includes(extension)) return 'archive';
+  if (codeExts.includes(extension)) return 'code';
+  return 'file';
+};
+
+/**
+ * Helper: Get appropriate icon component for file type
+ */
+const getFileTypeIcon = (fileType) => {
+  switch (fileType) {
+    case 'image': return Image;
+    case 'video': return Film;
+    case 'audio': return Music;
+    case 'document': return FileText;
+    case 'spreadsheet': return FileText;
+    case 'presentation': return FileText;
+    case 'archive': return FileArchive;
+    case 'code': return FileCode;
+    default: return File;
+  }
+};
+
+/**
+ * Helper: Get background color for file type icon
+ */
+const getFileTypeColor = (fileType) => {
+  switch (fileType) {
+    case 'image': return 'bg-emerald-500';
+    case 'video': return 'bg-purple-500';
+    case 'audio': return 'bg-pink-500';
+    case 'document': return 'bg-blue-500';
+    case 'spreadsheet': return 'bg-green-500';
+    case 'presentation': return 'bg-orange-500';
+    case 'archive': return 'bg-yellow-500';
+    case 'code': return 'bg-cyan-500';
+    default: return 'bg-gray-500';
+  }
+};
 
 /**
  * SUB-COMPONENT: Delete Channel Confirmation Modal
@@ -342,13 +433,31 @@ export default function ChatPage() {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef(null);
   
-  // Mock data for files and links (TODO: Replace with API calls)
-  const [channelFiles] = useState([
-    { id: 1, name: 'demo TeamApp.mp4', size: '19.3 MB', date: '12/12/2025', type: 'video' },
-    { id: 2, name: 'copilot-instructions.md', size: '3.64 KB', date: '05/12/2025', type: 'document' },
-    { id: 3, name: 'seed.sql', size: '5.57 KB', date: '04/12/2025', type: 'code' },
-  ]);
-  const [channelLinks] = useState([]);
+  // Image preview modal state
+  const [previewImage, setPreviewImage] = useState(null);
+  
+  // Derive channelFiles from messages with attachments (replaces mock data)
+  const channelFiles = React.useMemo(() => {
+    return messages
+      .filter(msg => msg.attachment_url)
+      .map(msg => ({
+        id: msg.id,
+        name: getFileNameFromUrl(msg.attachment_url),
+        url: msg.attachment_url,
+        type: getFileTypeFromUrl(msg.attachment_url),
+        date: msg.created_at ? new Date(msg.created_at).toLocaleDateString() : 'Unknown',
+        userId: msg.user_id,
+        username: msg.user?.username || 'Unknown'
+      }))
+      .reverse(); // Most recent first
+  }, [messages]);
+  
+  // Channel links state (fetched from API)
+  const [channelLinks, setChannelLinks] = useState([]);
+  const [isLoadingLinks, setIsLoadingLinks] = useState(false);
+  
+  // Message link metadata (for inline previews)
+  const [messageLinkMetadata, setMessageLinkMetadata] = useState({}); // { messageId: linkData }
   
   // Team projects state (for dropdown in create channel modal)
   const [teamProjects, setTeamProjects] = useState([]);
@@ -461,6 +570,7 @@ export default function ChatPage() {
       setTypingUsers([]);
       setMessageError(null);
       setHasMoreMessages(true);
+      setChannelLinks([]); // Clear links when switching channels
       isInitialLoadRef.current = true; // Mark as initial load for new channel
 
       // Leave previous channel room
@@ -567,7 +677,7 @@ export default function ChatPage() {
     for (const file of files) {
       // Check file size
       if (file.size > MAX_FILE_SIZE) {
-        toast.error(`${file.name} is too large. Maximum size is 10MB`);
+        toast.error(`${file.name} is too large. Maximum size is 100MB`);
         continue;
       }
       
@@ -661,6 +771,60 @@ export default function ChatPage() {
 
     performSearch();
   }, [debouncedSearchQuery, activeChannel, teamId, isSearchOpen]);
+
+  /**
+   * Fetch channel links when info sidebar is opened
+   */
+  useEffect(() => {
+    if (!isInfoOpen || !activeChannel || !teamId) {
+      return;
+    }
+
+    const loadChannelLinks = async () => {
+      setIsLoadingLinks(true);
+      try {
+        const links = await fetchChannelLinks(teamId, activeChannel.id);
+        setChannelLinks(links);
+      } catch (err) {
+        console.error('Failed to fetch channel links:', err);
+        // Don't show error toast - just leave empty
+        setChannelLinks([]);
+      } finally {
+        setIsLoadingLinks(false);
+      }
+    };
+
+    loadChannelLinks();
+  }, [isInfoOpen, activeChannel?.id, teamId]);
+
+  /**
+   * Fetch link metadata for messages when messages change
+   */
+  useEffect(() => {
+    if (!activeChannel || !teamId || messages.length === 0) {
+      return;
+    }
+
+    const loadMessageLinkMetadata = async () => {
+      try {
+        const links = await fetchChannelLinks(teamId, activeChannel.id);
+        
+        // Create a map: messageId -> linkData
+        const linkMap = {};
+        links.forEach(link => {
+          linkMap[link.message_id] = link;
+        });
+        
+        setMessageLinkMetadata(linkMap);
+      } catch (err) {
+        console.error('Failed to fetch message link metadata:', err);
+        // Silently fail - not critical
+      }
+    };
+
+    loadMessageLinkMetadata();
+    // Only re-fetch when channel changes or when new messages arrive (length changes)
+  }, [messages.length, activeChannel?.id, teamId]);
 
   /**
    * Subscribe to real-time message events
@@ -805,22 +969,30 @@ export default function ChatPage() {
     emitTypingStop(activeChannel.id);
 
     try {
-      // If files are attached, upload them first
+      // If files are attached, upload them via REST API (files go to S3)
       if (selectedFiles.length > 0) {
-        const formData = new FormData();
-        formData.append('content', trimmedMessage);
-        formData.append('channelId', activeChannel.id);
+        console.log('[ChatPage] Uploading files to S3:', selectedFiles.map(f => f.name));
         
-        selectedFiles.forEach((file) => {
-          formData.append('files', file);
-        });
+        // Call API to upload files and create message(s)
+        // Backend creates separate message for each file
+        const result = await sendMessageWithFiles(
+          teamId,
+          activeChannel.id,
+          trimmedMessage,
+          selectedFiles
+        );
         
-        // TODO: Call API endpoint to upload files and send message
-        // For now, simulate upload delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log('[ChatPage] Message(s) created with attachment:', result);
         
-        toast.success('Files uploaded successfully!');
-        console.log('[ChatPage] Would upload files:', selectedFiles.map(f => f.name));
+        // Handle both single message and array of messages from backend
+        const newMessages = Array.isArray(result) ? result : [result];
+        
+        // Add the new message(s) to the local state
+        // Note: Socket will also broadcast these, but we add them immediately for responsiveness
+        setMessages(prev => [...prev, ...newMessages]);
+        
+        const fileCount = selectedFiles.length;
+        toast.success(`${fileCount} file${fileCount > 1 ? 's' : ''} sent successfully!`);
         
         // Clear files after successful upload
         setSelectedFiles([]);
@@ -837,12 +1009,12 @@ export default function ChatPage() {
       }
     } catch (err) {
       console.error('Failed to send message:', err);
-      toast.error('Failed to send message. Please try again.');
+      toast.error(err.message || 'Failed to send message. Please try again.');
     } finally {
       setIsSending(false);
       setIsUploading(false);
     }
-  }, [inputMessage, activeChannel, isSending, selectedFiles]);
+  }, [inputMessage, activeChannel, isSending, selectedFiles, teamId]);
 
   /**
    * Handle input change with typing indicator
@@ -1049,56 +1221,314 @@ export default function ChatPage() {
 
   /**
    * SUB-COMPONENT: Message Bubble
-   * Renders individual message with proper styling
+   * Renders individual message with proper styling and file attachments
    */
-  const MessageBubble = ({ msg, isMe, isSequence }) => (
-    <div 
-      data-message-id={msg.id}
-      className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''} ${isSequence ? 'mt-1' : 'mt-4'} transition-all`}
-    >
-      {/* Avatar */}
-      <div className={`flex-shrink-0 w-8 h-8 ${isSequence ? 'invisible' : ''}`}>
-        {msg.user.avatar_url ? (
-          <img
-            src={msg.user.avatar_url}
-            alt={msg.user.username}
-            className="w-8 h-8 rounded-full object-cover"
-            onError={(e) => {
-              e.target.style.display = 'none';
-              e.target.nextElementSibling.style.display = 'flex';
-            }}
-          />
-        ) : null}
-        <div
-          className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-300 text-black'}`}
-          style={{ display: msg.user.avatar_url ? 'none' : 'flex' }}
-        >
-          {msg.user.username.substring(0,2).toUpperCase()}
-        </div>
-      </div>
-
-      {/* Message Content */}
-      <div className={`flex flex-col max-w-[75%] md:max-w-[60%] ${isMe ? 'items-end' : 'items-start'}`}>
-        {!isSequence && (
-          <div className={`flex items-baseline gap-2 mb-1 ${isMe ? 'flex-row-reverse' : ''}`}>
-            <span className={`text-sm font-bold ${textPrimary}`}>{msg.user.username}</span>
-            <span className={`text-[10px] ${textSecondary}`}>
-              {msg.created_at ? formatTimestamp(msg.created_at) : msg.timestamp}
-            </span>
+  const MessageBubble = ({ msg, isMe, isSequence }) => {
+    const attachmentUrl = msg.attachment_url;
+    const fileType = attachmentUrl ? getFileTypeFromUrl(attachmentUrl) : null;
+    const fileName = attachmentUrl ? getFileNameFromUrl(attachmentUrl) : null;
+    const FileIcon = fileType ? getFileTypeIcon(fileType) : File;
+    const fileColor = fileType ? getFileTypeColor(fileType) : 'bg-gray-500';
+    
+    // Get link metadata for this message (if available)
+    const linkData = messageLinkMetadata[msg.id];
+    
+    /**
+     * Render attachment based on file type
+     */
+    const renderAttachment = () => {
+      if (!attachmentUrl) return null;
+      
+      // Image attachment - render inline with click to preview
+      if (fileType === 'image') {
+        return (
+          <div className="mt-2">
+            <img
+              src={attachmentUrl}
+              alt={fileName}
+              className="max-w-full max-h-64 rounded-lg cursor-pointer hover:opacity-90 transition-opacity object-contain"
+              onClick={() => setPreviewImage(attachmentUrl)}
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.nextElementSibling.style.display = 'flex';
+              }}
+            />
+            {/* Fallback file card if image fails to load */}
+            <div 
+              className={`hidden items-center gap-3 p-3 rounded-lg border ${
+                isDarkMode ? 'bg-[#1F1F1F] border-[#333]' : 'bg-gray-100 border-gray-200'
+              }`}
+            >
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${fileColor}`}>
+                <FileIcon size={20} className="text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-medium truncate ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+                  {fileName}
+                </p>
+                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  Image failed to load
+                </p>
+              </div>
+              <a
+                href={attachmentUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                download
+                className={`p-2 rounded-lg transition-colors ${
+                  isDarkMode ? 'hover:bg-[#333]' : 'hover:bg-gray-300'
+                }`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Download size={16} className={isDarkMode ? 'text-gray-400' : 'text-gray-600'} />
+              </a>
+            </div>
           </div>
-        )}
-        
-        {/* Message Bubble - XSS Safe: React escapes text by default */}
-        <div className={`px-4 py-2 rounded-2xl text-sm leading-relaxed break-words ${
-          isMe 
-            ? 'bg-[#006239] text-white rounded-tr-sm' 
-            : `${isDarkMode ? 'bg-[#1F1F1F] text-gray-200' : 'bg-white border border-gray-200 text-gray-800 shadow-sm'} rounded-tl-sm`
-        }`}>
-          {msg.content}
+        );
+      }
+      
+      // Video attachment - render video player
+      if (fileType === 'video') {
+        return (
+          <div className="mt-2">
+            <div className={`rounded-lg overflow-hidden border ${
+              isDarkMode ? 'border-[#333]' : 'border-gray-200'
+            }`}>
+              <video
+                src={attachmentUrl}
+                controls
+                className="max-w-full max-h-80 w-full"
+                preload="metadata"
+              >
+                Your browser does not support video playback.
+              </video>
+              {/* Video info bar */}
+              <div className={`flex items-center justify-between px-3 py-2 ${
+                isDarkMode ? 'bg-[#1F1F1F]' : 'bg-gray-100'
+              }`}>
+                <div className="flex items-center gap-2 min-w-0">
+                  <Film size={16} className={isDarkMode ? 'text-gray-400' : 'text-gray-600'} />
+                  <span className={`text-xs truncate ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                    {fileName}
+                  </span>
+                </div>
+                <a
+                  href={attachmentUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download
+                  className={`p-1.5 rounded transition-colors ${
+                    isDarkMode ? 'hover:bg-[#333]' : 'hover:bg-gray-300'
+                  }`}
+                  onClick={(e) => e.stopPropagation()}
+                  title="Download video"
+                >
+                  <Download size={14} className={isDarkMode ? 'text-gray-400' : 'text-gray-600'} />
+                </a>
+              </div>
+            </div>
+          </div>
+        );
+      }
+      
+      // Audio attachment - render audio player
+      if (fileType === 'audio') {
+        return (
+          <div className="mt-2">
+            <div className={`rounded-lg overflow-hidden border p-3 ${
+              isDarkMode ? 'bg-[#1F1F1F] border-[#333]' : 'bg-gray-100 border-gray-200'
+            }`}>
+              <div className="flex items-center gap-3 mb-2">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${fileColor}`}>
+                  <Music size={20} className="text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-medium truncate ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+                    {fileName}
+                  </p>
+                </div>
+                <a
+                  href={attachmentUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download
+                  className={`p-2 rounded-lg transition-colors ${
+                    isDarkMode ? 'hover:bg-[#333]' : 'hover:bg-gray-300'
+                  }`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Download size={16} className={isDarkMode ? 'text-gray-400' : 'text-gray-600'} />
+                </a>
+              </div>
+              <audio src={attachmentUrl} controls className="w-full h-8" preload="metadata">
+                Your browser does not support audio playback.
+              </audio>
+            </div>
+          </div>
+        );
+      }
+      
+      // Other files - render file card
+      return (
+        <div className="mt-2">
+          <div className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+            isDarkMode 
+              ? 'bg-[#1F1F1F] border-[#333] hover:bg-[#252525]' 
+              : 'bg-gray-100 border-gray-200 hover:bg-gray-200'
+          }`}>
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${fileColor}`}>
+              <FileIcon size={20} className="text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className={`text-sm font-medium truncate ${isDarkMode ? 'text-gray-100' : 'text-gray-900'}`}>
+                {fileName}
+              </p>
+              <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                {fileType.charAt(0).toUpperCase() + fileType.slice(1)}
+              </p>
+            </div>
+            <a
+              href={attachmentUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              download
+              className={`p-2 rounded-lg transition-colors ${
+                isDarkMode ? 'hover:bg-[#333]' : 'hover:bg-gray-300'
+              }`}
+              onClick={(e) => e.stopPropagation()}
+              title="Download file"
+            >
+              <Download size={16} className={isDarkMode ? 'text-gray-400' : 'text-gray-600'} />
+            </a>
+          </div>
+        </div>
+      );
+    };
+    
+    /**
+     * Render link preview card
+     */
+    const renderLinkPreview = () => {
+      if (!linkData) return null;
+      
+      return (
+        <div className="mt-2 max-w-md">
+          <a
+            href={linkData.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`block rounded-lg border overflow-hidden transition-colors ${
+              isDarkMode
+                ? 'bg-[#1F1F1F] border-[#333] hover:bg-[#252525]'
+                : 'bg-white border-gray-200 hover:bg-gray-50'
+            }`}
+          >
+            {/* Image Preview */}
+            {linkData.image_url && (
+              <div className="w-full h-48 overflow-hidden">
+                <img
+                  src={linkData.image_url}
+                  alt={linkData.title || 'Link preview'}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.parentElement.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
+            
+            {/* Link Info */}
+            <div className="p-3">
+              <div className="flex items-start gap-2">
+                <div className={`w-8 h-8 rounded flex-shrink-0 flex items-center justify-center ${
+                  isDarkMode ? 'bg-[#333]' : 'bg-gray-100'
+                }`}>
+                  <ExternalLink size={16} className={isDarkMode ? 'text-gray-400' : 'text-gray-600'} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-semibold mb-1 line-clamp-2 ${
+                    isDarkMode ? 'text-gray-100' : 'text-gray-900'
+                  }`}>
+                    {linkData.title || 'Untitled'}
+                  </p>
+                  {linkData.description && (
+                    <p className={`text-xs mb-2 line-clamp-2 ${
+                      isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                    }`}>
+                      {linkData.description}
+                    </p>
+                  )}
+                  <p className={`text-xs flex items-center gap-1 ${
+                    isDarkMode ? 'text-gray-500' : 'text-gray-500'
+                  }`}>
+                    <ExternalLink size={10} />
+                    {linkData.domain || new URL(linkData.url).hostname}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </a>
+        </div>
+      );
+    };
+    
+    return (
+      <div 
+        data-message-id={msg.id}
+        className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''} ${isSequence ? 'mt-1' : 'mt-4'} transition-all`}
+      >
+        {/* Avatar */}
+        <div className={`flex-shrink-0 w-8 h-8 ${isSequence ? 'invisible' : ''}`}>
+          {msg.user.avatar_url ? (
+            <img
+              src={msg.user.avatar_url}
+              alt={msg.user.username}
+              className="w-8 h-8 rounded-full object-cover"
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.nextElementSibling.style.display = 'flex';
+              }}
+            />
+          ) : null}
+          <div
+            className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-300 text-black'}`}
+            style={{ display: msg.user.avatar_url ? 'none' : 'flex' }}
+          >
+            {msg.user.username.substring(0,2).toUpperCase()}
+          </div>
+        </div>
+
+        {/* Message Content */}
+        <div className={`flex flex-col max-w-[75%] md:max-w-[60%] ${isMe ? 'items-end' : 'items-start'}`}>
+          {!isSequence && (
+            <div className={`flex items-baseline gap-2 mb-1 ${isMe ? 'flex-row-reverse' : ''}`}>
+              <span className={`text-sm font-bold ${textPrimary}`}>{msg.user.username}</span>
+              <span className={`text-[10px] ${textSecondary}`}>
+                {msg.created_at ? formatTimestamp(msg.created_at) : msg.timestamp}
+              </span>
+            </div>
+          )}
+          
+          {/* Message Bubble - Text content */}
+          {msg.content && (
+            <div className={`px-4 py-2 rounded-2xl text-sm leading-relaxed break-words ${
+              isMe 
+                ? 'bg-[#006239] text-white rounded-tr-sm' 
+                : `${isDarkMode ? 'bg-[#1F1F1F] text-gray-200' : 'bg-white border border-gray-200 text-gray-800 shadow-sm'} rounded-tl-sm`
+            }`}>
+              {msg.content}
+            </div>
+          )}
+          
+          {/* Attachment (if any) */}
+          {renderAttachment()}
+          
+          {/* Link Preview (if available) */}
+          {renderLinkPreview()}
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   /**
    * SUB-COMPONENT: Message Skeleton Loader
@@ -1790,54 +2220,64 @@ export default function ChatPage() {
             >
               <div className="flex items-center gap-2">
                 <FileText size={18} className={textSecondary} />
-                <span className={`font-medium ${textPrimary}`}>File</span>
+                <span className={`font-medium ${textPrimary}`}>Files ({channelFiles.length})</span>
               </div>
               <ChevronDown size={18} className={textSecondary} />
             </button>
-            <div className="px-4 pb-4 space-y-2">
+            <div className="px-4 pb-4 space-y-2 max-h-80 overflow-y-auto">
               {channelFiles.length === 0 ? (
                 <p className={`text-sm text-center py-4 ${textSecondary}`}>
                   No files shared yet
                 </p>
               ) : (
-                channelFiles.map(file => (
-                  <div
-                    key={file.id}
-                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      isDarkMode
-                        ? 'bg-[#1F1F1F] border-[#333] hover:bg-[#252525]'
-                        : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-                    }`}
-                  >
-                    <div className={`w-10 h-10 rounded flex items-center justify-center flex-shrink-0 ${
-                      file.type === 'video' ? 'bg-purple-500' :
-                      file.type === 'document' ? 'bg-blue-500' :
-                      'bg-cyan-500'
-                    }`}>
-                      <FileText size={20} className="text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-medium truncate ${textPrimary}`}>
-                        {file.name}
-                      </p>
-                      <div className={`flex items-center gap-2 text-xs ${textSecondary}`}>
-                        <span>{file.size}</span>
-                        <span>•</span>
-                        <span>{file.date}</span>
-                      </div>
-                    </div>
-                    <button
-                      className={`p-1.5 rounded ${hoverBg}`}
-                      title="Download"
+                channelFiles.slice(0, 10).map(file => {
+                  const FileIconComponent = getFileTypeIcon(file.type);
+                  const fileColorClass = getFileTypeColor(file.type);
+                  return (
+                    <div
+                      key={file.id}
+                      className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                        isDarkMode
+                          ? 'bg-[#1F1F1F] border-[#333] hover:bg-[#252525]'
+                          : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                      }`}
+                      onClick={() => {
+                        if (file.type === 'image') {
+                          setPreviewImage(file.url);
+                        } else {
+                          window.open(file.url, '_blank');
+                        }
+                      }}
                     >
-                      <Download size={16} className={textSecondary} />
-                    </button>
-                  </div>
-                ))
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${fileColorClass}`}>
+                        <FileIconComponent size={20} className="text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-medium truncate ${textPrimary}`}>
+                          {file.name}
+                        </p>
+                        <div className={`flex items-center gap-2 text-xs ${textSecondary}`}>
+                          <span>{file.type}</span>
+                          <span>•</span>
+                          <span>{file.date}</span>
+                        </div>
+                      </div>
+                      <a
+                        href={file.url}
+                        download
+                        className={`p-1.5 rounded ${hoverBg}`}
+                        title="Download"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Download size={16} className={textSecondary} />
+                      </a>
+                    </div>
+                  );
+                })
               )}
-              {channelFiles.length > 0 && (
+              {channelFiles.length > 10 && (
                 <button className={`w-full text-center text-sm py-2 ${textSecondary} hover:underline`}>
-                  View all files
+                  View all {channelFiles.length} files
                 </button>
               )}
             </div>
@@ -1852,40 +2292,78 @@ export default function ChatPage() {
               <div className="flex items-center gap-2">
                 <LinkIcon size={18} className={textSecondary} />
                 <span className={`font-medium ${textPrimary}`}>Link</span>
+                {channelLinks.length > 0 && (
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                    isDarkMode ? 'bg-[#333] text-gray-400' : 'bg-gray-200 text-gray-600'
+                  }`}>
+                    {channelLinks.length}
+                  </span>
+                )}
               </div>
               <ChevronDown size={18} className={textSecondary} />
             </button>
             <div className="px-4 pb-4">
-              {channelLinks.length === 0 ? (
+              {isLoadingLinks ? (
+                <div className="flex justify-center py-8">
+                  <div className="w-6 h-6 border-2 border-[#006239] border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : channelLinks.length === 0 ? (
                 <p className={`text-sm text-center py-8 ${textSecondary}`}>
                   No links shared yet
                 </p>
               ) : (
                 <div className="space-y-2">
-                  {channelLinks.map(link => (
+                  {channelLinks.slice(0, 10).map(link => (
                     <a
                       key={link.id}
                       href={link.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                      className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
                         isDarkMode
                           ? 'bg-[#1F1F1F] border-[#333] hover:bg-[#252525]'
                           : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
                       }`}
                     >
-                      <ExternalLink size={16} className={textSecondary} />
+                      {link.image_url ? (
+                        <img 
+                          src={link.image_url} 
+                          alt=""
+                          className="w-12 h-12 rounded object-cover flex-shrink-0"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <div 
+                        className={`w-12 h-12 rounded flex-shrink-0 flex items-center justify-center ${
+                          isDarkMode ? 'bg-[#333]' : 'bg-gray-200'
+                        } ${link.image_url ? 'hidden' : ''}`}
+                      >
+                        <ExternalLink size={20} className={textSecondary} />
+                      </div>
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm truncate ${textPrimary}`}>
-                          {link.title || link.url}
+                        <p className={`text-sm font-medium truncate ${textPrimary}`}>
+                          {link.title || 'Untitled'}
                         </p>
-                        <p className={`text-xs truncate ${textSecondary}`}>
-                          {link.domain}
+                        {link.description && (
+                          <p className={`text-xs line-clamp-2 mt-0.5 ${textSecondary}`}>
+                            {link.description}
+                          </p>
+                        )}
+                        <p className={`text-xs mt-1 ${textSecondary}`}>
+                          {link.domain || new URL(link.url).hostname}
                         </p>
                       </div>
                     </a>
                   ))}
                 </div>
+              )}
+              {channelLinks.length > 10 && (
+                <button className={`w-full text-center text-sm py-2 mt-2 ${textSecondary} hover:underline`}>
+                  View all {channelLinks.length} links
+                </button>
               )}
             </div>
           </div>
@@ -1938,6 +2416,38 @@ export default function ChatPage() {
         isDeleting={isDeletingChannel}
         isDarkMode={isDarkMode}
       />
+      
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm"
+          onClick={() => setPreviewImage(null)}
+        >
+          <button
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+            onClick={() => setPreviewImage(null)}
+          >
+            <X size={24} className="text-white" />
+          </button>
+          <img
+            src={previewImage}
+            alt="Preview"
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <a
+            href={previewImage}
+            download
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute bottom-4 right-4 flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Download size={18} />
+            <span>Download</span>
+          </a>
+        </div>
+      )}
     </div>
   );
 }

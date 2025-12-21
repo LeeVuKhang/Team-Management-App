@@ -129,6 +129,42 @@ export const sendMessageREST = async (teamId, channelId, messageData) => {
 };
 
 /**
+ * Send a message with file attachments via REST
+ * Files are uploaded to S3 via the backend
+ * @param {number} teamId 
+ * @param {number} channelId 
+ * @param {string} content - Message text (can be empty if files attached)
+ * @param {File[]} files - Array of files to upload
+ * @returns {Promise<Object>} Created message with attachment URL
+ */
+export const sendMessageWithFiles = async (teamId, channelId, content, files) => {
+  const formData = new FormData();
+  
+  // Append message content (can be empty string if only files)
+  formData.append('content', content || '');
+  
+  // Append all files with field name 'files'
+  files.forEach((file) => {
+    formData.append('files', file);
+  });
+  
+  const response = await fetch(`${API_BASE}/teams/${teamId}/channels/${channelId}/messages`, {
+    method: 'POST',
+    credentials: 'include',
+    // Don't set Content-Type header - browser will set it automatically with boundary for FormData
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Failed to upload files' }));
+    throw new Error(error.message || 'Failed to send message with files');
+  }
+
+  const data = await response.json();
+  return data.data;
+};
+
+/**
  * Search messages in a channel
  * @param {number} teamId 
  * @param {number} channelId 
@@ -185,4 +221,31 @@ export const deleteChannel = async (teamId, channelId) => {
   
   // If no JSON content, return success
   return { success: true };
+};
+
+/**
+ * Fetch scraped links for a channel (for Channel Info sidebar)
+ * @param {number} teamId 
+ * @param {number} channelId 
+ * @param {Object} options - {limit, offset} for pagination
+ * @returns {Promise<Array>} Links with metadata
+ */
+export const fetchChannelLinks = async (teamId, channelId, options = {}) => {
+  const params = new URLSearchParams();
+  if (options.limit) params.set('limit', options.limit);
+  if (options.offset) params.set('offset', options.offset);
+
+  const url = `${API_BASE}/teams/${teamId}/channels/${channelId}/links${params.toString() ? `?${params}` : ''}`;
+
+  const response = await fetch(url, {
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ message: 'Failed to fetch links' }));
+    throw new Error(error.message || 'Failed to fetch links');
+  }
+
+  const data = await response.json();
+  return data.data || [];
 };

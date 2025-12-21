@@ -16,5 +16,8 @@
   "type": "commonjs",
   "devDependencies": {
     "concurrently": "^9.2.1"
+  },
+  "dependencies": {
+    "open-graph-scraper": "^6.11.0"
   }
 }
