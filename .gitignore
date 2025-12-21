@@ -28,3 +28,6 @@ Thumbs.db
 .idea/
 dev-dist/
 dist/
+
+# Personal Config
+.github/

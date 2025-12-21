@@ -1,40 +1,34 @@
-import axios from 'axios';
+const API_BASE_URL = 'http://localhost:5000/api/v1';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+async function apiFetch(endpoint, options = {}) {
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
 
-// Get auth token from localStorage
-const getAuthToken = () => {
-  return localStorage.getItem('token');
-};
+    const data = await response.json();
 
-// Axios instance with auth header
-const axiosInstance = axios.create({
-  baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Add token to every request
-axiosInstance.interceptors.request.use(
-  (config) => {
-    const token = getAuthToken();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (!response.ok) {
+      throw new Error(data.message || `HTTP ${response.status}: ${response.statusText}`);
     }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
+
+    return data;
+  } catch (error) {
+    console.error(`Task API Error [${endpoint}]:`, error);
+    throw error;
   }
-);
+}
 
 /**
  * Get all tasks assigned to the authenticated user
  */
 export const getUserTasks = async () => {
-  const response = await axiosInstance.get('/tasks/my-tasks');
-  return response.data;
+  return apiFetch('/tasks/my-tasks');
 };
 
 /**

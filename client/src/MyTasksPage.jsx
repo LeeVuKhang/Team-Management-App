@@ -1,6 +1,8 @@
 import React from 'react';
 import { useOutletContext } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Calendar, Clock, AlertCircle, CheckCircle2, Circle, Loader2 } from 'lucide-react';
+import { getUserTasks } from './services/taskApi';
 
 /**
  * TASK CARD COMPONENT
@@ -76,75 +78,14 @@ const TaskCard = ({ task, darkMode, onClick }) => {
  */
 export default function MyTasksPage() {
   const { isDarkMode } = useOutletContext();
-  const [tasks, setTasks] = React.useState([]);
-  const [isLoading, setIsLoading] = React.useState(true);
 
-  // Mock data for now - will replace with API call later
-  React.useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setTasks([
-        // Overdue tasks
-        {
-          id: 1,
-          title: 'Fix authentication bug',
-          description: 'Users unable to login with social accounts',
-          status: 'in_progress',
-          priority: 'high',
-          due_date: '2025-12-18',
-          project_name: 'Backend API',
-        },
-        {
-          id: 2,
-          title: 'Update API documentation',
-          description: 'Add examples for new endpoints',
-          status: 'todo',
-          priority: 'medium',
-          due_date: '2025-12-19',
-          project_name: 'Documentation',
-        },
-        // Today's tasks
-        {
-          id: 3,
-          title: 'Review pull requests',
-          description: 'Check team members PRs before merging',
-          status: 'in_progress',
-          priority: 'high',
-          due_date: '2025-12-21',
-          project_name: 'Code Review',
-        },
-        {
-          id: 4,
-          title: 'Write unit tests',
-          description: 'Add tests for user authentication flow',
-          status: 'todo',
-          priority: 'medium',
-          due_date: '2025-12-21',
-          project_name: 'Testing',
-        },
-        // Upcoming tasks
-        {
-          id: 5,
-          title: 'Implement dark mode',
-          description: 'Add dark mode support to all pages',
-          status: 'todo',
-          priority: 'low',
-          due_date: '2025-12-25',
-          project_name: 'Frontend',
-        },
-        {
-          id: 6,
-          title: 'Database optimization',
-          description: 'Optimize slow queries and add indexes',
-          status: 'todo',
-          priority: 'medium',
-          due_date: '2025-12-28',
-          project_name: 'Backend API',
-        },
-      ]);
-      setIsLoading(false);
-    }, 1000);
-  }, []);
+  // Fetch tasks from API using React Query
+  const { data: tasksData, isLoading, isError, error } = useQuery({
+    queryKey: ['myTasks'],
+    queryFn: getUserTasks,
+  });
+
+  const tasks = tasksData?.data || [];
 
   // Group tasks by date
   const today = new Date();
@@ -194,6 +135,12 @@ export default function MyTasksPage() {
       {isLoading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className={`w-8 h-8 animate-spin ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`} />
+        </div>
+      ) : isError ? (
+        <div className={`text-center py-20 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+          <AlertCircle size={48} className="mx-auto mb-4 text-red-500 opacity-50" />
+          <p className="text-lg font-medium mb-2">Failed to load tasks</p>
+          <p className="text-sm">{error?.message || 'Something went wrong. Please try again.'}</p>
         </div>
       ) : (
         <div className="pb-12 space-y-8">
