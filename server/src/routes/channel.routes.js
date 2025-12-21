@@ -2,6 +2,7 @@ import express from 'express';
 import * as ChannelController from '../controllers/channel.controller.js';
 import { validate } from '../middlewares/validate.js';
 import { verifyToken, verifyTeamMember, verifyTeamRole } from '../middlewares/auth.js';
+import upload from '../middlewares/upload.js';
 import {
   teamIdParamSchema,
   teamChannelParamsSchema,
@@ -101,15 +102,16 @@ router.get(
 /**
  * POST /teams/:teamId/channels/:channelId/messages
  * Send a message to a channel (REST fallback - prefer WebSocket)
+ * Supports file attachments via multipart/form-data (up to 5 files, 100MB each)
  * Access: Any team member (project membership checked in model)
  */
 router.post(
   '/:channelId/messages',
   validate({
     params: teamChannelParamsSchema,
-    body: createMessageSchema,
   }),
   verifyTeamMember,
+  upload.array('files', 5), // Handle up to 5 files with field name 'files'
   ChannelController.createMessage
 );
 

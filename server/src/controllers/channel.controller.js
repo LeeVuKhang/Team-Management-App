@@ -217,23 +217,52 @@ export const getChannelMessages = async (req, res, next) => {
 /**
  * POST /teams/:teamId/channels/:channelId/messages
  * Create a new message in a channel (REST fallback, prefer WebSocket)
+ * Supports file attachments via multipart/form-data (files uploaded to S3)
  */
 export const createMessage = async (req, res, next) => {
   try {
     const { channelId } = req.validated?.params || req.params;
     const userId = req.user.id;
-    const { content, attachmentUrl } = req.body;
+    
+    // Get content from body (may come from FormData or JSON)
+    const content = req.body.content || '';
+    
+    // Handle file attachments - get S3 URL from uploaded file
+    let attachmentUrl = req.body.attachmentUrl || null;
+    
+    // If files were uploaded via multer-s3, get the S3 location
+    if (req.files && req.files.length > 0) {
+      // Take the first file's S3 URL (location property from multer-s3)
+      attachmentUrl = req.files[0].location;
+      console.log(`[createMessage] File uploaded to S3: ${attachmentUrl}`);
+      
+      // Log all uploaded files for debugging
+      req.files.forEach((file, index) => {
+        console.log(`[createMessage] File ${index + 1}: ${file.originalname} -> ${file.location}`);
+      });
+    }
+
+    // Validate: must have either content or attachment
+    if (!content.trim() && !attachmentUrl) {
+      return res.status(400).json({
+        success: false,
+        message: 'Message must have content or attachment',
+      });
+    }
 
     const message = await ChannelModel.createMessage(
-      { channelId, content, attachmentUrl },
+      { channelId, content: content.trim(), attachmentUrl },
       userId
     );
+
+    console.log(`[createMessage] Message created: ID ${message.id}, hasAttachment: ${!!attachmentUrl}`);
 
     res.status(201).json({
       success: true,
       data: message,
     });
   } catch (error) {
+    console.error('[createMessage] Error:', error.message);
     if (error.message.includes('Access denied') || error.message.includes('not found')) {
       return res.status(403).json({
         success: false,

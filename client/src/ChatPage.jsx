@@ -25,7 +25,7 @@ import {
   Trash2,
   AlertCircle
 } from 'lucide-react';
-import { fetchTeamChannels, fetchChannelMessages, createChannel, searchMessages, deleteChannel } from './services/channelApi.js';
+import { fetchTeamChannels, fetchChannelMessages, createChannel, searchMessages, deleteChannel, sendMessageWithFiles } from './services/channelApi.js';
 import { getTeamProjects, getTeam } from './services/projectApi.js';
 import { useDebounce } from './hooks/useDebounce.js';
 import { useAuth } from './hooks/useAuth.js';
@@ -43,7 +43,7 @@ import {
   getSocket,
 } from './services/socketService.js';
 const MAX_MESSAGE_LENGTH = 2000; // Character limit for messages (matches DB constraint)
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB per file
+const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB per file (matches backend limit)
 const MAX_FILES = 5; // Maximum files per message
 const ALLOWED_FILE_TYPES = [
   // Images
@@ -567,7 +567,7 @@ export default function ChatPage() {
     for (const file of files) {
       // Check file size
       if (file.size > MAX_FILE_SIZE) {
-        toast.error(`${file.name} is too large. Maximum size is 10MB`);
+        toast.error(`${file.name} is too large. Maximum size is 100MB`);
         continue;
       }
       
@@ -805,22 +805,24 @@ export default function ChatPage() {
     emitTypingStop(activeChannel.id);
 
     try {
-      // If files are attached, upload them first
+      // If files are attached, upload them via REST API (files go to S3)
       if (selectedFiles.length > 0) {
-        const formData = new FormData();
-        formData.append('content', trimmedMessage);
-        formData.append('channelId', activeChannel.id);
+        console.log('[ChatPage] Uploading files to S3:', selectedFiles.map(f => f.name));
         
-        selectedFiles.forEach((file) => {
-          formData.append('files', file);
-        });
+        // Call API to upload files and create message
+        const newMessage = await sendMessageWithFiles(
+          teamId,
+          activeChannel.id,
+          trimmedMessage,
+          selectedFiles
+        );
         
-        // TODO: Call API endpoint to upload files and send message
-        // For now, simulate upload delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log('[ChatPage] Message created with attachment:', newMessage);
         
-        toast.success('Files uploaded successfully!');
-        console.log('[ChatPage] Would upload files:', selectedFiles.map(f => f.name));
+        // Add the new message to the local state (socket will also broadcast it)
+        setMessages(prev => [...prev, newMessage]);
+        
+        toast.success('Message sent with attachment!');
         
         // Clear files after successful upload
         setSelectedFiles([]);
@@ -837,12 +839,12 @@ export default function ChatPage() {
       }
     } catch (err) {
       console.error('Failed to send message:', err);
-      toast.error('Failed to send message. Please try again.');
+      toast.error(err.message || 'Failed to send message. Please try again.');
     } finally {
       setIsSending(false);
       setIsUploading(false);
     }
-  }, [inputMessage, activeChannel, isSending, selectedFiles]);
+  }, [inputMessage, activeChannel, isSending, selectedFiles, teamId]);
 
   /**
    * Handle input change with typing indicator
