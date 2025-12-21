@@ -27,19 +27,17 @@ const TaskCard = ({ task, darkMode, onClick }) => {
     <div
       onClick={() => onClick?.(task)}
       className={`border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 ${
-        darkMode 
-          ? 'bg-dark-secondary border-[#171717] hover:border-gray-700' 
+        darkMode
+          ? 'bg-dark-secondary border-[#171717] hover:border-gray-700'
           : 'bg-white border-gray-200 hover:border-gray-400'
       }`}
     >
       <div className="flex items-start gap-3">
         <div className="mt-0.5">{getStatusIcon(task.status)}</div>
-        
         <div className="flex-1 min-w-0">
           <h3 className={`font-semibold mb-1 ${darkMode ? 'text-white' : 'text-gray-900'}`}>
             {task.title}
           </h3>
-          
           {task.description && (
             <p className={`text-sm mb-2 line-clamp-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               {task.description}
@@ -182,7 +180,6 @@ export default function MyTasksPage() {
 
   return (
     <div className="w-full min-h-full flex flex-col max-w-[1200px] mx-auto px-4 lg:px-6 xl:px-10">
-      
       {/* Header */}
       <div className="pt-12 pb-6">
         <h1 className={`text-3xl font-bold ${isDarkMode ? 'text-white' : 'text-black'}`}>
@@ -200,7 +197,6 @@ export default function MyTasksPage() {
         </div>
       ) : (
         <div className="pb-12 space-y-8">
-          
           {/* Overdue Tasks */}
           {overdueTasks.length > 0 && (
             <div>
@@ -269,9 +265,8 @@ export default function MyTasksPage() {
                 <h2 className={`text-xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
                   No Due Date
                 </h2>
-                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                  isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
-                }`}>
+                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'
+                  }`}>
                   {noDateTasks.length}
                 </span>
               </div>

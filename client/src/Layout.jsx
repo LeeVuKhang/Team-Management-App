@@ -9,8 +9,10 @@ export default function Layout() {
 
   // Determine active page based on route
   const getActivePage = () => {
-    if (location.pathname === '/') return 'dashboard';
-    if (location.pathname.startsWith('/project')) return 'projects';
+    if (location.pathname === '/dashboard') return 'dashboard';
+    if (location.pathname === '/my-tasks') return 'my-tasks';
+    if (location.pathname.includes('/chat')) return 'chat';
+    if (location.pathname.includes('/project')) return 'projects';
     return '';
   };
 
