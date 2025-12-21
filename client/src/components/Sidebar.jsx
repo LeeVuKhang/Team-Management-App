@@ -1,8 +1,11 @@
-import { LayoutDashboard, FolderKanban, Users, Settings, MessageSquare, Zap, Folder } from 'lucide-react';
+import { LayoutDashboard, FolderKanban, Users, Settings, MessageSquare, Zap, Folder, CheckSquare, MoreHorizontal } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { getUserTeams } from '../services/projectApi';
 import SidebarItem from './SidebarItem';
+
+// Maximum teams to display in sidebar before showing "See more"
+const MAX_VISIBLE_TEAMS = 4;
 
 export default function Sidebar({ darkMode, activePage }) {
   const bgSidebar = darkMode ? 'bg-dark-secondary border-[#171717]' : 'bg-white border-gray-200 shadow-sm';
@@ -15,6 +18,9 @@ export default function Sidebar({ darkMode, activePage }) {
   });
 
   const teams = teamsData?.data || [];
+  const visibleTeams = teams.slice(0, MAX_VISIBLE_TEAMS);
+  const hasMoreTeams = teams.length > MAX_VISIBLE_TEAMS;
+  const hiddenTeamsCount = teams.length - MAX_VISIBLE_TEAMS;
   
   // Determine which team to use for chat link
   // Priority: current teamId from route > first team from list > no team route
@@ -23,10 +29,10 @@ export default function Sidebar({ darkMode, activePage }) {
 
   return (
     <aside 
-      className={`w-16 hover:w-56 group ${bgSidebar} border-r flex flex-col transition-all duration-300 overflow-x-hidden`}
+      className={`w-16 hover:w-56 group ${bgSidebar} border-r flex flex-col transition-all duration-300 overflow-hidden`}
     >
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto overflow-x-hidden">
+      <nav className="flex-1 px-3 py-6 space-y-1 overflow-hidden">
         <Link to="/dashboard" className={`w-full flex items-center px-3 py-3 rounded-lg transition-all duration-200 group/item relative ${
           activePage === 'dashboard'
             ? darkMode
@@ -36,6 +42,16 @@ export default function Sidebar({ darkMode, activePage }) {
         }`}>
           <LayoutDashboard size={20} className="flex-shrink-0" />
           <span className="ml-3 font-medium text-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap overflow-hidden">Dashboard</span>
+        </Link>
+        <Link to="/my-tasks" className={`w-full flex items-center px-3 py-3 rounded-lg transition-all duration-200 group/item relative ${
+          activePage === 'my-tasks'
+            ? darkMode
+              ? 'bg-[#171717] text-white' 
+              : 'bg-gray-200 text-gray-900'
+            : `${darkMode ? 'text-gray-400 hover:bg-[#1F1F1F] hover:text-gray-200' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`
+        }`}>
+          <CheckSquare size={20} className="flex-shrink-0" />
+          <span className="ml-3 font-medium text-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap overflow-hidden">My Tasks</span>
         </Link>
         <Link to={chatLink} className={`w-full flex items-center px-3 py-3 rounded-lg transition-all duration-200 group/item relative ${
           activePage === 'chat'
@@ -69,36 +85,56 @@ export default function Sidebar({ darkMode, activePage }) {
             No teams found
           </div>
         ) : (
-          teams.map((team) => (
-            <Link 
-              key={team.id} 
-              to={`/teams/${team.id}`}
-              className={`w-full flex items-center px-3 py-2.5 text-sm rounded-lg transition-all ${
-                teamId === String(team.id)
-                  ? darkMode 
-                    ? 'bg-[#171717] text-white' 
-                    : 'bg-gray-200 text-gray-900'
-                  : darkMode 
-                    ? 'text-gray-400 hover:text-gray-200 hover:bg-[#1F1F1F]' 
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-              }`}
-              title={team.name}
-            >
-              <Folder size={18} className={`flex-shrink-0 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
-              <span className="ml-3 flex-1 truncate opacity-0 group-hover:opacity-100 transition-opacity">{team.name}</span>
-              {team.project_count > 0 && (
-                <span className={`text-[10px] px-1.5 py-0.5 rounded ml-auto opacity-0 group-hover:opacity-100 transition-opacity ${
+          <>
+            {visibleTeams.map((team) => (
+              <Link 
+                key={team.id} 
+                to={`/teams/${team.id}`}
+                className={`w-full flex items-center px-3 py-2.5 text-sm rounded-lg transition-all ${
                   teamId === String(team.id)
-                    ? 'bg-white/20'
-                    : darkMode
-                      ? 'bg-[#171717]'
-                      : 'bg-gray-200'
-                }`}>
-                  {team.project_count}
+                    ? darkMode 
+                      ? 'bg-[#171717] text-white' 
+                      : 'bg-gray-200 text-gray-900'
+                    : darkMode 
+                      ? 'text-gray-400 hover:text-gray-200 hover:bg-[#1F1F1F]' 
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+                title={team.name}
+              >
+                <Folder size={18} className={`flex-shrink-0 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
+                <span className="ml-3 flex-1 truncate opacity-0 group-hover:opacity-100 transition-opacity">{team.name}</span>
+                {team.project_count > 0 && (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded ml-auto opacity-0 group-hover:opacity-100 transition-opacity ${
+                    teamId === String(team.id)
+                      ? 'bg-white/20'
+                      : darkMode
+                        ? 'bg-[#171717]'
+                        : 'bg-gray-200'
+                  }`}>
+                    {team.project_count}
+                  </span>
+                )}
+              </Link>
+            ))}
+            
+            {/* See more button */}
+            {hasMoreTeams && (
+              <Link 
+                to="/dashboard"
+                className={`w-full flex items-center px-3 py-2.5 text-sm rounded-lg transition-all ${
+                  darkMode 
+                    ? 'text-gray-500 hover:text-gray-300 hover:bg-[#1F1F1F]' 
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                }`}
+                title={`View all ${teams.length} teams`}
+              >
+                <MoreHorizontal size={18} className="flex-shrink-0" />
+                <span className="ml-3 flex-1 truncate opacity-0 group-hover:opacity-100 transition-opacity">
+                  {hiddenTeamsCount} more teams
                 </span>
-              )}
-            </Link>
-          ))
+              </Link>
+            )}
+          </>
         )}
       </nav>
 
