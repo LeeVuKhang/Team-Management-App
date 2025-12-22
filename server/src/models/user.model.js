@@ -67,3 +67,74 @@ export const emailExists = async (email) => {
 
   return !!result;
 };
+
+/**
+ * Find user by Google ID
+ * @param {string} googleId - Google's unique user identifier
+ * @returns {Promise<Object|null>} User object or null
+ */
+export const findUserByGoogleId = async (googleId) => {
+  const [user] = await db`
+    SELECT id, username, email, avatar_url, google_id, auth_provider, created_at
+    FROM users
+    WHERE google_id = ${googleId}
+  `;
+
+  return user || null;
+};
+
+/**
+ * Create a new user via Google OAuth
+ * @param {Object} googleProfile - Profile data from Google
+ * @returns {Promise<Object>} Created user object
+ */
+export const createGoogleUser = async ({ googleId, username, email, avatarUrl }) => {
+  const [user] = await db`
+    INSERT INTO users (google_id, username, email, avatar_url, auth_provider, password_hash)
+    VALUES (${googleId}, ${username}, ${email.toLowerCase()}, ${avatarUrl}, 'google', NULL)
+    RETURNING id, username, email, avatar_url, google_id, auth_provider, created_at
+  `;
+
+  return user;
+};
+
+/**
+ * Link Google account to existing user
+ * @param {string} email - User's email
+ * @param {string} googleId - Google's unique user identifier
+ * @param {string|null} avatarUrl - Google avatar URL (optional)
+ * @returns {Promise<Object>} Updated user object
+ */
+export const linkGoogleAccount = async (email, googleId, avatarUrl = null) => {
+  const [user] = await db`
+    UPDATE users 
+    SET 
+      google_id = ${googleId}, 
+      avatar_url = COALESCE(avatar_url, ${avatarUrl}),
+      auth_provider = CASE 
+        WHEN password_hash IS NOT NULL THEN auth_provider 
+        ELSE 'google' 
+      END,
+      updated_at = NOW()
+    WHERE email = ${email.toLowerCase()}
+    RETURNING id, username, email, avatar_url, google_id, auth_provider, created_at
+  `;
+
+  return user;
+};
+
+/**
+ * Check if user can login with password
+ * (Users created via Google OAuth only cannot use password login)
+ * @param {string} email - User's email
+ * @returns {Promise<boolean>} True if user has a password set
+ */
+export const canLoginWithPassword = async (email) => {
+  const [result] = await db`
+    SELECT password_hash IS NOT NULL as has_password
+    FROM users
+    WHERE email = ${email.toLowerCase()}
+  `;
+
+  return result?.has_password || false;
+};
