@@ -1,4 +1,5 @@
 import express from 'express';
+import passport from 'passport';
 import * as AuthController from '../controllers/auth.controller.js';
 import { validate } from '../middlewares/validate.js';
 import { verifyToken } from '../middlewares/auth.js';
@@ -38,5 +39,33 @@ router.post('/logout', AuthController.logout);
  * @access Private (requires authentication)
  */
 router.get('/me', verifyToken, AuthController.getMe);
+
+/**
+ * ==========================================
+ * GOOGLE OAUTH ROUTES
+ * ==========================================
+ */
+
+/**
+ * @route GET /api/v1/auth/google
+ * @desc Initiate Google OAuth login flow
+ * @access Public
+ */
+router.get('/google', passport.authenticate('google', { 
+  scope: ['profile', 'email'] 
+}));
+
+/**
+ * @route GET /api/v1/auth/google/callback
+ * @desc Google OAuth callback - handles redirect from Google
+ * @access Public (called by Google)
+ */
+router.get('/google/callback',
+  passport.authenticate('google', { 
+    session: false, 
+    failureRedirect: '/login?error=google_auth_failed' 
+  }),
+  AuthController.googleCallback
+);
 
 export default router;
