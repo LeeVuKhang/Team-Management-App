@@ -476,6 +476,7 @@ export default function Signup() {
           </button>
           <button 
             type="button"
+            onClick={() => window.location.href = 'http://localhost:5000/api/v1/auth/github'}
             className="flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all hover:shadow-md hover:-translate-y-0.5 active:scale-95"
           >
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">

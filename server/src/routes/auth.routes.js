@@ -68,4 +68,32 @@ router.get('/google/callback',
   AuthController.googleCallback
 );
 
+/**
+ * ==========================================
+ * GITHUB OAUTH ROUTES
+ * ==========================================
+ */
+
+/**
+ * @route GET /api/v1/auth/github
+ * @desc Initiate GitHub OAuth login flow
+ * @access Public
+ */
+router.get('/github', passport.authenticate('github', { 
+  scope: ['user:email'] 
+}));
+
+/**
+ * @route GET /api/v1/auth/github/callback
+ * @desc GitHub OAuth callback - handles redirect from GitHub
+ * @access Public (called by GitHub)
+ */
+router.get('/github/callback',
+  passport.authenticate('github', { 
+    session: false, 
+    failureRedirect: '/login?error=github_auth_failed' 
+  }),
+  AuthController.githubCallback
+);
+
 export default router;

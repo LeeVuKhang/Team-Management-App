@@ -243,3 +243,55 @@ export const googleCallback = async (req, res, next) => {
     res.redirect(`${clientUrl}/login?error=token_generation_failed`);
   }
 };
+
+/**
+ * Handle GitHub OAuth callback
+ * @route GET /api/v1/auth/github/callback
+ * @desc Called after successful GitHub authentication
+ *       Creates JWT token and redirects to frontend
+ */
+export const githubCallback = async (req, res, next) => {
+  try {
+    // User data is attached by Passport from the GitHubStrategy callback
+    const user = req.user;
+
+    if (!user) {
+      console.error('❌ GitHub OAuth: No user data from Passport');
+      const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+      return res.redirect(`${clientUrl}/login?error=github_auth_failed`);
+    }
+
+    console.log('🔐 GitHub OAuth: Creating JWT for user:', user.email);
+
+    // Generate JWT token (same as regular login)
+    const token = jwt.sign(
+      { 
+        userId: user.id,
+        email: user.email 
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    );
+
+    // Set token in HTTP-only cookie (same as regular login)
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    // Redirect to frontend success page
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    
+    console.log('✅ GitHub OAuth: Redirecting to frontend...');
+    
+    // Redirect to dashboard (cookie is already set)
+    res.redirect(`${clientUrl}/dashboard`);
+
+  } catch (error) {
+    console.error('❌ GitHub OAuth Callback Error:', error.message);
+    const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    res.redirect(`${clientUrl}/login?error=token_generation_failed`);
+  }
+};
