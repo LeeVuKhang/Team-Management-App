@@ -4,11 +4,22 @@ CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(50) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255), 
+    password_hash VARCHAR(255),  -- NULLABLE: OAuth users don't have passwords
     avatar_url TEXT,
+
+    -- OAuth fields
+    google_id VARCHAR(255) UNIQUE,
+    github_id VARCHAR(255) UNIQUE,
+    auth_provider VARCHAR(50) DEFAULT 'local' NOT NULL CHECK (auth_provider IN ('local', 'google', 'github')),
+
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Indexes for OAuth lookups
+CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);
+CREATE INDEX IF NOT EXISTS idx_users_github_id ON users(github_id);
+CREATE INDEX IF NOT EXISTS idx_users_auth_provider ON users(auth_provider);
 
 -- 2. Bảng TEAMS (Workspaces)
 -- Đây là không gian làm việc chính 

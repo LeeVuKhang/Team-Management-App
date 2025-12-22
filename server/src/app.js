@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import passport from './config/passport.js';
 import routes from './routes/index.js';
 import internalRoutes from './routes/internal.routes.js';
 import { errorHandler } from './middlewares/error.js';
@@ -21,6 +22,9 @@ app.use(cors({
 // Parsing Middleware
 app.use(express.json());
 app.use(cookieParser()); // Essential for HTTP-only JWTs 
+
+// Passport Initialization (for Google OAuth)
+app.use(passport.initialize());
 
 // Routes
 app.use('/api/v1', routes);
