@@ -11,6 +11,7 @@ import ProjectPage from './ProjectPage.jsx';
 import AcceptInvitePage from './AcceptInvitePage.jsx';
 import ChatPage from './ChatPage.jsx';
 import MyTasksPage from './MyTasksPage.jsx';
+import ProfileSetting from './ProfileSetting.jsx';
 
 function App() {
   return (
@@ -46,6 +47,8 @@ function App() {
         <Route element={<Layout />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/my-tasks" element={<MyTasksPage />} />
+          <Route path="/profile" element={<ProfileSetting />} />
+          <Route path="/settings" element={<ProfileSetting />} />
           <Route path="/chat" element={<ChatPage />} />
           <Route path="/teams/:teamId/chat" element={<ChatPage />} />
           <Route path="/teams/:teamId" element={<TeamPage />} />

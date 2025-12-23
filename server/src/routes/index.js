@@ -8,6 +8,7 @@ import channelRoutes from './channel.routes.js';
 import riskReportRoutes from './riskReport.routes.js';
 import notificationRoutes from './notification.routes.js';
 import taskRoutes from './task.routes.js';
+import userRoutes from './user.routes.js';
 import { verifyToken } from '../middlewares/auth.js';
 import * as RiskReportController from '../controllers/riskReport.controller.js';
 import { validate } from '../middlewares/validate.js';
@@ -19,6 +20,7 @@ router.get('/health', (req, res) => res.status(200).json({ status: 'ok' }));
 
 // Mount routes
 router.use('/auth', authRoutes); // Authentication endpoints
+router.use('/users', userRoutes); // User profile endpoints (auth applied in route file)
 router.use('/teams', verifyToken, teamRoutes); // Protected routes
 router.use('/teams/:teamId/projects', verifyToken, teamProjectRouter); // Protected routes
 router.use('/teams/:teamId/channels', channelRoutes); // Channel/Message routes (real-time chat)

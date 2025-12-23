@@ -523,7 +523,13 @@ export default function Header({ isDarkMode, toggleDarkMode }) {
                 <span className="text-sm font-medium">My Tasks</span>
               </button>
               
-              <button className={`w-full flex items-center space-x-3 px-4 py-3 transition-colors ${isDarkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-700'}`}>
+              <button 
+                onClick={() => {
+                  setDropdownOpen(false);
+                  navigate('/profile');
+                }}
+                className={`w-full flex items-center space-x-3 px-4 py-3 transition-colors ${isDarkMode ? 'hover:bg-gray-800 text-gray-300' : 'hover:bg-gray-100 text-gray-700'}`}
+              >
                 <User size={16} />
                 <span className="text-sm font-medium">Profile Settings</span>
               </button>
