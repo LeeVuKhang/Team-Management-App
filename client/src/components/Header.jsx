@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Bell, Plus, Menu, Sun, Moon, FileText, LogOut, User, HelpCircle, Check, X, Clock, AlertTriangle, CheckCircle, Info, AlertCircle } from 'lucide-react';
 import { getSocket, disconnectSocket } from '../services/socketService';
@@ -193,12 +193,12 @@ export default function Header({ isDarkMode, toggleDarkMode }) {
   return (
     <header className={`h-16 backdrop-blur-md border-b flex items-center justify-between px-6 sticky top-0 z-10 transition-colors duration-300 ${bgHeader}`}>
       <div className="flex items-center space-x-4">
-        <div className="flex items-center space-x-3">
+        <Link to="/dashboard" className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
           <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${isDarkMode ? 'bg-[#171717]' : 'bg-gray-200'}`}>
             <span className={`font-bold text-lg ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>T</span>
           </div>
           <span className={`text-xl font-bold tracking-tight ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Team Hub</span>
-        </div>
+        </Link>
       </div>
 
       {/* Center: Search Bar */}
