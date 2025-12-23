@@ -12,6 +12,7 @@ import AcceptInvitePage from './AcceptInvitePage.jsx';
 import ChatPage from './ChatPage.jsx';
 import MyTasksPage from './MyTasksPage.jsx';
 import ProfileSetting from './ProfileSetting.jsx';
+import HelpSupport from './HelpSupport.jsx';
 
 function App() {
   return (
@@ -53,6 +54,7 @@ function App() {
           <Route path="/teams/:teamId/chat" element={<ChatPage />} />
           <Route path="/teams/:teamId" element={<TeamPage />} />
           <Route path="/teams/:teamId/projects/:projectId" element={<ProjectPage />} />
+          <Route path="/help" element={<HelpSupport />} />
         </Route>
       </Routes>
     </BrowserRouter>
